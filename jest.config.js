@@ -4,7 +4,7 @@ module.exports = {
     "^.+\\.(js|jsx|ts|tsx)$": "babel-jest",
   },
   transformIgnorePatterns: [
-    "node_modules/(?!(react-native|@react-native|@react-navigation|expo|@expo|@unimodules|unimodules|sentry-expo|native-base|react-native-svg|react-native-markdown-display|@testing-library)/)",
+    "node_modules/(?!(react-native|@react-native|@react-navigation|expo|@expo|@unimodules|unimodules|sentry-expo|native-base|react-native-svg|react-native-markdown-display)/)",
   ],
   setupFilesAfterEnv: ["<rootDir>/jest-setup.ts"],
   collectCoverageFrom: [

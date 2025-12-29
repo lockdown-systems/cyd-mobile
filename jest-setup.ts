@@ -1,34 +1,47 @@
-// Note: @testing-library/jest-native is deprecated.
-// The matchers are now built into @testing-library/react-native v12.4+
-// No need to import extend-expect separately
+// Jest setup file for mocking React Native and Expo modules
+// This enables testing components in a Node.js environment
 
-// Mock React Native entirely to avoid Flow type issues
-jest.mock("react-native", () => ({
-  StyleSheet: {
-    create: (styles: any) => styles,
-    hairlineWidth: 1,
-  },
-  View: "View",
-  Text: "Text",
-  Dimensions: {
-    get: jest.fn(() => ({ height: 800, width: 400 })),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-  },
-  Platform: {
-    OS: "ios",
-    select: (obj: any) => obj.ios || obj.default,
-  },
-  Animated: {
-    Value: jest.fn(() => ({
-      setValue: jest.fn(),
-      interpolate: jest.fn(() => ({ interpolate: jest.fn() })),
-    })),
-    timing: jest.fn(() => ({ start: jest.fn() })),
-    spring: jest.fn(() => ({ start: jest.fn() })),
-    View: "Animated.View",
-  },
-}));
+// Mock React Native entirely with proper functional components
+jest.mock("react-native", () => {
+  const React = require("react");
+
+  // Create proper functional component mocks for React Native primitives
+  const createMockComponent = (name: string) => {
+    const Component = React.forwardRef(
+      ({ children, ...props }: any, ref: any) =>
+        React.createElement(name, { ...props, ref }, children)
+    );
+    Component.displayName = name;
+    return Component;
+  };
+
+  return {
+    StyleSheet: {
+      create: (styles: any) => styles,
+      hairlineWidth: 1,
+    },
+    View: createMockComponent("View"),
+    Text: createMockComponent("Text"),
+    Dimensions: {
+      get: jest.fn(() => ({ height: 800, width: 400 })),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    },
+    Platform: {
+      OS: "ios",
+      select: (obj: any) => obj.ios || obj.default,
+    },
+    Animated: {
+      Value: jest.fn(() => ({
+        setValue: jest.fn(),
+        interpolate: jest.fn(() => ({ interpolate: jest.fn() })),
+      })),
+      timing: jest.fn(() => ({ start: jest.fn() })),
+      spring: jest.fn(() => ({ start: jest.fn() })),
+      View: createMockComponent("Animated.View"),
+    },
+  };
+});
 
 // Mock expo-router
 jest.mock("expo-router", () => ({
