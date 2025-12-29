@@ -80,6 +80,16 @@ jest.mock("expo-sqlite", () => ({
   ),
 }));
 
+// Mock expo-crypto
+jest.mock("expo-crypto", () => {
+  let counter = 0;
+  const nextUuid = () => `mocked-uuid-${counter++}`;
+  return {
+    randomUUID: jest.fn(() => nextUuid()),
+    randomUUIDAsync: jest.fn(async () => nextUuid()),
+  };
+});
+
 // Mock expo-file-system
 jest.mock("expo-file-system", () => ({
   documentDirectory: "/mock/document/directory/",

@@ -1,16 +1,8 @@
+import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
-
-// Helper to generate UUID v4
-function generateUUID(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
 
 /**
  * Abstract base class for account controllers.
@@ -26,7 +18,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
   constructor(accountId: number, accountUUID?: string) {
     this.accountId = accountId;
     // If UUID not provided, generate one (will be overwritten when fetched from DB)
-    this.accountUUID = accountUUID ?? generateUUID();
+    this.accountUUID = accountUUID ?? Crypto.randomUUID();
     this._progress = this.resetProgress();
   }
 
