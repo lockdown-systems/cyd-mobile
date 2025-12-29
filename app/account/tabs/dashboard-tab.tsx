@@ -51,7 +51,7 @@ export function DashboardTab({
 }: AccountTabProps) {
   return (
     <>
-      <SpeechBubble message="It's _you're_ data. What do you want to do with it?" />
+      <SpeechBubble message="It's your data.\n\n**What do you want to do with it?**" />
       <ScrollView
         contentContainerStyle={[styles.grid, { paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}

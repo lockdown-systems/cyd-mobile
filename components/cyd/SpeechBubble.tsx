@@ -43,6 +43,20 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
     [palette.text, palette.tint]
   );
 
+  const normalizedMessage = useMemo(() => {
+    // Treat both literal "\n" sequences and actual newline characters as line breaks.
+    const withActualBreaks = message
+      .replace(/\\n/g, "\n")
+      .replace(/\r\n?|\u2028|\u2029/g, "\n");
+
+    // Preserve blank lines (paragraph breaks) while converting single newlines into
+    // Markdown hard-break syntax so SpeechBubble callers can rely on "\n" for layout.
+    return withActualBreaks
+      .split("\n\n")
+      .map((paragraph) => paragraph.replace(/\n/g, "  \n"))
+      .join("\n\n");
+  }, [message]);
+
   return (
     <View
       style={[styles.wrapper, { minHeight: BUBBLE_MIN_HEIGHT }]}
@@ -59,7 +73,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
           },
         ]}
       >
-        <Markdown style={markdownStyles}>{message}</Markdown>
+        <Markdown style={markdownStyles}>{normalizedMessage}</Markdown>
       </View>
     </View>
   );

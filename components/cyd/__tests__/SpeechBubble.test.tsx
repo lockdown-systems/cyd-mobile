@@ -101,6 +101,14 @@ describe("SpeechBubble", () => {
         })
       ).not.toThrow();
     });
+
+    it("should accept escaped newline sequences", () => {
+      expect(() =>
+        React.createElement(SpeechBubble, {
+          message: "Line A\\nLine B\\nLine C",
+        })
+      ).not.toThrow();
+    });
   });
 
   describe("theming", () => {
