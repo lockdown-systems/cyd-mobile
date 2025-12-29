@@ -1,24 +1,26 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 export interface MockDatabase {
-  execSync: jest.Mock;
-  getAllSync: jest.Mock;
-  getFirstSync: jest.Mock;
-  runSync: jest.Mock;
-  closeSync: jest.Mock;
-  withTransactionSync: jest.Mock;
+  execAsync: jest.Mock;
+  getAllAsync: jest.Mock;
+  getFirstAsync: jest.Mock;
+  runAsync: jest.Mock;
+  closeAsync: jest.Mock;
+  withTransactionAsync: jest.Mock;
 }
 
 export function createMockDatabase(
-  overrides?: Partial<MockDatabase>,
+  overrides?: Partial<MockDatabase>
 ): SQLiteDatabase {
   const mockDb: MockDatabase = {
-    execSync: jest.fn(),
-    getAllSync: jest.fn(() => []),
-    getFirstSync: jest.fn(() => null),
-    runSync: jest.fn(() => ({ changes: 0, lastInsertRowId: 0 })),
-    closeSync: jest.fn(),
-    withTransactionSync: jest.fn((callback) => callback()),
+    execAsync: jest.fn(),
+    getAllAsync: jest.fn(() => Promise.resolve([])),
+    getFirstAsync: jest.fn(() => Promise.resolve(null)),
+    runAsync: jest.fn(() =>
+      Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+    ),
+    closeAsync: jest.fn(() => Promise.resolve()),
+    withTransactionAsync: jest.fn((callback) => callback()),
     ...overrides,
   };
 
@@ -27,8 +29,12 @@ export function createMockDatabase(
 
 export function createMockDatabaseWithData<T>(data: T[]): SQLiteDatabase {
   return createMockDatabase({
-    getAllSync: jest.fn(() => data),
-    getFirstSync: jest.fn(() => (data.length > 0 ? data[0] : null)),
-    runSync: jest.fn(() => ({ changes: data.length, lastInsertRowId: 1 })),
+    getAllAsync: jest.fn(() => Promise.resolve(data)),
+    getFirstAsync: jest.fn(() =>
+      Promise.resolve(data.length > 0 ? data[0] : null)
+    ),
+    runAsync: jest.fn(() =>
+      Promise.resolve({ changes: data.length, lastInsertRowId: 1 })
+    ),
   });
 }

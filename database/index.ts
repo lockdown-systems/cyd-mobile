@@ -1,4 +1,4 @@
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite/next";
+import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import { migrations } from "./migrations";
 
@@ -21,7 +21,7 @@ async function openAndMigrate(): Promise<SQLiteDatabase> {
 
 async function applyPendingMigrations(db: SQLiteDatabase) {
   const versionRow = await db.getFirstAsync<{ user_version: number }>(
-    "PRAGMA user_version;",
+    "PRAGMA user_version;"
   );
   const currentVersion = versionRow?.user_version ?? 0;
 

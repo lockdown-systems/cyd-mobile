@@ -1,5 +1,5 @@
 import * as FileSystem from "expo-file-system";
-import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite";
+import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
 
@@ -100,19 +100,19 @@ export abstract class BaseAccountController<TProgress = unknown> {
     const dbPath = `${this.getAccountType()}-accounts/${
       this.accountUUID
     }/data.sqlite3`;
-    const db = openDatabaseSync(dbPath);
-    db.execSync("PRAGMA foreign_keys = ON;");
+    const db = await openDatabaseAsync(dbPath);
+    await db.execAsync("PRAGMA foreign_keys = ON;");
     return db;
   }
 
   /**
    * Get the current schema version of the account database
    */
-  protected getSchemaVersion(): number {
+  protected async getSchemaVersion(): Promise<number> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
-    const result = this.db.getFirstSync<{ user_version: number }>(
+    const result = await this.db.getFirstAsync<{ user_version: number }>(
       "PRAGMA user_version;"
     );
     return result?.user_version ?? 0;
@@ -121,11 +121,11 @@ export abstract class BaseAccountController<TProgress = unknown> {
   /**
    * Set the schema version of the account database
    */
-  protected setSchemaVersion(version: number): void {
+  protected async setSchemaVersion(version: number): Promise<void> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
-    this.db.execSync(`PRAGMA user_version = ${version};`);
+    await this.db.execAsync(`PRAGMA user_version = ${version};`);
   }
 
   /**
@@ -135,7 +135,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
-    const result = this.db.getFirstSync<{ value: string }>(
+    const result = await this.db.getFirstAsync<{ value: string }>(
       "SELECT value FROM config WHERE key = ?;",
       [key]
     );
@@ -149,7 +149,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
-    this.db.runSync(
+    await this.db.runAsync(
       `INSERT INTO config (key, value) VALUES (?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
       [key, value]
@@ -163,7 +163,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     if (!this.db) {
       throw new Error("Database not initialized");
     }
-    this.db.runSync("DELETE FROM config WHERE key = ?;", [key]);
+    await this.db.runAsync("DELETE FROM config WHERE key = ?;", [key]);
   }
 
   /**
@@ -184,7 +184,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
    */
   async cleanup(): Promise<void> {
     if (this.db) {
-      this.db.closeSync();
+      await this.db.closeAsync();
       this.db = null;
     }
   }

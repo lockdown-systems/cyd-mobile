@@ -66,14 +66,18 @@ jest.mock("expo-router", () => ({
 
 // Mock expo-sqlite
 jest.mock("expo-sqlite", () => ({
-  openDatabaseSync: jest.fn(() => ({
-    execSync: jest.fn(),
-    getAllSync: jest.fn(() => []),
-    getFirstSync: jest.fn(() => null),
-    runSync: jest.fn(() => ({ changes: 0, lastInsertRowId: 0 })),
-    closeSync: jest.fn(),
-    withTransactionSync: jest.fn((callback) => callback()),
-  })),
+  openDatabaseAsync: jest.fn(() =>
+    Promise.resolve({
+      execAsync: jest.fn(() => Promise.resolve()),
+      getAllAsync: jest.fn(() => Promise.resolve([])),
+      getFirstAsync: jest.fn(() => Promise.resolve(null)),
+      runAsync: jest.fn(() =>
+        Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+      ),
+      closeAsync: jest.fn(() => Promise.resolve()),
+      withTransactionAsync: jest.fn((callback) => callback()),
+    })
+  ),
 }));
 
 // Mock expo-file-system

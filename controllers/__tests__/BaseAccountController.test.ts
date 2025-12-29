@@ -102,10 +102,10 @@ describe("BaseAccountController", () => {
   describe("cleanup", () => {
     it("should close the database connection", async () => {
       const controller = new TestAccountController(1);
-      const mockClose = jest.fn();
+      const mockClose = jest.fn(() => Promise.resolve());
 
       controller.mockDb = {
-        closeSync: mockClose,
+        closeAsync: mockClose,
       };
 
       await controller.initDB();

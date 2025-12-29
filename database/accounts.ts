@@ -1,6 +1,6 @@
 import type { AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
-import type { SQLiteDatabase } from "expo-sqlite/next";
+import type { SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "./index";
 
@@ -36,7 +36,7 @@ export async function listAccounts(): Promise<AccountListItem[]> {
     `SELECT a.id, a.uuid, a.sortOrder, a.type, a.bskyAccountID, b.handle, b.displayName, b.avatarDataURI, b.did
      FROM account a
      INNER JOIN bsky_account b ON b.id = a.bskyAccountID
-     ORDER BY a.sortOrder ASC, a.id ASC;`,
+     ORDER BY a.sortOrder ASC, a.id ASC;`
   );
 
   return rows.map((row) => ({
@@ -52,7 +52,7 @@ export async function listAccounts(): Promise<AccountListItem[]> {
 }
 
 export async function createBlueskyAccount(
-  params: CreateBlueskyAccountParams,
+  params: CreateBlueskyAccountParams
 ): Promise<AccountListItem> {
   const db = await getDatabase();
   return createBlueskyAccountWithDb(db, params);
@@ -60,7 +60,7 @@ export async function createBlueskyAccount(
 
 async function createBlueskyAccountWithDb(
   db: SQLiteDatabase,
-  params: CreateBlueskyAccountParams,
+  params: CreateBlueskyAccountParams
 ): Promise<AccountListItem> {
   const now = Date.now();
   const postsCount = params.postsCount ?? 0;
@@ -93,7 +93,7 @@ async function createBlueskyAccountWithDb(
         params.accessJwt ?? null,
         params.refreshJwt ?? null,
         params.sessionJson ?? null,
-      ],
+      ]
     );
 
     const bskyAccountID = bskyResult.lastInsertRowId;
@@ -103,7 +103,7 @@ async function createBlueskyAccountWithDb(
     const accountResult = await db.runAsync(
       `INSERT INTO account (uuid, sortOrder, type, bskyAccountID)
        VALUES (?, ?, 'bluesky', ?);`,
-      [uuid, sortOrder ?? 0, bskyAccountID],
+      [uuid, sortOrder ?? 0, bskyAccountID]
     );
 
     createdAccount = {
@@ -127,7 +127,7 @@ async function createBlueskyAccountWithDb(
 
 async function getNextSortOrder(db: SQLiteDatabase): Promise<number> {
   const row = await db.getFirstAsync<{ nextOrder: number }>(
-    "SELECT COALESCE(MAX(sortOrder), -1) + 1 AS nextOrder FROM account;",
+    "SELECT COALESCE(MAX(sortOrder), -1) + 1 AS nextOrder FROM account;"
   );
   return row?.nextOrder ?? 0;
 }
@@ -150,7 +150,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
 
     const existing = await db.getFirstAsync<{ id: number }>(
       `SELECT id FROM bsky_account WHERE did = ? OR handle = ? LIMIT 1;`,
-      [session.did, profile.handle],
+      [session.did, profile.handle]
     );
 
     let bskyAccountID: number;
@@ -180,7 +180,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
           persistedRefreshJwt,
           sessionJson,
           existing.id,
-        ],
+        ]
       );
       bskyAccountID = existing.id;
     } else {
@@ -210,14 +210,14 @@ export async function saveAuthenticatedBlueskyAccount(params: {
           persistedAccessJwt,
           persistedRefreshJwt,
           sessionJson,
-        ],
+        ]
       );
       bskyAccountID = insert.lastInsertRowId;
     }
 
     const existingAccount = await db.getFirstAsync<{ id: number }>(
       `SELECT id FROM account WHERE bskyAccountID = ?;`,
-      [bskyAccountID],
+      [bskyAccountID]
     );
 
     if (!existingAccount) {
@@ -225,7 +225,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
       await db.runAsync(
         `INSERT INTO account (uuid, sortOrder, type, bskyAccountID)
          VALUES (?, ?, 'bluesky', ?);`,
-        [createUUID(), sortOrder, bskyAccountID],
+        [createUUID(), sortOrder, bskyAccountID]
       );
     }
 
@@ -237,7 +237,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
        INNER JOIN bsky_account b ON b.id = a.bskyAccountID
        WHERE b.id = ?
        LIMIT 1;`,
-      [bskyAccountID],
+      [bskyAccountID]
     );
 
     if (!row) {

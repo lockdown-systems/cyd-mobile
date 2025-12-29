@@ -2,13 +2,17 @@ const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
 
-config.transformer.babelTransformerPath = require.resolve(
-  "react-native-svg-transformer",
-);
-config.resolver.assetExts = config.resolver.assetExts.filter(
-  (ext) => ext !== "svg",
-);
-config.resolver.sourceExts.push("svg");
+// Handle SVG files - use inline requires for the transformer
+const { transformer, resolver } = config;
+config.transformer = {
+  ...transformer,
+  babelTransformerPath: require.resolve("react-native-svg-transformer/expo"),
+};
+config.resolver = {
+  ...resolver,
+  assetExts: resolver.assetExts.filter((ext) => ext !== "svg"),
+  sourceExts: [...resolver.sourceExts, "svg"],
+};
 
 // Prefer "react-native" then "browser" exports.
 // This ensures we get the browser version of "jose" (which uses WebCrypto)
@@ -25,12 +29,12 @@ const originalGetTransformOptions = config.transformer.getTransformOptions;
 config.transformer.getTransformOptions = async (
   entryFiles,
   options,
-  getDependenciesOf,
+  getDependenciesOf
 ) => {
   const result = await originalGetTransformOptions(
     entryFiles,
     options,
-    getDependenciesOf,
+    getDependenciesOf
   );
   return result;
 };
