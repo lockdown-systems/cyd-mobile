@@ -2,7 +2,7 @@
  * @fileoverview Tests for BlueskyAccountController
  */
 
-import type { AppBskyFeedGetAuthorFeed } from "@atproto/api";
+import type { Agent, AppBskyFeedGetAuthorFeed } from "@atproto/api";
 
 import {
   createMockDatabase,
@@ -156,14 +156,14 @@ describe("BlueskyAccountController", () => {
       const getAuthorFeed = jest.fn();
       const controllerState = controller as unknown as {
         db: ReturnType<typeof createMockDatabase>;
-        agent: any;
+        agent: Agent | null;
         did: string | null;
         handle: string | null;
       };
       controllerState.db = mockDb;
       controllerState.did = "did:plc:test";
       controllerState.handle = "user.test";
-      controllerState.agent = {
+      const mockAgent = {
         app: {
           bsky: {
             feed: {
@@ -171,7 +171,8 @@ describe("BlueskyAccountController", () => {
             },
           },
         },
-      };
+      } as unknown as Agent;
+      controllerState.agent = mockAgent;
 
       const page1 = [createFeedPost(1)];
       const page2 = [createFeedPost(2)];
@@ -207,12 +208,12 @@ describe("BlueskyAccountController", () => {
       const controller = new BlueskyAccountController(1);
       const getAuthorFeed = jest.fn();
       const controllerState = controller as unknown as {
-        agent: any;
+        agent: Agent | null;
         did: string | null;
       };
       controllerState.agent = {
         app: { bsky: { feed: { getAuthorFeed } } },
-      };
+      } as unknown as Agent;
       controllerState.did = "did:plc:test";
 
       await expect(controller.indexPosts()).rejects.toThrow(
