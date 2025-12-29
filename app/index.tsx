@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
@@ -5,18 +6,17 @@ import {
   Image,
   Linking,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
   View,
-  RefreshControl,
 } from "react-native";
-import { useRouter } from "expo-router";
 
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
-import type { AccountListItem } from "@/database/accounts";
 import { Colors } from "@/constants/theme";
+import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
@@ -30,22 +30,26 @@ export default function AccountSelectionScreen() {
   const router = useRouter();
 
   const handleAddAccount = useCallback(() => {
-    router.push("/add-account");
+    void router.push("/add-account");
   }, [router]);
 
   const handleSelectAccount = useCallback(
     (account: AccountListItem) => {
-      router.push({
+      void router.push({
         pathname: "/account/[accountId]",
         params: { accountId: account.uuid },
       });
     },
-    [router],
+    [router]
   );
 
+  const handleRefresh = useCallback(() => {
+    void refresh();
+  }, [refresh]);
+
   const handleOpenDesktop = useCallback(() => {
-    Linking.openURL(CYD_DESKTOP_URL).catch((err) =>
-      console.warn("Unable to open URL", err),
+    void Linking.openURL(CYD_DESKTOP_URL).catch((err) =>
+      console.warn("Unable to open URL", err)
     );
   }, []);
 
@@ -57,7 +61,7 @@ export default function AccountSelectionScreen() {
         onSelect={handleSelectAccount}
       />
     ),
-    [palette, handleSelectAccount],
+    [palette, handleSelectAccount]
   );
 
   const listEmpty = useMemo(() => {
@@ -119,7 +123,7 @@ export default function AccountSelectionScreen() {
             refreshControl={
               <RefreshControl
                 refreshing={loading}
-                onRefresh={refresh}
+                onRefresh={handleRefresh}
                 tintColor={palette.icon}
               />
             }

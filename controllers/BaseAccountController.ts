@@ -1,5 +1,6 @@
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system";
+import { Paths } from "expo-file-system";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
@@ -63,7 +64,26 @@ export abstract class BaseAccountController<TProgress = unknown> {
    */
   protected getAccountDirectory(): string {
     const type = this.getAccountType();
-    return `${FileSystem.documentDirectory}${type}-accounts/${this.accountUUID}/`;
+    const legacyFs = FileSystem as typeof FileSystem & {
+      documentDirectory?: string | null;
+      cacheDirectory?: string | null;
+    };
+
+    const documentUri =
+      Paths?.document?.uri ??
+      legacyFs.documentDirectory ??
+      Paths?.cache?.uri ??
+      legacyFs.cacheDirectory;
+
+    if (!documentUri) {
+      throw new Error("Unable to resolve a writable document directory");
+    }
+
+    const normalizedUri = documentUri.endsWith("/")
+      ? documentUri
+      : `${documentUri}/`;
+
+    return `${normalizedUri}${type}-accounts/${this.accountUUID}/`;
   }
 
   /**

@@ -1,6 +1,6 @@
-import { Dimensions, StyleSheet, View } from "react-native";
 import { useMemo } from "react";
-import Markdown from "react-native-markdown-display";
+import { Dimensions, StyleSheet, View } from "react-native";
+import Markdown, { type MarkdownProps } from "react-native-markdown-display";
 
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -20,7 +20,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
   const palette = Colors[colorScheme];
   const bubbleBackground = colorScheme === "dark" ? "#202020ff" : "#f3f3f3";
   const bubbleBorder = colorScheme === "dark" ? "#404040" : "#e0e0e0";
-  const markdownStyles = useMemo(
+  const markdownStyles = useMemo<MarkdownProps["style"]>(
     () => ({
       body: {
         fontSize: 18,
@@ -40,7 +40,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
         color: palette.tint,
       },
     }),
-    [palette.text, palette.tint],
+    [palette.text, palette.tint]
   );
 
   return (
@@ -59,7 +59,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
           },
         ]}
       >
-        <Markdown style={markdownStyles as any}>{message}</Markdown>
+        <Markdown style={markdownStyles}>{message}</Markdown>
       </View>
     </View>
   );

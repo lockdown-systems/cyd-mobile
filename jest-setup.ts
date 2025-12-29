@@ -1,23 +1,25 @@
 // Jest setup file for mocking React Native and Expo modules
 // This enables testing components in a Node.js environment
 
+import React, { type ReactNode } from "react";
+
+type MockProps = Record<string, unknown> & { children?: ReactNode };
+type PlatformSelectOptions<T> = Partial<Record<string, T>> & { default?: T };
+
+const createMockComponent = (name: string) => {
+  const Component = React.forwardRef<unknown, MockProps>(
+    ({ children, ...props }, ref) =>
+      React.createElement(name, { ...props, ref }, children)
+  );
+  Component.displayName = name;
+  return Component;
+};
+
 // Mock React Native entirely with proper functional components
 jest.mock("react-native", () => {
-  const React = require("react");
-
-  // Create proper functional component mocks for React Native primitives
-  const createMockComponent = (name: string) => {
-    const Component = React.forwardRef(
-      ({ children, ...props }: any, ref: any) =>
-        React.createElement(name, { ...props, ref }, children)
-    );
-    Component.displayName = name;
-    return Component;
-  };
-
   return {
     StyleSheet: {
-      create: (styles: any) => styles,
+      create: <T extends Record<string, unknown>>(styles: T): T => styles,
       hairlineWidth: 1,
     },
     View: createMockComponent("View"),
@@ -29,7 +31,8 @@ jest.mock("react-native", () => {
     },
     Platform: {
       OS: "ios",
-      select: (obj: any) => obj.ios || obj.default,
+      select: <T>(options: PlatformSelectOptions<T>): T | undefined =>
+        options.ios ?? options.native ?? options.default,
     },
     Animated: {
       Value: jest.fn(() => ({
@@ -75,7 +78,9 @@ jest.mock("expo-sqlite", () => ({
         Promise.resolve({ changes: 0, lastInsertRowId: 0 })
       ),
       closeAsync: jest.fn(() => Promise.resolve()),
-      withTransactionAsync: jest.fn((callback) => callback()),
+      withTransactionAsync: jest.fn(
+        async (callback: () => Promise<unknown> | unknown) => await callback()
+      ),
     })
   ),
 }));
@@ -86,7 +91,7 @@ jest.mock("expo-crypto", () => {
   const nextUuid = () => `mocked-uuid-${counter++}`;
   return {
     randomUUID: jest.fn(() => nextUuid()),
-    randomUUIDAsync: jest.fn(async () => nextUuid()),
+    randomUUIDAsync: jest.fn(() => Promise.resolve(nextUuid())),
   };
 });
 
@@ -94,6 +99,10 @@ jest.mock("expo-crypto", () => {
 jest.mock("expo-file-system", () => ({
   documentDirectory: "/mock/document/directory/",
   cacheDirectory: "/mock/cache/directory/",
+  Paths: {
+    document: { uri: "file:///mock/document/directory/" },
+    cache: { uri: "file:///mock/cache/directory/" },
+  },
   makeDirectoryAsync: jest.fn(),
   deleteAsync: jest.fn(),
   getInfoAsync: jest.fn(() => Promise.resolve({ exists: false })),

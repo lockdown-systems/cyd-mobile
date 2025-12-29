@@ -6,6 +6,7 @@ import {
   AppBskyFeedRepost,
 } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
+import type { HeadersMap } from "@atproto/xrpc";
 
 import { getDatabase } from "@/database";
 import {
@@ -67,6 +68,8 @@ type FeedPostView = FeedViewPost["post"];
 type FeedRecordInfo =
   | { kind: "post"; record: AppBskyFeedPost.Record }
   | { kind: "repost"; record: AppBskyFeedRepost.Record };
+
+type ResponseHeaders = Headers | HeadersMap | undefined;
 
 /**
  * Database statistics for the account
@@ -441,19 +444,32 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   /**
    * Update rate limit info from API response headers
    */
-  private updateRateLimitFromHeaders(headers: Headers | undefined): void {
-    if (!headers) return;
-
-    const limit = headers.get("ratelimit-limit");
-    const remaining = headers.get("ratelimit-remaining");
-    const reset = headers.get("ratelimit-reset");
+  private updateRateLimitFromHeaders(headers: ResponseHeaders): void {
+    const limit = this.getHeaderValue(headers, "ratelimit-limit");
+    const remaining = this.getHeaderValue(headers, "ratelimit-remaining");
+    const reset = this.getHeaderValue(headers, "ratelimit-reset");
 
     if (limit) this.rateLimitInfo.limit = parseInt(limit, 10);
     if (remaining) this.rateLimitInfo.remaining = parseInt(remaining, 10);
     if (reset) this.rateLimitInfo.resetAt = parseInt(reset, 10);
 
-    // Notify UI of rate limit status
-    this.rateLimitCallback?.(this.rateLimitInfo);
+    if (limit || remaining || reset) {
+      this.rateLimitCallback?.(this.rateLimitInfo);
+    }
+  }
+
+  private getHeaderValue(headers: ResponseHeaders, key: string): string | null {
+    if (!headers) {
+      return null;
+    }
+
+    if (headers instanceof Headers) {
+      return headers.get(key);
+    }
+
+    const normalizedKey = key.toLowerCase();
+    const value = headers[key] ?? headers[normalizedKey];
+    return value ?? null;
   }
 
   /**
@@ -491,12 +507,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     let resetAt = this.rateLimitInfo.resetAt;
 
     if (error && typeof error === "object") {
-      const err = error as { headers?: Headers };
-      if (err.headers) {
-        const reset = err.headers.get("ratelimit-reset");
-        if (reset) {
-          resetAt = parseInt(reset, 10);
-        }
+      const err = error as { headers?: Headers | HeadersMap };
+      const reset = this.getHeaderValue(err.headers, "ratelimit-reset");
+      if (reset) {
+        resetAt = parseInt(reset, 10);
       }
     }
 
@@ -579,7 +593,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Automatically waits and retries when rate limited.
    */
   protected async makeApiRequest<T>(
-    requestFn: () => Promise<{ data: T; headers?: Headers }>
+    requestFn: () => Promise<{ data: T; headers?: Headers | HeadersMap }>
   ): Promise<T> {
     // Check if we're already rate limited before making request
     if (this.rateLimitInfo.isLimited) {
@@ -590,9 +604,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       const response = await this.makeAuthenticatedRequest(requestFn);
 
       // Update rate limit tracking from response headers
-      if (response.headers) {
-        this.updateRateLimitFromHeaders(response.headers);
-      }
+      this.updateRateLimitFromHeaders(response.headers);
 
       return response.data;
     } catch (error) {
@@ -840,12 +852,24 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     );
   }
 
+  private isPostRecord(
+    record: FeedPostView["record"]
+  ): record is AppBskyFeedPost.Record {
+    return AppBskyFeedPost.isRecord(record as Record<string, unknown>);
+  }
+
+  private isRepostRecord(
+    record: FeedPostView["record"]
+  ): record is AppBskyFeedRepost.Record {
+    return AppBskyFeedRepost.isRecord(record as Record<string, unknown>);
+  }
+
   private getRecordInfo(record: FeedPostView["record"]): FeedRecordInfo | null {
-    if (AppBskyFeedPost.isRecord(record)) {
+    if (this.isPostRecord(record)) {
       return { kind: "post", record };
     }
 
-    if (AppBskyFeedRepost.isRecord(record)) {
+    if (this.isRepostRecord(record)) {
       return { kind: "repost", record };
     }
 

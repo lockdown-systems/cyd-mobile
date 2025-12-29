@@ -1,3 +1,4 @@
+import { Stack, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -10,7 +11,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, useRouter } from "expo-router";
 
 import { Colors } from "@/constants/theme";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -38,7 +38,7 @@ export default function AddAccountScreen() {
     }
 
     const existingAccount = accounts.find(
-      (account) => normalizeHandle(account.handle) === normalizedHandle,
+      (account) => normalizeHandle(account.handle) === normalizedHandle
     );
 
     if (existingAccount) {
@@ -118,7 +118,9 @@ export default function AddAccountScreen() {
               ]}
               returnKeyType="go"
               editable={!submitting}
-              onSubmitEditing={onAuthenticate}
+              onSubmitEditing={() => {
+                void onAuthenticate();
+              }}
             />
           </View>
 
@@ -129,7 +131,9 @@ export default function AddAccountScreen() {
           ) : null}
 
           <Pressable
-            onPress={onAuthenticate}
+            onPress={() => {
+              void onAuthenticate();
+            }}
             disabled={!canSubmit}
             style={({ pressed }) => [
               styles.primaryButton,
