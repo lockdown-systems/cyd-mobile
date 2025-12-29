@@ -243,6 +243,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
+   * Get the current rate limit info
+   */
+  getRateLimitInfo(): RateLimitInfo {
+    return { ...this.rateLimitInfo };
+  }
+
+  /**
    * Get the DID for this account
    */
   getDid(): string | null {
@@ -417,14 +424,184 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     return stats;
   }
 
+  // ==================== Rate Limit & Session Handling ====================
+
+  /**
+   * Update rate limit info from API response headers
+   */
+  private updateRateLimitFromHeaders(headers: Headers | undefined): void {
+    if (!headers) return;
+
+    const limit = headers.get("ratelimit-limit");
+    const remaining = headers.get("ratelimit-remaining");
+    const reset = headers.get("ratelimit-reset");
+
+    if (limit) this.rateLimitInfo.limit = parseInt(limit, 10);
+    if (remaining) this.rateLimitInfo.remaining = parseInt(remaining, 10);
+    if (reset) this.rateLimitInfo.resetAt = parseInt(reset, 10);
+
+    // Notify UI of rate limit status
+    this.rateLimitCallback?.(this.rateLimitInfo);
+  }
+
+  /**
+   * Check if an error indicates the session has expired
+   */
+  private isSessionExpiredError(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false;
+
+    const err = error as { status?: number; error?: string; message?: string };
+
+    return (
+      err.status === 401 ||
+      err.error === "ExpiredToken" ||
+      err.error === "InvalidToken" ||
+      (typeof err.message === "string" &&
+        (err.message.includes("token") || err.message.includes("expired")))
+    );
+  }
+
+  /**
+   * Check if an error indicates rate limiting
+   */
+  private isRateLimitError(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false;
+
+    const err = error as { status?: number };
+    return err.status === 429;
+  }
+
+  /**
+   * Handle rate limit by waiting until reset time
+   */
+  private async handleRateLimit(error?: unknown): Promise<void> {
+    // Extract reset time from error or use existing info
+    let resetAt = this.rateLimitInfo.resetAt;
+
+    if (error && typeof error === "object") {
+      const err = error as { headers?: Headers };
+      if (err.headers) {
+        const reset = err.headers.get("ratelimit-reset");
+        if (reset) {
+          resetAt = parseInt(reset, 10);
+        }
+      }
+    }
+
+    // If no valid reset time, default to 5 minutes from now
+    const now = Math.floor(Date.now() / 1000);
+    if (!resetAt || resetAt < now) {
+      resetAt = now + 300;
+    }
+
+    this.rateLimitInfo.isLimited = true;
+    this.rateLimitInfo.resetAt = resetAt;
+
+    // Notify UI
+    this.rateLimitCallback?.(this.rateLimitInfo);
+
+    // Wait until rate limit expires with countdown updates
+    await this.waitForRateLimitReset(resetAt);
+
+    this.rateLimitInfo.isLimited = false;
+    this.updateProgress({ currentAction: "Resuming..." });
+  }
+
+  /**
+   * Wait for rate limit to reset, updating progress with countdown
+   */
+  private waitForRateLimitReset(resetAt: number): Promise<void> {
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        const now = Math.floor(Date.now() / 1000);
+        const remaining = resetAt - now;
+
+        if (remaining <= 0) {
+          clearInterval(checkInterval);
+          resolve();
+        } else {
+          // Update progress with countdown
+          this.updateProgress({
+            currentAction: `Rate limited. Resuming in ${remaining}s...`,
+          });
+          this.rateLimitCallback?.({
+            ...this.rateLimitInfo,
+            resetAt,
+          });
+        }
+      }, 1000);
+    });
+  }
+
+  /**
+   * Make an authenticated API request with session expiration handling.
+   * If the session expires, pauses and waits for re-authentication.
+   */
+  protected async makeAuthenticatedRequest<T>(
+    requestFn: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await requestFn();
+    } catch (error) {
+      if (this.isSessionExpiredError(error)) {
+        // Pause operation, notify UI
+        this.updateProgress({
+          currentAction: "Waiting for re-authentication...",
+          isRunning: false,
+        });
+
+        if (this.sessionExpiredCallback) {
+          await this.sessionExpiredCallback();
+          // After re-auth, retry the request
+          return await requestFn();
+        } else {
+          throw new Error("Session expired and no callback provided");
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Make an API request with rate limit handling.
+   * Automatically waits and retries when rate limited.
+   */
+  protected async makeApiRequest<T>(
+    requestFn: () => Promise<{ data: T; headers?: Headers }>
+  ): Promise<T> {
+    // Check if we're already rate limited before making request
+    if (this.rateLimitInfo.isLimited) {
+      await this.handleRateLimit();
+    }
+
+    try {
+      const response = await this.makeAuthenticatedRequest(requestFn);
+
+      // Update rate limit tracking from response headers
+      if (response.headers) {
+        this.updateRateLimitFromHeaders(response.headers);
+      }
+
+      return response.data;
+    } catch (error) {
+      // Handle rate limit errors
+      if (this.isRateLimitError(error)) {
+        await this.handleRateLimit(error);
+        // Retry after waiting
+        return this.makeApiRequest(requestFn);
+      }
+      throw error;
+    }
+  }
+
   // ==================== Save Operations ====================
-  // These will be implemented in Phase 2
+  // These will be implemented in Phase 3
 
   /**
    * Index (save) the user's posts
    */
   async indexPosts(): Promise<void> {
-    // TODO: Implement in Phase 2
+    // TODO: Implement in Phase 3
     throw new Error("Not implemented yet");
   }
 
@@ -432,7 +609,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Index (save) the user's likes
    */
   async indexLikes(): Promise<void> {
-    // TODO: Implement in Phase 2
+    // TODO: Implement in Phase 3
     throw new Error("Not implemented yet");
   }
 
@@ -440,7 +617,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Index (save) the user's bookmarks
    */
   async indexBookmarks(): Promise<void> {
-    // TODO: Implement in Phase 2
+    // TODO: Implement in Phase 3
     throw new Error("Not implemented yet");
   }
 
@@ -448,7 +625,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Index (save) the accounts the user follows
    */
   async indexFollowing(): Promise<void> {
-    // TODO: Implement in Phase 2
+    // TODO: Implement in Phase 3
     throw new Error("Not implemented yet");
   }
 
@@ -456,7 +633,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Index (save) the user's conversations
    */
   async indexConversations(): Promise<void> {
-    // TODO: Implement in Phase 2
+    // TODO: Implement in Phase 3
     throw new Error("Not implemented yet");
   }
 
@@ -464,18 +641,18 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Index (save) messages in a conversation
    */
   async indexMessages(_convoId: string): Promise<void> {
-    // TODO: Implement in Phase 2
+    // TODO: Implement in Phase 3
     throw new Error("Not implemented yet");
   }
 
   // ==================== Delete Operations ====================
-  // These will be implemented in Phase 4
+  // These will be implemented in Phase 6
 
   /**
    * Delete posts matching the given options
    */
   async deletePosts(_options: DeletePostsOptions): Promise<void> {
-    // TODO: Implement in Phase 4
+    // TODO: Implement in Phase 6
     throw new Error("Not implemented yet");
   }
 
@@ -483,7 +660,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Delete reposts matching the given options
    */
   async deleteReposts(_options: DeleteRepostsOptions): Promise<void> {
-    // TODO: Implement in Phase 4
+    // TODO: Implement in Phase 6
     throw new Error("Not implemented yet");
   }
 
@@ -491,7 +668,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Delete likes matching the given options
    */
   async deleteLikes(_options: DeleteLikesOptions): Promise<void> {
-    // TODO: Implement in Phase 4
+    // TODO: Implement in Phase 6
     throw new Error("Not implemented yet");
   }
 
@@ -499,7 +676,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Delete all bookmarks
    */
   async deleteBookmarks(): Promise<void> {
-    // TODO: Implement in Phase 4
+    // TODO: Implement in Phase 6
     throw new Error("Not implemented yet");
   }
 
@@ -507,7 +684,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Delete messages matching the given options
    */
   async deleteMessages(_options: DeleteMessagesOptions): Promise<void> {
-    // TODO: Implement in Phase 4
+    // TODO: Implement in Phase 6
     throw new Error("Not implemented yet");
   }
 
@@ -515,18 +692,18 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Unfollow all accounts
    */
   async unfollowAll(): Promise<void> {
-    // TODO: Implement in Phase 4
+    // TODO: Implement in Phase 6
     throw new Error("Not implemented yet");
   }
 
   // ==================== Media Operations ====================
-  // These will be implemented in Phase 3
+  // These will be implemented in Phase 4
 
   /**
    * Download media blob and return local file path
    */
   async downloadMedia(_blobCid: string, _did: string): Promise<string> {
-    // TODO: Implement in Phase 3
+    // TODO: Implement in Phase 4
     throw new Error("Not implemented yet");
   }
 

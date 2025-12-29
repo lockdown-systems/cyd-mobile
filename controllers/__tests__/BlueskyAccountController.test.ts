@@ -228,4 +228,88 @@ describe("BlueskyAccountController", () => {
       expect(controller.isAgentReady()).toBe(false);
     });
   });
+
+  describe("rate limit info", () => {
+    it("should return initial rate limit info", () => {
+      const controller = new BlueskyAccountController(1);
+      const info = controller.getRateLimitInfo();
+
+      expect(info.limit).toBe(3000);
+      expect(info.remaining).toBe(3000);
+      expect(info.resetAt).toBe(0);
+      expect(info.isLimited).toBe(false);
+    });
+
+    it("should return a copy of rate limit info", () => {
+      const controller = new BlueskyAccountController(1);
+      const info1 = controller.getRateLimitInfo();
+      const info2 = controller.getRateLimitInfo();
+
+      // Should be equal but not the same object
+      expect(info1).toEqual(info2);
+      expect(info1).not.toBe(info2);
+    });
+  });
+
+  describe("rate limit callback", () => {
+    it("should call rate limit callback when set", () => {
+      const controller = new BlueskyAccountController(1);
+      const callback = jest.fn();
+
+      controller.setRateLimitCallback(callback);
+
+      // The callback should be stored and callable
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it("should allow replacing rate limit callback", () => {
+      const controller = new BlueskyAccountController(1);
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      controller.setRateLimitCallback(callback1);
+      controller.setRateLimitCallback(callback2);
+
+      // Should not throw
+      expect(callback1).not.toHaveBeenCalled();
+      expect(callback2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("session expired callback", () => {
+    it("should call session expired callback when set", () => {
+      const controller = new BlueskyAccountController(1);
+      const callback = jest.fn().mockResolvedValue(undefined);
+
+      controller.setSessionExpiredCallback(callback);
+
+      // The callback should be stored
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it("should allow replacing session expired callback", () => {
+      const controller = new BlueskyAccountController(1);
+      const callback1 = jest.fn().mockResolvedValue(undefined);
+      const callback2 = jest.fn().mockResolvedValue(undefined);
+
+      controller.setSessionExpiredCallback(callback1);
+      controller.setSessionExpiredCallback(callback2);
+
+      // Should not throw
+      expect(callback1).not.toHaveBeenCalled();
+      expect(callback2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("progress callback", () => {
+    it("should call progress callback when set", () => {
+      const controller = new BlueskyAccountController(1);
+      const callback = jest.fn<void, [BlueskyProgress]>();
+
+      controller.setProgressCallback(callback);
+
+      // The callback should be stored
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
 });
