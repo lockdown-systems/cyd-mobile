@@ -1,3 +1,5 @@
+import { MaterialIcons } from "@expo/vector-icons";
+import { Stack, useLocalSearchParams } from "expo-router";
 import {
   useCallback,
   useMemo,
@@ -6,20 +8,18 @@ import {
   type ComponentType,
 } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAccounts } from "@/hooks/use-accounts";
-import { DashboardTab } from "./tabs/dashboard-tab";
-import { SaveTab } from "./tabs/save-tab";
-import { DeleteTab } from "./tabs/delete-tab";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { BrowseTab } from "./tabs/browse-tab";
+import { DashboardTab } from "./tabs/dashboard-tab";
+import { DeleteTab } from "./tabs/delete-tab";
+import { SaveTab } from "./tabs/save-tab";
 import type { AccountTabKey, AccountTabProps } from "./tabs/types";
 
 export default function AccountPlaceholderScreen() {
@@ -32,7 +32,7 @@ export default function AccountPlaceholderScreen() {
   const { accounts, loading, error } = useAccounts();
   const account = useMemo(
     () => accounts.find((item) => item.uuid === accountId),
-    [accounts, accountId],
+    [accounts, accountId]
   );
   const [activeTab, setActiveTab] = useState<AccountTabKey>("dashboard");
   const insets = useSafeAreaInsets();
@@ -124,13 +124,14 @@ export default function AccountPlaceholderScreen() {
                 {accountStatus}
               </Text>
             </View>
-          ) : (
+          ) : account ? (
             <ActiveTabComponent
+              accountId={account.id}
               handle={canonicalHandle}
               palette={palette}
               onSelectTab={handleSelectTab}
             />
-          )}
+          ) : null}
         </View>
         <View
           style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}

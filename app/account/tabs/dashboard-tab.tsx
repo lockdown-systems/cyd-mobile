@@ -45,6 +45,7 @@ const CARDS: DashboardCard[] = [
 ];
 
 export function DashboardTab({
+  accountId: _accountId,
   handle,
   palette,
   onSelectTab,

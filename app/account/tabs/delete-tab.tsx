@@ -1,7 +1,11 @@
-import type { AccountTabProps } from "./types";
 import { TabPlaceholder } from "./tab-placeholder";
+import type { AccountTabProps } from "./types";
 
-export function DeleteTab({ handle, palette }: AccountTabProps) {
+export function DeleteTab({
+  accountId: _accountId,
+  handle,
+  palette,
+}: AccountTabProps) {
   return (
     <TabPlaceholder
       palette={palette}
