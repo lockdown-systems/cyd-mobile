@@ -1,4 +1,10 @@
-import { Agent, type AppBskyActorDefs } from "@atproto/api";
+import {
+  Agent,
+  type AppBskyActorDefs,
+  type AppBskyFeedGetAuthorFeed,
+  AppBskyFeedPost,
+  AppBskyFeedRepost,
+} from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
 
 import { getDatabase } from "@/database";
@@ -55,6 +61,12 @@ export interface RateLimitInfo {
   resetAt: number; // Unix timestamp (seconds)
   isLimited: boolean;
 }
+
+type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
+type FeedPostView = FeedViewPost["post"];
+type FeedRecordInfo =
+  | { kind: "post"; record: AppBskyFeedPost.Record }
+  | { kind: "repost"; record: AppBskyFeedRepost.Record };
 
 /**
  * Database statistics for the account
@@ -601,8 +613,266 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Index (save) the user's posts
    */
   async indexPosts(): Promise<void> {
-    // TODO: Implement in Phase 3
-    throw new Error("Not implemented yet");
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
+    if (!this.agent || !this.did) {
+      throw new Error("Agent not initialized");
+    }
+
+    this.updateProgress({
+      postsSaved: 0,
+      postsTotal: null,
+      currentAction: "Indexing posts...",
+      isRunning: true,
+      error: null,
+    });
+
+    const pageSize = 100;
+    let cursor: string | undefined;
+    let totalSaved = 0;
+
+    try {
+      while (true) {
+        const response = await this.makeApiRequest(() =>
+          this.agent!.app.bsky.feed.getAuthorFeed({
+            actor: this.did!,
+            cursor,
+            limit: pageSize,
+          })
+        );
+
+        const feed = response.feed ?? [];
+        const nextCursor = response.cursor;
+
+        if (feed.length > 0) {
+          const savedCount = await this.saveFeedPosts(feed);
+          totalSaved += savedCount;
+
+          this.updateProgress({
+            postsSaved: totalSaved,
+            currentAction: `Indexed ${totalSaved} posts`,
+          });
+        }
+
+        if (!nextCursor) {
+          break;
+        }
+
+        cursor = nextCursor;
+      }
+
+      this.updateProgress({
+        postsSaved: totalSaved,
+        postsTotal: totalSaved,
+        currentAction: "Post indexing complete",
+        isRunning: false,
+      });
+    } catch (error) {
+      this.updateProgress({
+        isRunning: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
+    }
+  }
+
+  private async saveFeedPosts(feed: FeedViewPost[]): Promise<number> {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
+    const db = this.db;
+    let saved = 0;
+    await db.withTransactionAsync(async () => {
+      for (const item of feed) {
+        const postView = item.post;
+        const recordInfo = this.getRecordInfo(postView.record);
+        if (!recordInfo) {
+          continue;
+        }
+
+        await this.upsertProfile(postView.author);
+
+        const postRecord =
+          recordInfo.kind === "post" ? recordInfo.record : null;
+        const repostRecord =
+          recordInfo.kind === "repost" ? recordInfo.record : null;
+        const now = Date.now();
+
+        const text = postRecord?.text ?? "";
+        const facetsJSON =
+          postRecord?.facets && postRecord.facets.length > 0
+            ? JSON.stringify(postRecord.facets)
+            : null;
+        const embedType = postView.embed?.$type ?? null;
+        const embedJSON = postView.embed
+          ? JSON.stringify(postView.embed)
+          : null;
+        const langs =
+          postRecord?.langs && postRecord.langs.length > 0
+            ? postRecord.langs.join(",")
+            : null;
+
+        const replyParentUri = postRecord?.reply?.parent?.uri ?? null;
+        const replyRootUri = postRecord?.reply?.root?.uri ?? null;
+        const isReply = postRecord?.reply ? 1 : 0;
+
+        const quotedPostUri = postRecord
+          ? this.extractQuotedPostUri(postView.embed)
+          : null;
+        const isQuote = quotedPostUri ? 1 : 0;
+
+        const isRepost = recordInfo.kind === "repost" ? 1 : 0;
+        const repostUri = isRepost ? postView.uri : null;
+        const repostCid = isRepost ? postView.cid : null;
+        const originalPostUri = repostRecord ? repostRecord.subject.uri : null;
+
+        await db.runAsync(
+          `INSERT INTO post (
+            uri, cid, authorDid,
+            text, facetsJSON, embedType, embedJSON, langs,
+            isReply, replyParentUri, replyRootUri,
+            isQuote, quotedPostUri,
+            isRepost, repostUri, repostCid, originalPostUri,
+            likeCount, repostCount, replyCount, quoteCount,
+            viewerLiked, viewerReposted, viewerBookmarked,
+            createdAt, savedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(uri) DO UPDATE SET
+            cid = excluded.cid,
+            authorDid = excluded.authorDid,
+            text = excluded.text,
+            facetsJSON = excluded.facetsJSON,
+            embedType = excluded.embedType,
+            embedJSON = excluded.embedJSON,
+            langs = excluded.langs,
+            isReply = excluded.isReply,
+            replyParentUri = excluded.replyParentUri,
+            replyRootUri = excluded.replyRootUri,
+            isQuote = excluded.isQuote,
+            quotedPostUri = excluded.quotedPostUri,
+            isRepost = excluded.isRepost,
+            repostUri = excluded.repostUri,
+            repostCid = excluded.repostCid,
+            originalPostUri = excluded.originalPostUri,
+            likeCount = excluded.likeCount,
+            repostCount = excluded.repostCount,
+            replyCount = excluded.replyCount,
+            quoteCount = excluded.quoteCount,
+            viewerLiked = excluded.viewerLiked,
+            viewerReposted = excluded.viewerReposted,
+            viewerBookmarked = excluded.viewerBookmarked,
+            createdAt = excluded.createdAt,
+            savedAt = excluded.savedAt;`,
+          [
+            postView.uri,
+            postView.cid,
+            postView.author.did,
+            text,
+            facetsJSON,
+            embedType,
+            embedJSON,
+            langs,
+            isReply,
+            replyParentUri,
+            replyRootUri,
+            isQuote,
+            quotedPostUri,
+            isRepost,
+            repostUri,
+            repostCid,
+            originalPostUri,
+            postView.likeCount ?? 0,
+            postView.repostCount ?? 0,
+            postView.replyCount ?? 0,
+            postView.quoteCount ?? 0,
+            postView.viewer?.like ? 1 : 0,
+            postView.viewer?.repost ? 1 : 0,
+            postView.viewer?.bookmarked ? 1 : 0,
+            postRecord?.createdAt ??
+              repostRecord?.createdAt ??
+              postView.indexedAt,
+            now,
+          ]
+        );
+
+        saved += 1;
+      }
+    });
+
+    return saved;
+  }
+
+  private async upsertProfile(
+    profile: AppBskyActorDefs.ProfileViewBasic
+  ): Promise<void> {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+
+    const now = Date.now();
+    const description =
+      (profile as { description?: string }).description ?? null;
+
+    await this.db.runAsync(
+      `INSERT INTO profile (
+        did, handle, displayName, avatarUrl, avatarLocalPath, avatarDataURI, description, savedAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(did) DO UPDATE SET
+        handle = excluded.handle,
+        displayName = excluded.displayName,
+        avatarUrl = excluded.avatarUrl,
+        description = excluded.description,
+        updatedAt = excluded.updatedAt;`,
+      [
+        profile.did,
+        profile.handle,
+        profile.displayName ?? null,
+        profile.avatar ?? null,
+        null,
+        null,
+        description,
+        now,
+        now,
+      ]
+    );
+  }
+
+  private getRecordInfo(record: FeedPostView["record"]): FeedRecordInfo | null {
+    if (AppBskyFeedPost.isRecord(record)) {
+      return { kind: "post", record };
+    }
+
+    if (AppBskyFeedRepost.isRecord(record)) {
+      return { kind: "repost", record };
+    }
+
+    return null;
+  }
+
+  private extractQuotedPostUri(
+    embed: FeedPostView["embed"] | undefined
+  ): string | null {
+    const findUri = (value: unknown, depth = 0): string | null => {
+      if (!value || typeof value !== "object" || depth > 4) {
+        return null;
+      }
+
+      const candidate = value as Record<string, unknown>;
+      if (typeof candidate.uri === "string") {
+        return candidate.uri;
+      }
+
+      if (candidate.record) {
+        return findUri(candidate.record, depth + 1);
+      }
+
+      return null;
+    };
+
+    return findUri(embed);
   }
 
   /**

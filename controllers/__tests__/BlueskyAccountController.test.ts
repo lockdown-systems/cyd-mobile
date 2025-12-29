@@ -2,6 +2,12 @@
  * @fileoverview Tests for BlueskyAccountController
  */
 
+import type { AppBskyFeedGetAuthorFeed } from "@atproto/api";
+
+import {
+  createMockDatabase,
+  type MockDatabase,
+} from "@/testUtils/mockDatabase";
 import {
   BlueskyAccountController,
   type BlueskyProgress,
@@ -120,14 +126,114 @@ describe("BlueskyAccountController", () => {
     });
   });
 
-  describe("unimplemented save operations", () => {
-    it("indexPosts should throw not implemented", async () => {
+  describe("indexPosts", () => {
+    type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
+
+    const createFeedPost = (suffix: number): FeedViewPost => {
+      const createdAt = new Date(1700000000000 + suffix).toISOString();
+      return {
+        post: {
+          uri: `at://did:plc:test/app.bsky.feed.post/${suffix}`,
+          cid: `cid-${suffix}`,
+          author: {
+            did: "did:plc:test",
+            handle: "user.test",
+            displayName: "Test User",
+          },
+          record: {
+            $type: "app.bsky.feed.post",
+            text: `Post ${suffix}`,
+            createdAt,
+          },
+          indexedAt: createdAt,
+        },
+      };
+    };
+
+    it("should fetch pages and store posts", async () => {
       const controller = new BlueskyAccountController(1);
+      const mockDb = createMockDatabase();
+      const getAuthorFeed = jest.fn();
+      const controllerState = controller as unknown as {
+        db: ReturnType<typeof createMockDatabase>;
+        agent: any;
+        did: string | null;
+        handle: string | null;
+      };
+      controllerState.db = mockDb;
+      controllerState.did = "did:plc:test";
+      controllerState.handle = "user.test";
+      controllerState.agent = {
+        app: {
+          bsky: {
+            feed: {
+              getAuthorFeed,
+            },
+          },
+        },
+      };
+
+      const page1 = [createFeedPost(1)];
+      const page2 = [createFeedPost(2)];
+
+      getAuthorFeed
+        .mockResolvedValueOnce({ data: { feed: page1, cursor: "cursor-2" } })
+        .mockResolvedValueOnce({ data: { feed: page2 } });
+
+      await controller.indexPosts();
+
+      expect(getAuthorFeed).toHaveBeenCalledTimes(2);
+      expect(getAuthorFeed).toHaveBeenNthCalledWith(1, {
+        actor: "did:plc:test",
+        cursor: undefined,
+        limit: 100,
+      });
+      expect(getAuthorFeed).toHaveBeenNthCalledWith(2, {
+        actor: "did:plc:test",
+        cursor: "cursor-2",
+        limit: 100,
+      });
+
+      const dbMocks = mockDb as unknown as MockDatabase;
+      const insertCalls = dbMocks.runAsync.mock.calls.filter(
+        ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
+      );
+      expect(insertCalls).toHaveLength(2);
+      expect(controller.progress.postsSaved).toBe(2);
+      expect(controller.progress.isRunning).toBe(false);
+    });
+
+    it("should fail when database is not ready", async () => {
+      const controller = new BlueskyAccountController(1);
+      const getAuthorFeed = jest.fn();
+      const controllerState = controller as unknown as {
+        agent: any;
+        did: string | null;
+      };
+      controllerState.agent = {
+        app: { bsky: { feed: { getAuthorFeed } } },
+      };
+      controllerState.did = "did:plc:test";
+
       await expect(controller.indexPosts()).rejects.toThrow(
-        "Not implemented yet"
+        "Database not initialized"
       );
     });
 
+    it("should fail when agent is not ready", async () => {
+      const controller = new BlueskyAccountController(1);
+      const controllerState = controller as unknown as {
+        db: ReturnType<typeof createMockDatabase>;
+      };
+      controllerState.db = createMockDatabase();
+
+      await expect(controller.indexPosts()).rejects.toThrow(
+        "Agent not initialized"
+      );
+    });
+  });
+
+  describe("unimplemented save operations", () => {
     it("indexLikes should throw not implemented", async () => {
       const controller = new BlueskyAccountController(1);
       await expect(controller.indexLikes()).rejects.toThrow(
