@@ -486,6 +486,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         activeJobId: update.activeJobId ?? null,
         speechText: update.speechText,
         progressText: update.progressText,
+        progressPercent: update.progressPercent,
         detailText: update.detailText,
       });
     };
@@ -514,6 +515,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           activeJobId: job.id,
           speechText: update.speechText,
           progressText: update.progressText,
+          progressPercent: update.progressPercent,
           detailText: update.detailText,
         });
       };

@@ -24,12 +24,14 @@ export type BlueskyJobRunUpdate = {
   activeJobId: number | null;
   speechText?: string;
   progressText?: string;
+  progressPercent?: number;
   detailText?: string;
 };
 
 export type JobEmit = (update: {
   speechText?: string;
   progressText?: string;
+  progressPercent?: number;
   detailText?: string;
 }) => void;
 

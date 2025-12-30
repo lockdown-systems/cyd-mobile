@@ -21,8 +21,13 @@ export async function runSavePostsJob(
 
   // Forward indexer progress to the job emitter so AutomationModal can display it.
   controller.setProgressCallback((progress: BlueskyProgress) => {
+    const fraction =
+      progress.postsTotal && progress.postsTotal > 0
+        ? Math.max(0, Math.min(1, progress.postsSaved / progress.postsTotal))
+        : null;
     emit({
       progressText: formatProgress(progress.postsSaved, progress.postsTotal),
+      progressPercent: fraction ?? undefined,
       detailText: progress.currentAction || undefined,
     });
   });
@@ -37,5 +42,5 @@ export async function runSavePostsJob(
   controller.pause();
   await controller.waitForPause();
 
-  emit({ progressText: "Saved posts" });
+  emit({ progressText: "Saved posts", progressPercent: 1 });
 }

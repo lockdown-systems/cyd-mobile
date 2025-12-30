@@ -45,6 +45,8 @@ export function AutomationModal({
   const [state, setState] = useState<AutomationModalState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<number | null>(null);
+  const [activeJobProgress, setActiveJobProgress] = useState(0);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
@@ -139,11 +141,15 @@ export function AutomationModal({
             if (cancelled) return;
             latestJobsRef.current = update.jobs;
             setJobs(update.jobs);
+            setActiveJobId(update.activeJobId);
             if (update.speechText !== undefined) {
               setSpeech(update.speechText);
             }
             if (update.progressText !== undefined) {
               setProgress(update.progressText);
+            }
+            if (update.progressPercent !== undefined) {
+              setActiveJobProgress(update.progressPercent);
             }
             if (update.detailText !== undefined) {
               setDetail(update.detailText);
@@ -195,6 +201,10 @@ export function AutomationModal({
       setPaused(false);
     }
   }, [visible]);
+
+  useEffect(() => {
+    setActiveJobProgress(0);
+  }, [activeJobId]);
 
   useEffect(() => {
     return () => {
@@ -266,23 +276,34 @@ export function AutomationModal({
 
   const progressPercent = (() => {
     if (totalJobs === 0) return 0;
+
     const hasVerify = jobs.some((job) => job.jobType === "verifyAuthorization");
-    const remainingCount = hasVerify ? Math.max(totalJobs - 1, 0) : totalJobs;
     const verifyWeight = hasVerify ? 2 : 0;
-    const remainingWeight = hasVerify ? 98 : 100;
+    const remainingWeight = 100 - verifyWeight;
+    const nonVerifyJobs = jobs.filter(
+      (job) => job.jobType !== "verifyAuthorization"
+    );
     const perJobWeight =
-      remainingCount > 0 ? remainingWeight / remainingCount : 0;
+      nonVerifyJobs.length > 0 ? remainingWeight / nonVerifyJobs.length : 0;
 
-    const weightForJob = (job: BlueskyJobRecord) =>
-      job.jobType === "verifyAuthorization" ? verifyWeight : perJobWeight;
+    let percent = 0;
 
-    const completedWeight = jobs
-      .filter((job) => job.status === "completed")
-      .reduce((sum, job) => sum + weightForJob(job), 0);
+    for (const job of jobs) {
+      if (job.jobType === "verifyAuthorization") {
+        if (job.status === "completed") {
+          percent += verifyWeight;
+        }
+        continue;
+      }
 
-    const runningWeight = runningJob ? weightForJob(runningJob) * 0.5 : 0;
+      if (job.status === "completed") {
+        percent += perJobWeight;
+      } else if (job.status === "running") {
+        const clampedProgress = Math.max(0, Math.min(1, activeJobProgress));
+        percent += perJobWeight * clampedProgress;
+      }
+    }
 
-    const percent = completedWeight + runningWeight;
     return Math.max(0, Math.min(100, percent));
   })();
 

@@ -36,9 +36,20 @@ export class BlueskyIndexer {
     const agent = this.requireAgent();
     const did = this.requireDid();
 
+    let postsTotal: number | null = null;
+    try {
+      const profile = await agent.getProfile({ actor: did });
+      const profilePosts = profile.data?.postsCount;
+      if (typeof profilePosts === "number" && profilePosts >= 0) {
+        postsTotal = profilePosts;
+      }
+    } catch (err) {
+      console.warn("[Indexer] Unable to fetch profile posts count", err);
+    }
+
     this.deps.updateProgress({
       postsSaved: 0,
-      postsTotal: null,
+      postsTotal,
       currentAction: "Indexing posts...",
       isRunning: true,
       error: null,
@@ -61,11 +72,17 @@ export class BlueskyIndexer {
         const nextCursor = response.cursor;
 
         if (feed.length > 0) {
-          const savedCount = await this.saveFeedPosts(db, feed);
+          const savedCount = await this.saveFeedPosts(
+            db,
+            feed,
+            totalSaved,
+            postsTotal
+          );
           totalSaved += savedCount;
 
           this.deps.updateProgress({
             postsSaved: totalSaved,
+            postsTotal,
             currentAction: `Indexed ${totalSaved} posts`,
           });
         }
@@ -77,9 +94,10 @@ export class BlueskyIndexer {
         cursor = nextCursor;
       }
 
+      const finalTotal = Math.max(postsTotal ?? 0, totalSaved);
       this.deps.updateProgress({
         postsSaved: totalSaved,
-        postsTotal: totalSaved,
+        postsTotal: finalTotal,
         currentAction: "Post indexing complete",
         isRunning: false,
       });
@@ -118,7 +136,9 @@ export class BlueskyIndexer {
 
   private async saveFeedPosts(
     db: SQLiteDatabase,
-    feed: FeedViewPost[]
+    feed: FeedViewPost[],
+    totalSavedSoFar: number,
+    postsTotal: number | null
   ): Promise<number> {
     let saved = 0;
 
@@ -235,7 +255,18 @@ export class BlueskyIndexer {
           ]
         );
 
+        // Emit per-post progress for debugging UI visibility.
         saved += 1;
+        this.deps.updateProgress({
+          postsSaved: totalSavedSoFar + saved,
+          postsTotal: postsTotal ?? undefined,
+          currentAction: `Indexed ${totalSavedSoFar + saved} posts`,
+        });
+
+        // Debug: slow down to visualize progress updates.
+        console.log("[saveFeedPosts] before sleep");
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        console.log("[saveFeedPosts] after sleep");
       }
     });
 
