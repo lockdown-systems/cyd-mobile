@@ -3,6 +3,7 @@
  */
 
 import type { Agent, AppBskyFeedGetAuthorFeed } from "@atproto/api";
+import { downloadAsync, getInfoAsync } from "expo-file-system";
 
 import {
   createMockDatabase,
@@ -14,6 +15,10 @@ import {
 } from "../BlueskyAccountController";
 
 describe("BlueskyAccountController", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe("constructor and initialization", () => {
     it("should create a controller with the given account ID", () => {
       const controller = new BlueskyAccountController(123);
@@ -385,12 +390,39 @@ describe("BlueskyAccountController", () => {
     });
   });
 
-  describe("unimplemented media operations", () => {
-    it("downloadMedia should throw not implemented", async () => {
+  describe("media operations", () => {
+    it("should skip download when file already exists", async () => {
       const controller = new BlueskyAccountController(1);
-      await expect(
-        controller.downloadMedia("blob-cid", "did:plc:123")
-      ).rejects.toThrow("Not implemented yet");
+      (controller as unknown as { agent: Agent | null }).agent = {} as Agent;
+      (getInfoAsync as jest.Mock).mockResolvedValueOnce({
+        exists: true,
+        uri: "file:///existing",
+      });
+
+      const path = await controller.downloadMedia("blob-cid", "did:plc:123");
+
+      expect(getInfoAsync).toHaveBeenCalledTimes(1);
+      expect(downloadAsync).not.toHaveBeenCalled();
+      expect(path).toContain("media/did%3Aplc%3A123/");
+      expect(path.endsWith("blob-cid")).toBe(true);
+    });
+
+    it("should download media when missing", async () => {
+      const controller = new BlueskyAccountController(1);
+      (controller as unknown as { agent: Agent | null }).agent = {} as Agent;
+      (getInfoAsync as jest.Mock).mockResolvedValueOnce({ exists: false });
+      (downloadAsync as jest.Mock).mockResolvedValueOnce({
+        uri: "file:///mock/downloaded",
+      });
+
+      const path = await controller.downloadMedia("bafy/test", "did:plc:123");
+
+      expect(downloadAsync).toHaveBeenCalledTimes(1);
+      const [url, dest] = (downloadAsync as jest.Mock).mock.calls[0];
+      expect(url).toBe("https://cdn.bsky.app/blob/did%3Aplc%3A123/bafy%2Ftest");
+      expect(dest).toBe(path);
+      expect(path).toContain("media/did%3Aplc%3A123/");
+      expect(path.endsWith("bafy%2Ftest")).toBe(true);
     });
   });
 

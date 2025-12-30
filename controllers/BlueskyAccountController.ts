@@ -1,5 +1,6 @@
 import { Agent, type AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
+import { Directory, downloadAsync, getInfoAsync } from "expo-file-system";
 
 import { getDatabase } from "@/database";
 import {
@@ -741,9 +742,32 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   /**
    * Download media blob and return local file path
    */
-  async downloadMedia(_blobCid: string, _did: string): Promise<string> {
-    // TODO: Implement in Phase 4
-    throw new Error("Not implemented yet");
+  async downloadMedia(blobCid: string, did: string): Promise<string> {
+    if (!this.agent) {
+      throw new Error("Agent not initialized");
+    }
+
+    if (!blobCid || !did) {
+      throw new Error("Invalid blobCid or did");
+    }
+
+    await this.ensureAccountDirectory();
+    const accountDir = this.getAccountDirectoryHandle();
+    const safeDid = encodeURIComponent(did);
+    const safeCid = encodeURIComponent(blobCid);
+    const mediaDir = new Directory(accountDir, "media", safeDid);
+    mediaDir.create({ intermediates: true, idempotent: true });
+
+    const targetPath = `${mediaDir.uri}${safeCid}`;
+    const info = await getInfoAsync(targetPath);
+    if (info?.exists) {
+      return targetPath;
+    }
+
+    const url = `https://cdn.bsky.app/blob/${safeDid}/${safeCid}`;
+
+    await downloadAsync(url, targetPath);
+    return targetPath;
   }
 
   async deleteAccountStorage(): Promise<void> {

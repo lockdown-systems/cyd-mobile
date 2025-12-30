@@ -123,6 +123,13 @@ jest.mock("expo-file-system", () => {
     cache: { uri: "file:///mock/cache/directory/" },
   };
 
+  const downloadAsync = jest.fn((url: string, fileUri: string) =>
+    Promise.resolve({ uri: fileUri, url })
+  );
+  const getInfoAsync = jest.fn(() =>
+    Promise.resolve({ exists: false, uri: "" })
+  );
+
   return {
     documentDirectory: "/mock/document/directory/",
     cacheDirectory: "/mock/cache/directory/",
@@ -130,7 +137,8 @@ jest.mock("expo-file-system", () => {
     Paths,
     makeDirectoryAsync: jest.fn(),
     deleteAsync: jest.fn(),
-    getInfoAsync: jest.fn(() => Promise.resolve({ exists: false })),
+    getInfoAsync,
+    downloadAsync,
     readAsStringAsync: jest.fn(),
     writeAsStringAsync: jest.fn(),
   };
