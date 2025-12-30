@@ -1,27 +1,10 @@
+import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import React, { type JSX } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
 type AutomationPostPreviewProps = {
-  post: {
-    uri: string;
-    cid: string;
-    text: string;
-    createdAt: string;
-    author: {
-      did: string;
-      handle: string;
-      displayName?: string | null;
-      avatarUrl?: string | null;
-      avatarDataURI?: string | null;
-    };
-    likeCount?: number | null;
-    repostCount?: number | null;
-    replyCount?: number | null;
-    quoteCount?: number | null;
-    isRepost?: boolean;
-    quotedPostUri?: string | null;
-  };
+  post: AutomationPostPreviewData;
   palette: AccountTabPalette;
 };
 
@@ -65,6 +48,43 @@ export function AutomationPostPreview({
       <Text style={[styles.bodyText, { color: palette.text }]}>
         {post.text}
       </Text>
+      {post.media && post.media.length > 0 ? (
+        <View style={styles.mediaGrid}>
+          {post.media.map((item, index) => {
+            const key = `${item.type}-${index}`;
+            const uri =
+              item.localThumbPath ??
+              item.thumbUrl ??
+              item.localFullsizePath ??
+              item.fullsizeUrl ??
+              undefined;
+
+            if (item.type === "video") {
+              return (
+                <View
+                  key={key}
+                  style={[
+                    styles.videoPlaceholder,
+                    { borderColor: palette.icon + "33" },
+                  ]}
+                >
+                  <Text style={[styles.videoLabel, { color: palette.text }]}>
+                    Video
+                  </Text>
+                </View>
+              );
+            }
+
+            if (!uri) {
+              return null;
+            }
+
+            return (
+              <Image key={key} source={{ uri }} style={styles.mediaImage} />
+            );
+          })}
+        </View>
+      ) : null}
       <View style={styles.metaRow}>
         <Text style={[styles.meta, { color: palette.icon }]} numberOfLines={1}>
           ❤ {post.likeCount ?? 0} 🔁 {post.repostCount ?? 0} 💬{" "}
@@ -118,5 +138,30 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontSize: 14,
+  },
+  mediaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  mediaImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 10,
+    backgroundColor: "#0001",
+  },
+  videoPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0002",
+  },
+  videoLabel: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

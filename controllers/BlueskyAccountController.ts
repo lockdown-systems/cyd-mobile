@@ -96,6 +96,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       waitForPause: () => this.waitForPause(),
       makeApiRequest: <T>(requestFn: ApiRequestFn<T>) =>
         this.makeApiRequest<T>(requestFn),
+      downloadMediaFromUrl: (url: string, did: string) =>
+        this.downloadMediaFromUrl(url, did),
     });
   }
 
@@ -743,28 +745,51 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Download media blob and return local file path
    */
   async downloadMedia(blobCid: string, did: string): Promise<string> {
-    if (!this.agent) {
-      throw new Error("Agent not initialized");
-    }
-
     if (!blobCid || !did) {
       throw new Error("Invalid blobCid or did");
+    }
+
+    return this.downloadToAccountMedia({
+      did,
+      filename: blobCid,
+      url: `https://cdn.bsky.app/blob/${encodeURIComponent(did)}/${encodeURIComponent(blobCid)}`,
+    });
+  }
+
+  async downloadMediaFromUrl(url: string, did: string): Promise<string> {
+    if (!url || !did) {
+      throw new Error("Invalid url or did");
+    }
+
+    return this.downloadToAccountMedia({
+      did,
+      filename: url,
+      url,
+    });
+  }
+
+  private async downloadToAccountMedia(options: {
+    did: string;
+    filename: string;
+    url: string;
+  }): Promise<string> {
+    const { did, filename, url } = options;
+    if (!this.agent) {
+      throw new Error("Agent not initialized");
     }
 
     await this.ensureAccountDirectory();
     const accountDir = this.getAccountDirectoryHandle();
     const safeDid = encodeURIComponent(did);
-    const safeCid = encodeURIComponent(blobCid);
+    const safeName = encodeURIComponent(filename);
     const mediaDir = new Directory(accountDir, "media", safeDid);
     mediaDir.create({ intermediates: true, idempotent: true });
 
-    const targetPath = `${mediaDir.uri}${safeCid}`;
+    const targetPath = `${mediaDir.uri}${safeName}`;
     const info = await getInfoAsync(targetPath);
     if (info?.exists) {
       return targetPath;
     }
-
-    const url = `https://cdn.bsky.app/blob/${safeDid}/${safeCid}`;
 
     await downloadAsync(url, targetPath);
     return targetPath;

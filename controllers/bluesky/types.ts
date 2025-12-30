@@ -53,6 +53,9 @@ export type AutomationMediaAttachment = {
   type: "image" | "video";
   thumbUrl?: string | null;
   fullsizeUrl?: string | null;
+  localThumbPath?: string | null;
+  localFullsizePath?: string | null;
+  localVideoPath?: string | null;
   alt?: string | null;
   width?: number | null;
   height?: number | null;

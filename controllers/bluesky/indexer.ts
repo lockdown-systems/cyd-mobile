@@ -29,6 +29,7 @@ interface IndexerDeps {
   updateProgress: (updates: Partial<BlueskyProgress>) => void;
   waitForPause: () => Promise<void>;
   makeApiRequest: RequestExecutor;
+  downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
 }
 
 export class BlueskyIndexer {
@@ -146,6 +147,7 @@ export class BlueskyIndexer {
     postsTotal: number | null
   ): Promise<number> {
     let saved = 0;
+    const did = this.requireDid();
 
     await db.withTransactionAsync(async () => {
       for (const item of feed) {
@@ -263,6 +265,39 @@ export class BlueskyIndexer {
 
         const media = this.extractMedia(postView);
 
+        const downloadedMedia = await Promise.all(
+          media.map(async (attachment) => {
+            if (attachment.type === "image") {
+              let localThumbPath: string | null | undefined = null;
+              let localFullsizePath: string | null | undefined = null;
+              try {
+                if (attachment.thumbUrl) {
+                  localThumbPath = await this.deps.downloadMediaFromUrl(
+                    attachment.thumbUrl,
+                    did
+                  );
+                }
+                if (attachment.fullsizeUrl) {
+                  localFullsizePath = await this.deps.downloadMediaFromUrl(
+                    attachment.fullsizeUrl,
+                    did
+                  );
+                }
+              } catch (err) {
+                console.warn("[saveFeedPosts] Failed to download media", err);
+              }
+
+              return {
+                ...attachment,
+                localThumbPath,
+                localFullsizePath,
+              } satisfies AutomationMediaAttachment;
+            }
+
+            return attachment;
+          })
+        );
+
         const author = postView.author;
         const likeCount =
           typeof postView.likeCount === "number" ? postView.likeCount : null;
@@ -275,7 +310,6 @@ export class BlueskyIndexer {
         const quoteCount =
           typeof postView.quoteCount === "number" ? postView.quoteCount : null;
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const previewPost: AutomationPostPreviewData = {
           uri: String(postView.uri ?? ""),
           cid: String(postView.cid ?? ""),
@@ -300,7 +334,7 @@ export class BlueskyIndexer {
           quoteCount,
           isRepost: recordInfo.kind === "repost",
           quotedPostUri,
-          media,
+          media: downloadedMedia,
         } satisfies AutomationPostPreviewData;
 
         // Emit per-post progress for debugging UI visibility.
@@ -309,7 +343,7 @@ export class BlueskyIndexer {
           postsSaved: totalSavedSoFar + saved,
           postsTotal: postsTotal ?? undefined,
           currentAction: `Indexed ${totalSavedSoFar + saved} posts`,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
           previewPost,
         });
 
