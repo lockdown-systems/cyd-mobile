@@ -24,6 +24,8 @@ import {
 } from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
+import { revokeBlueskyAuthorization } from "@/services/bluesky-oauth";
 import type { AccountTabKey, AccountTabProps } from "@/types/account-tabs";
 import { BrowseTab } from "./tabs/browse-tab";
 import { DashboardTab } from "./tabs/dashboard-tab";
@@ -57,6 +59,38 @@ export default function AccountPlaceholderScreen() {
   const closeSettings = useCallback(() => {
     setSettingsVisible(false);
   }, []);
+  const handleSignOut = useCallback(async () => {
+    if (!account) {
+      throw new Error(
+        "Account information is not available yet. Please try again in a moment."
+      );
+    }
+
+    const controller = new BlueskyAccountController(account.id, account.uuid);
+
+    try {
+      await controller.initDB();
+      await revokeBlueskyAuthorization(account.id);
+      const nextStatus = await verifyBlueskyAccountAuthStatus(
+        controller,
+        account
+      );
+      setAuthStatus(nextStatus);
+    } catch (err) {
+      throw err instanceof Error
+        ? err
+        : new Error("Unable to sign out of Bluesky right now.");
+    } finally {
+      try {
+        await controller.cleanup();
+      } catch (cleanupErr) {
+        console.warn(
+          "Failed to cleanup controller after signing out",
+          cleanupErr
+        );
+      }
+    }
+  }, [account]);
 
   useEffect(() => {
     if (!account) {
@@ -280,6 +314,7 @@ export default function AccountPlaceholderScreen() {
         visible={settingsVisible}
         onClose={closeSettings}
         bottomInset={insets.bottom}
+        onSignOut={handleSignOut}
       />
     </>
   );

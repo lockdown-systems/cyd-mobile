@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Colors } from "@/constants/theme";
 
@@ -9,6 +9,7 @@ export type AccountSettingsSheetProps = {
   visible: boolean;
   onClose: () => void;
   bottomInset: number;
+  onSignOut?: () => Promise<void>;
 };
 
 type SettingsItem =
@@ -32,6 +33,7 @@ export function AccountSettingsSheet({
   visible,
   onClose,
   bottomInset,
+  onSignOut,
 }: AccountSettingsSheetProps) {
   const items = useMemo<SettingsItem[]>(
     () => [
@@ -67,11 +69,40 @@ export function AccountSettingsSheet({
   );
 
   const handleActionPress = useCallback(
-    (item: SettingsActionItem) => {
+    async (item: SettingsActionItem) => {
       console.log(`[Account Settings] ${item.log}`);
+
+      if (item.key === "schedule") {
+        Alert.alert("TODO: This is not implemented yet.");
+        onClose();
+        return;
+      }
+
+      if (item.key === "signout") {
+        if (!onSignOut) {
+          Alert.alert(
+            "Sign out unavailable",
+            "This action is not supported here."
+          );
+          return;
+        }
+
+        try {
+          await onSignOut();
+          onClose();
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Unable to sign out of Bluesky right now.";
+          Alert.alert("Sign out failed", message);
+        }
+        return;
+      }
+
       onClose();
     },
-    [onClose]
+    [onClose, onSignOut]
   );
 
   const dangerColor = palette.danger ?? Colors.light.danger;
@@ -124,7 +155,9 @@ export function AccountSettingsSheet({
             return (
               <Pressable
                 key={item.key}
-                onPress={() => handleActionPress(item)}
+                onPress={() => {
+                  void handleActionPress(item);
+                }}
                 style={({ pressed }) => [
                   styles.actionButton,
                   {

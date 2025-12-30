@@ -1,21 +1,22 @@
 import "@/services/polyfills";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Agent } from "@atproto/api";
+import type { Jwk, Key } from "@atproto/jwk";
+import { JoseKey } from "@atproto/jwk-jose";
 import {
   OAuthClient,
   type AuthorizeOptions,
   type DigestAlgorithm,
   type InternalStateData,
-  type RuntimeImplementation,
   type Session as PersistedSession,
+  type RuntimeImplementation,
   type SessionStore,
   type StateStore,
 } from "@atproto/oauth-client";
-import type { Jwk, Key } from "@atproto/jwk";
-import { JoseKey } from "@atproto/jwk-jose";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 
+import { getDatabase } from "@/database";
 import { saveAuthenticatedBlueskyAccount } from "@/database/accounts";
 
 const STATE_PREFIX = "@cyd/bluesky/state/";
@@ -84,7 +85,7 @@ export async function authenticateBlueskyAccount(handleInput: string) {
 
   const result = await WebBrowser.openAuthSessionAsync(
     authUrl.toString(),
-    redirectUri,
+    redirectUri
   );
 
   if (result.type !== "success") {
@@ -110,6 +111,51 @@ export async function authenticateBlueskyAccount(handleInput: string) {
     session,
     profile: profileResponse.data,
   });
+}
+
+export async function revokeBlueskyAuthorization(
+  accountId: number
+): Promise<void> {
+  const db = await getDatabase();
+  const accountRow = await db.getFirstAsync<{
+    bskyAccountID: number;
+    sessionJson: string | null;
+  }>(
+    `SELECT a.bskyAccountID, b.sessionJson
+       FROM account a
+       INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+      WHERE a.id = ?
+      LIMIT 1;`,
+    [accountId]
+  );
+
+  if (!accountRow?.bskyAccountID) {
+    throw new Error("Unable to locate this Bluesky account");
+  }
+
+  if (accountRow.sessionJson) {
+    try {
+      const storedSession = JSON.parse(
+        accountRow.sessionJson
+      ) as Partial<PersistedSession> & { sub?: string };
+      const subject = storedSession.sub;
+      if (typeof subject === "string" && subject.length > 0) {
+        await sessionStore.del(subject);
+      }
+    } catch (err) {
+      console.warn("Failed to clear cached Bluesky session", err);
+    }
+  }
+
+  await db.runAsync(
+    `UPDATE bsky_account
+        SET sessionJson = NULL,
+            accessJwt = NULL,
+            refreshJwt = NULL,
+            updatedAt = ?
+      WHERE id = ?;`,
+    [Date.now(), accountRow.bskyAccountID]
+  );
 }
 
 type SerializedState = Omit<InternalStateData, "dpopKey"> & {
@@ -166,7 +212,7 @@ function serializeState(value: InternalStateData): SerializedState {
 }
 
 async function deserializeState(
-  value: SerializedState,
+  value: SerializedState
 ): Promise<InternalStateData> {
   const { dpopKeyJwk, ...rest } = value;
   return { ...rest, dpopKey: await deserializeKey(dpopKeyJwk) };
@@ -178,7 +224,7 @@ function serializeSession(value: PersistedSession): SerializedSession {
 }
 
 async function deserializeSession(
-  value: SerializedSession,
+  value: SerializedSession
 ): Promise<PersistedSession> {
   const { dpopKeyJwk, ...rest } = value;
   return { ...rest, dpopKey: await deserializeKey(dpopKeyJwk) };
@@ -223,7 +269,7 @@ function createRuntimeImplementation(): RuntimeImplementation {
         () =>
           new Promise<void>((resolve) => {
             release = resolve;
-          }),
+          })
       );
       locks.set(name, current);
       await previous;
@@ -243,7 +289,7 @@ function ensureCrypto(): Crypto {
   if (!globalThis.crypto) {
     throw new Error("WebCrypto API is unavailable in this environment");
   }
-  return globalThis.crypto as Crypto;
+  return globalThis.crypto;
 }
 
 function mapDigestAlgorithm(algorithm: DigestAlgorithm): AlgorithmIdentifier {
@@ -255,6 +301,6 @@ function mapDigestAlgorithm(algorithm: DigestAlgorithm): AlgorithmIdentifier {
     case "sha512":
       return "SHA-512";
     default:
-      throw new Error(`Unsupported digest algorithm: ${algorithm.name}`);
+      throw new Error("Unsupported digest algorithm");
   }
 }
