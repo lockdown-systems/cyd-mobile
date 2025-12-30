@@ -3,6 +3,10 @@
 
 import React, { type ReactNode } from "react";
 
+// Expo/React Native global flag
+// eslint-disable-next-line no-underscore-dangle
+(global as unknown as { __DEV__: boolean }).__DEV__ = false;
+
 type MockProps = Record<string, unknown> & { children?: ReactNode };
 type PlatformSelectOptions<T> = Partial<Record<string, T>> & { default?: T };
 
@@ -96,18 +100,65 @@ jest.mock("expo-crypto", () => {
 });
 
 // Mock expo-file-system
-jest.mock("expo-file-system", () => ({
-  documentDirectory: "/mock/document/directory/",
-  cacheDirectory: "/mock/cache/directory/",
-  Paths: {
+jest.mock("expo-file-system", () => {
+  class Directory {
+    uri: string;
+
+    constructor(base?: { uri?: string } | string, ...paths: string[]) {
+      const baseUri = typeof base === "string" ? base : (base?.uri ?? "");
+      const joined = [baseUri, ...paths].filter(Boolean).join("/");
+      this.uri = joined.endsWith("/") ? joined : `${joined}/`;
+    }
+
+    get exists() {
+      return true;
+    }
+
+    // Directory operations are no-ops in tests
+    create = jest.fn();
+  }
+
+  const Paths = {
     document: { uri: "file:///mock/document/directory/" },
     cache: { uri: "file:///mock/cache/directory/" },
+  };
+
+  return {
+    documentDirectory: "/mock/document/directory/",
+    cacheDirectory: "/mock/cache/directory/",
+    Directory,
+    Paths,
+    makeDirectoryAsync: jest.fn(),
+    deleteAsync: jest.fn(),
+    getInfoAsync: jest.fn(() => Promise.resolve({ exists: false })),
+    readAsStringAsync: jest.fn(),
+    writeAsStringAsync: jest.fn(),
+  };
+});
+
+// Mock expo-file-system legacy entrypoint
+jest.mock("expo-file-system/legacy", () => ({
+  documentDirectory: "/mock/document/directory/",
+  cacheDirectory: "/mock/cache/directory/",
+}));
+
+// Mock react-native-quick-crypto to avoid native module requirements in Jest
+jest.mock("react-native-quick-crypto", () => ({
+  install: jest.fn(),
+}));
+
+// Mock expo-web-browser
+jest.mock("expo-web-browser", () => ({
+  openAuthSessionAsync: jest.fn(async () => ({
+    type: "success",
+    url: "https://example.com/callback?code=mock",
+  })),
+  WebBrowserResultType: {
+    SUCCESS: "success",
+    CANCEL: "cancel",
+    DISMISS: "dismiss",
   },
-  makeDirectoryAsync: jest.fn(),
-  deleteAsync: jest.fn(),
-  getInfoAsync: jest.fn(() => Promise.resolve({ exists: false })),
-  readAsStringAsync: jest.fn(),
-  writeAsStringAsync: jest.fn(),
+  maybeCompleteAuthSession: jest.fn(),
 }));
 
 // Mock react-native-svg

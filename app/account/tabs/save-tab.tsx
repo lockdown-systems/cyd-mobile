@@ -9,6 +9,8 @@ import {
   View,
 } from "react-native";
 
+import { AutomationModal } from "@/app/account/components/AutomationModal";
+import type { SaveJobOptions } from "@/controllers/bluesky/job-types";
 import type { AccountSaveSettings } from "@/database/save-settings";
 import {
   getAccountSaveSettings,
@@ -16,7 +18,7 @@ import {
 } from "@/database/save-settings";
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
 
-type SaveFlowScreen = "form" | "review" | "automation";
+type SaveFlowScreen = "form" | "review";
 
 const SAVE_OPTION_DEFINITIONS = [
   {
@@ -67,6 +69,16 @@ function mapSettingsToState(settings: AccountSaveSettings): SaveOptionState {
   };
 }
 
+function mapStateToJobOptions(state: SaveOptionState): SaveJobOptions {
+  return {
+    posts: state.posts,
+    likes: state.likes,
+    bookmarks: state.bookmarks,
+    chat: state.chat,
+    following: state.following,
+  };
+}
+
 export function SaveTab({
   accountId,
   handle,
@@ -79,6 +91,9 @@ export function SaveTab({
   const [error, setError] = useState<Error | null>(null);
   const [saving, setSaving] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
+  const [automationVisible, setAutomationVisible] = useState(false);
+  const [automationOptions, setAutomationOptions] =
+    useState<SaveOptionState | null>(null);
 
   const selectedOptions = useMemo(() => {
     if (!state) {
@@ -178,8 +193,10 @@ export function SaveTab({
   }, [accountId, canContinue, state, pushScreen]);
 
   const handleConfirm = useCallback(() => {
-    pushScreen("automation");
-  }, [pushScreen]);
+    if (!state) return;
+    setAutomationOptions(state);
+    setAutomationVisible(true);
+  }, [state]);
 
   return (
     <View style={styles.container}>
@@ -206,14 +223,26 @@ export function SaveTab({
           onConfirm={handleConfirm}
         />
       )}
-      {currentScreen === "automation" && (
-        <SaveAutomationScreen
-          palette={palette}
-          onBack={popScreen}
-          onRestart={resetToForm}
-          onSelectTab={onSelectTab}
-        />
-      )}
+      <AutomationModal
+        visible={automationVisible}
+        accountId={accountId}
+        palette={palette}
+        options={mapStateToJobOptions(
+          automationOptions ?? state ?? DEFAULT_STATE
+        )}
+        onFinished={(result) => {
+          if (result === "completed") {
+            onSelectTab?.("dashboard");
+          }
+        }}
+        onClose={() => {
+          setAutomationVisible(false);
+        }}
+        onRestart={() => {
+          setAutomationVisible(false);
+          resetToForm();
+        }}
+      />
     </View>
   );
 }
@@ -409,6 +438,21 @@ function SaveReviewScreen({
             </View>
           ))}
         </View>
+        <View
+          style={[
+            styles.infoCard,
+            {
+              borderColor: palette.icon + "22",
+              backgroundColor: palette.card,
+            },
+          ]}
+          accessibilityRole="text"
+        >
+          <Text style={[styles.infoText, { color: palette.text }]}>
+            While Cyd is working, your phone must be unlocked and the Cyd app
+            must stay active.
+          </Text>
+        </View>
       </ScrollView>
       <View
         style={[
@@ -428,52 +472,6 @@ function SaveReviewScreen({
           label="Save My Data"
           onPress={onConfirm}
           disabled={chosen.length === 0}
-          palette={palette}
-        />
-      </View>
-    </View>
-  );
-}
-
-type SaveAutomationScreenProps = {
-  palette: AccountTabPalette;
-  onBack: () => void;
-  onRestart: () => void;
-  onSelectTab?: AccountTabProps["onSelectTab"];
-};
-
-function SaveAutomationScreen({
-  palette,
-  onBack,
-  onRestart,
-  onSelectTab,
-}: SaveAutomationScreenProps) {
-  const handleGoHome = useCallback(() => {
-    onSelectTab?.("dashboard");
-    onRestart();
-  }, [onRestart, onSelectTab]);
-
-  return (
-    <View style={styles.stackScreen}>
-      <StackHeader title="Automation" palette={palette} onBack={onBack} />
-      <View style={styles.automationContent}>
-        <MaterialIcons name="smart-toy" size={48} color={palette.tint} />
-        <Text style={[styles.headline, { color: palette.text }]}>
-          Automation coming soon
-        </Text>
-        <Text
-          style={[styles.subhead, { color: palette.icon, textAlign: "center" }]}
-        >
-          Not implemented yet
-        </Text>
-        <PrimaryButton
-          label="Back to Save Options"
-          onPress={onRestart}
-          palette={palette}
-        />
-        <SecondaryButton
-          label="Go to Dashboard"
-          onPress={handleGoHome}
           palette={palette}
         />
       </View>
@@ -505,7 +503,6 @@ function StackHeader({ title, palette, onBack }: StackHeaderProps) {
     </View>
   );
 }
-
 type PrimaryButtonProps = {
   label: string;
   palette: AccountTabPalette;
@@ -664,6 +661,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
+  infoCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   reviewCard: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 20,
@@ -678,13 +686,6 @@ const styles = StyleSheet.create({
   reviewLabel: {
     fontSize: 16,
     fontWeight: "600",
-  },
-  automationContent: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    paddingHorizontal: 16,
   },
   primaryButton: {
     borderRadius: 14,

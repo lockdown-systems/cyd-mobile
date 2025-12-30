@@ -9,6 +9,15 @@ import {
 import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import { BaseAccountController } from "./BaseAccountController";
 import { BlueskyIndexer } from "./bluesky/indexer";
+import { mapJobRow, type JobRow } from "./bluesky/job-helpers";
+import { runJob, type JobEmit } from "./bluesky/job-runner";
+import {
+  type BlueskyJobRecord,
+  type BlueskyJobRunUpdate,
+  type BlueskyJobStatus,
+  type BlueskyJobType,
+  type SaveJobOptions,
+} from "./bluesky/job-types";
 import { BlueskyRateLimiter, type ApiRequestFn } from "./bluesky/rate-limiter";
 import type {
   BlueskyDatabaseStats,
@@ -393,6 +402,184 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
   protected makeApiRequest<T>(requestFn: ApiRequestFn<T>): Promise<T> {
     return this.rateLimiter.makeApiRequest(requestFn);
+  }
+
+  // ==================== Job Management ====================
+
+  async defineJobs(options: SaveJobOptions): Promise<BlueskyJobRecord[]> {
+    const db = this.requireDb();
+    const scheduledAt = Date.now();
+    const jobTypes: BlueskyJobType[] = ["verifyAuthorization"];
+
+    if (options.posts) {
+      jobTypes.push("savePosts");
+    }
+
+    // TODO: add likes, bookmarks, chats, and following when implemented in later phases
+
+    const inserted: BlueskyJobRecord[] = [];
+
+    for (const jobType of jobTypes) {
+      const result = await db.runAsync(
+        `INSERT INTO job (jobType, status, scheduledAt, progressJSON) VALUES (?, 'pending', ?, NULL);`,
+        [jobType, scheduledAt]
+      );
+      const id = Number(result.lastInsertRowId);
+      inserted.push({
+        id,
+        jobType,
+        status: "pending",
+        scheduledAt,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      });
+    }
+
+    return inserted;
+  }
+
+  async getPendingJobs(): Promise<BlueskyJobRecord[]> {
+    const db = this.requireDb();
+    const rows = await db.getAllAsync<JobRow>(
+      `SELECT id, jobType, status, scheduledAt, startedAt, finishedAt, progressJSON, error
+       FROM job
+       WHERE status IN ('pending', 'running')
+       ORDER BY scheduledAt ASC, id ASC;`
+    );
+    return (rows ?? []).map(mapJobRow);
+  }
+
+  async runJobs(params?: {
+    jobs?: BlueskyJobRecord[];
+    onUpdate?: (update: BlueskyJobRunUpdate) => void;
+  }): Promise<void> {
+    let jobs = params?.jobs ?? (await this.getPendingJobs());
+    const emit = (update: Partial<BlueskyJobRunUpdate>) => {
+      params?.onUpdate?.({
+        jobs,
+        activeJobId: update.activeJobId ?? null,
+        speechText: update.speechText,
+        progressText: update.progressText,
+        detailText: update.detailText,
+      });
+    };
+
+    emit({ activeJobId: null });
+
+    for (const job of jobs) {
+      const startedAt = Date.now();
+      await this.updateJobStatus(job.id, "running", startedAt, null, null);
+      jobs = jobs.map((existing) =>
+        existing.id === job.id
+          ? { ...existing, status: "running", startedAt, error: null }
+          : existing
+      );
+      emit({ activeJobId: job.id });
+
+      const emitForJob: JobEmit = (update) => {
+        emit({
+          activeJobId: job.id,
+          speechText: update.speechText,
+          progressText: update.progressText,
+          detailText: update.detailText,
+        });
+      };
+
+      try {
+        await runJob(
+          this,
+          { ...job, status: "running", startedAt },
+          emitForJob
+        );
+        const finishedAt = Date.now();
+        await this.updateJobStatus(
+          job.id,
+          "completed",
+          job.startedAt ?? startedAt,
+          finishedAt,
+          null
+        );
+        jobs = jobs.map((existing) =>
+          existing.id === job.id
+            ? { ...existing, status: "completed", finishedAt, error: null }
+            : existing
+        );
+        emit({ activeJobId: null });
+      } catch (err) {
+        const finishedAt = Date.now();
+        const message = err instanceof Error ? err.message : String(err);
+        await this.updateJobStatus(
+          job.id,
+          "failed",
+          job.startedAt ?? startedAt,
+          finishedAt,
+          message
+        );
+        jobs = jobs.map((existing) =>
+          existing.id === job.id
+            ? { ...existing, status: "failed", finishedAt, error: message }
+            : existing
+        );
+
+        // Cancel remaining jobs
+        const remaining = jobs.filter(
+          (existing) => existing.status === "pending"
+        );
+        for (const pendingJob of remaining) {
+          await this.updateJobStatus(
+            pendingJob.id,
+            "failed",
+            pendingJob.startedAt ?? null,
+            finishedAt,
+            "Cancelled due to previous failure"
+          );
+        }
+        jobs = jobs.map((existing) =>
+          existing.status === "pending"
+            ? {
+                ...existing,
+                status: "failed",
+                finishedAt,
+                error: existing.error ?? "Cancelled due to previous failure",
+              }
+            : existing
+        );
+        emit({
+          activeJobId: null,
+          progressText: message,
+          speechText: "Automation failed",
+        });
+        break;
+      }
+    }
+  }
+
+  private async updateJobStatus(
+    jobId: number,
+    status: BlueskyJobStatus,
+    startedAt: number | null,
+    finishedAt: number | null,
+    error: string | null
+  ): Promise<void> {
+    const db = this.requireDb();
+    await db.runAsync(
+      `UPDATE job
+       SET status = ?,
+           startedAt = COALESCE(startedAt, ?),
+           finishedAt = ?,
+           error = ?
+       WHERE id = ?;`,
+      [status, startedAt, finishedAt, error, jobId]
+    );
+  }
+
+  private requireDb() {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+    return this.db;
   }
 
   // ==================== Save Operations ====================
