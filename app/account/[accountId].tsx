@@ -2,6 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ComponentProps,
@@ -15,6 +16,12 @@ import {
 
 import { AccountSettingsSheet } from "@/components/account/AccountSettingsSheet";
 import { Colors } from "@/constants/theme";
+import {
+  ACCOUNT_AUTH_STATUS,
+  ACCOUNT_CONFIG_KEYS,
+  BlueskyAccountController,
+  type AccountAuthStatusValue,
+} from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { BrowseTab } from "./tabs/browse-tab";
@@ -37,6 +44,9 @@ export default function AccountPlaceholderScreen() {
   );
   const [activeTab, setActiveTab] = useState<AccountTabKey>("dashboard");
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [authStatus, setAuthStatus] = useState<
+    AccountAuthStatusValue | "unknown"
+  >("unknown");
   const insets = useSafeAreaInsets();
   const handleSelectTab = useCallback((tab: AccountTabKey) => {
     setActiveTab(tab);
@@ -47,6 +57,52 @@ export default function AccountPlaceholderScreen() {
   const closeSettings = useCallback(() => {
     setSettingsVisible(false);
   }, []);
+
+  useEffect(() => {
+    if (!account) {
+      setAuthStatus("unknown");
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new BlueskyAccountController(account.id, account.uuid);
+
+    void (async () => {
+      try {
+        await controller.initDB();
+        const storedStatus = await controller.getConfig(
+          ACCOUNT_CONFIG_KEYS.authStatus
+        );
+        if (!cancelled) {
+          if (storedStatus === ACCOUNT_AUTH_STATUS.authenticated) {
+            setAuthStatus(ACCOUNT_AUTH_STATUS.authenticated);
+          } else if (storedStatus === ACCOUNT_AUTH_STATUS.signedOut) {
+            setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
+          } else {
+            setAuthStatus("unknown");
+          }
+        }
+      } catch (err) {
+        console.warn("Unable to read account auth status", err);
+        if (!cancelled) {
+          setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
+        }
+      } finally {
+        try {
+          await controller.cleanup();
+        } catch (cleanupErr) {
+          console.warn(
+            "Failed to cleanup controller after reading status",
+            cleanupErr
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
 
   const avatarUri = account?.avatarDataURI ?? null;
   const username = account?.handle
@@ -65,6 +121,8 @@ export default function AccountPlaceholderScreen() {
         : "Account not found";
   const canonicalHandle = username ?? account?.handle ?? accountId ?? "unknown";
   const ActiveTabComponent = TAB_COMPONENTS[activeTab];
+  const isSignedOut = authStatus === ACCOUNT_AUTH_STATUS.signedOut;
+  const statusIconColor = palette.warning ?? Colors.light.warning;
 
   return (
     <>
@@ -110,12 +168,22 @@ export default function AccountPlaceholderScreen() {
                   </View>
                 )}
                 <View style={styles.headerTextStack}>
-                  <Text
-                    style={[styles.accountName, { color: palette.text }]}
-                    numberOfLines={1}
-                  >
-                    {displayName}
-                  </Text>
+                  <View style={styles.accountNameRow}>
+                    <Text
+                      style={[styles.accountName, { color: palette.text }]}
+                      numberOfLines={1}
+                    >
+                      {displayName}
+                    </Text>
+                    {isSignedOut ? (
+                      <MaterialIcons
+                        name="error-outline"
+                        size={18}
+                        color={statusIconColor}
+                        accessibilityLabel="Signed out of Bluesky"
+                      />
+                    ) : null}
+                  </View>
                   <Text
                     style={[styles.accountUsername, { color: palette.icon }]}
                     numberOfLines={1}
@@ -280,6 +348,11 @@ const styles = StyleSheet.create({
   accountName: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  accountNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   accountUsername: {
     fontSize: 14,

@@ -16,9 +16,11 @@ import {
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
 import { Colors } from "@/constants/theme";
+import { BlueskyAccountController } from "@/controllers";
 import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
 
 const CYD_DESKTOP_URL = "https://cyd.social/";
 
@@ -29,18 +31,49 @@ export default function AccountSelectionScreen() {
   const { accounts, loading, error, refresh } = useAccounts();
   const router = useRouter();
 
+  const verifyAccountAuthStatus = useCallback(
+    async (account: AccountListItem) => {
+      const controller = new BlueskyAccountController(account.id, account.uuid);
+      try {
+        await controller.initDB();
+        try {
+          await controller.initAgent();
+        } catch (authError) {
+          console.warn("Unable to initialize Bluesky agent", authError);
+        }
+        await verifyBlueskyAccountAuthStatus(controller, account);
+      } catch (err) {
+        console.warn(
+          "Failed to verify auth status for account",
+          account.handle,
+          err
+        );
+      } finally {
+        try {
+          await controller.cleanup();
+        } catch (cleanupErr) {
+          console.warn("Failed to cleanup controller", cleanupErr);
+        }
+      }
+    },
+    []
+  );
+
   const handleAddAccount = useCallback(() => {
     void router.push("/add-account");
   }, [router]);
 
   const handleSelectAccount = useCallback(
     (account: AccountListItem) => {
-      void router.push({
-        pathname: "/account/[accountId]",
-        params: { accountId: account.uuid },
-      });
+      void (async () => {
+        await verifyAccountAuthStatus(account);
+        router.push({
+          pathname: "/account/[accountId]",
+          params: { accountId: account.uuid },
+        });
+      })();
     },
-    [router]
+    [router, verifyAccountAuthStatus]
   );
 
   const handleRefresh = useCallback(() => {
