@@ -8,7 +8,15 @@ import {
   type ComponentProps,
   type ComponentType,
 } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -55,6 +63,7 @@ export default function AccountPlaceholderScreen() {
     AccountAuthStatusValue | "unknown"
   >("unknown");
   const [statusActionPending, setStatusActionPending] = useState(false);
+  const [verifyingAuth, setVerifyingAuth] = useState(false);
   const insets = useSafeAreaInsets();
   const handleSelectTab = useCallback((tab: AccountTabKey) => {
     setActiveTab(tab);
@@ -166,6 +175,7 @@ export default function AccountPlaceholderScreen() {
   useEffect(() => {
     if (!account) {
       setAuthStatus("unknown");
+      setVerifyingAuth(false);
       return;
     }
 
@@ -215,6 +225,41 @@ export default function AccountPlaceholderScreen() {
     };
   }, [account]);
 
+  useEffect(() => {
+    if (!account) {
+      setVerifyingAuth(false);
+      return;
+    }
+
+    let cancelled = false;
+    setVerifyingAuth(true);
+
+    void (async () => {
+      try {
+        const nextStatus = await runWithAccountController(
+          account,
+          (controller) => verifyBlueskyAccountAuthStatus(controller, account)
+        );
+        if (!cancelled) {
+          setAuthStatus(nextStatus);
+        }
+      } catch (err) {
+        console.warn("[AccountScreen] verify auth -> error", account.id, err);
+        if (!cancelled) {
+          setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
+        }
+      } finally {
+        if (!cancelled) {
+          setVerifyingAuth(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
+
   const avatarUri = account?.avatarDataURI ?? null;
   const username = account?.handle
     ? account.handle.startsWith("@")
@@ -227,16 +272,17 @@ export default function AccountPlaceholderScreen() {
     ? "Unable to load account"
     : loading
       ? "Loading account…"
-      : account
-        ? null
-        : "Account not found";
+      : !account
+        ? "Account not found"
+        : null;
   const canonicalHandle = username ?? account?.handle ?? accountId ?? "unknown";
   const ActiveTabComponent = TAB_COMPONENTS[activeTab];
   const showWarning = authStatus !== ACCOUNT_AUTH_STATUS.authenticated;
   const statusIconColor = showWarning
     ? (palette.warning ?? Colors.light.warning)
     : palette.tint;
-  const statusIconDisabled = showWarning && statusActionPending;
+  const statusIconDisabled =
+    (showWarning && statusActionPending) || verifyingAuth;
   const handleStatusIconPress = useCallback(() => {
     if (showWarning) {
       if (statusActionPending) {
@@ -338,11 +384,15 @@ export default function AccountPlaceholderScreen() {
                       accessibilityState={{ busy: statusIconDisabled }}
                       disabled={statusIconDisabled}
                     >
-                      <MaterialIcons
-                        name={showWarning ? "error-outline" : "check-circle"}
-                        size={18}
-                        color={statusIconColor}
-                      />
+                      {verifyingAuth ? (
+                        <ActivityIndicator size="small" color={palette.icon} />
+                      ) : (
+                        <MaterialIcons
+                          name={showWarning ? "error-outline" : "check-circle"}
+                          size={18}
+                          color={statusIconColor}
+                        />
+                      )}
                     </Pressable>
                   </View>
                   <Text
@@ -377,11 +427,19 @@ export default function AccountPlaceholderScreen() {
           <View style={styles.contentArea}>
             {accountStatus ? (
               <View style={styles.statusContainer}>
+                {loading && (
+                  <ActivityIndicator
+                    size="small"
+                    color={palette.icon}
+                    style={{ marginBottom: 8 }}
+                  />
+                )}
                 <Text style={[styles.subtitle, { color: palette.icon }]}>
                   {accountStatus}
                 </Text>
               </View>
-            ) : account ? (
+            ) : null}
+            {account ? (
               <ActiveTabComponent
                 accountId={account.id}
                 handle={canonicalHandle}

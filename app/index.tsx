@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import { useCallback, useMemo } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,11 +16,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
 import { Colors } from "@/constants/theme";
-import { BlueskyAccountController } from "@/controllers";
 import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
 
 const CYD_DESKTOP_URL = "https://cyd.social/";
 
@@ -30,56 +28,14 @@ export default function AccountSelectionScreen() {
   const Wordmark = colorScheme === "dark" ? WordmarkDark : WordmarkLight;
   const { accounts, loading, error, refresh } = useAccounts();
   const router = useRouter();
+  const [navigatingAccountId, setNavigatingAccountId] = useState<string | null>(
+    null
+  );
 
-  const verifyAccountAuthStatus = useCallback(
-    async (account: AccountListItem) => {
-      console.log(
-        "[AccountSelectionScreen] verifyAccountAuthStatus -> start",
-        account.id,
-        account.handle
-      );
-      const controller = new BlueskyAccountController(account.id, account.uuid);
-      try {
-        await controller.initDB();
-        console.log(
-          "[AccountSelectionScreen] initDB complete",
-          account.id,
-          account.handle
-        );
-        try {
-          await controller.initAgent();
-        } catch (authError) {
-          console.warn("Unable to initialize Bluesky agent", authError);
-        }
-        const status = await verifyBlueskyAccountAuthStatus(
-          controller,
-          account
-        );
-        console.log(
-          "[AccountSelectionScreen] verifyAccountAuthStatus -> status",
-          account.id,
-          status
-        );
-      } catch (err) {
-        console.warn(
-          "Failed to verify auth status for account",
-          account.handle,
-          err
-        );
-      } finally {
-        try {
-          await controller.cleanup();
-          console.log(
-            "[AccountSelectionScreen] cleanup complete",
-            account.id,
-            account.handle
-          );
-        } catch (cleanupErr) {
-          console.warn("Failed to cleanup controller", cleanupErr);
-        }
-      }
-    },
-    []
+  useFocusEffect(
+    useCallback(() => {
+      setNavigatingAccountId(null);
+    }, [])
   );
 
   const handleAddAccount = useCallback(() => {
@@ -88,25 +44,22 @@ export default function AccountSelectionScreen() {
 
   const handleSelectAccount = useCallback(
     (account: AccountListItem) => {
-      void (async () => {
-        console.log(
-          "[AccountSelectionScreen] handleSelectAccount",
-          account.id,
-          account.handle
-        );
-        await verifyAccountAuthStatus(account);
-        router.push({
-          pathname: "/account/[accountId]",
-          params: { accountId: account.uuid },
-        });
-        console.log(
-          "[AccountSelectionScreen] navigated to account",
-          account.id,
-          account.handle
-        );
-      })();
+      if (navigatingAccountId) {
+        return;
+      }
+
+      setNavigatingAccountId(account.uuid);
+      router.push({
+        pathname: "/account/[accountId]",
+        params: { accountId: account.uuid },
+      });
+      console.log(
+        "[AccountSelectionScreen] navigated to account",
+        account.id,
+        account.handle
+      );
     },
-    [router, verifyAccountAuthStatus]
+    [router, navigatingAccountId]
   );
 
   const handleRefresh = useCallback(() => {
@@ -125,9 +78,11 @@ export default function AccountSelectionScreen() {
         account={item}
         palette={palette}
         onSelect={handleSelectAccount}
+        disabled={Boolean(navigatingAccountId)}
+        busy={navigatingAccountId === item.uuid}
       />
     ),
-    [palette, handleSelectAccount]
+    [palette, handleSelectAccount, navigatingAccountId]
   );
 
   const listEmpty = useMemo(() => {
@@ -240,9 +195,17 @@ type AccountCardProps = {
   account: AccountListItem;
   palette: typeof Colors.light;
   onSelect: (account: AccountListItem) => void;
+  disabled?: boolean;
+  busy?: boolean;
 };
 
-function AccountCard({ account, palette, onSelect }: AccountCardProps) {
+function AccountCard({
+  account,
+  palette,
+  onSelect,
+  disabled,
+  busy,
+}: AccountCardProps) {
   const avatarUri = account.avatarDataURI || null;
   const username = account.handle.startsWith("@")
     ? account.handle
@@ -253,12 +216,13 @@ function AccountCard({ account, palette, onSelect }: AccountCardProps) {
   return (
     <Pressable
       onPress={() => onSelect(account)}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.accountCard,
         {
           borderColor: palette.icon + "22",
           backgroundColor: palette.card,
-          opacity: pressed ? 0.92 : 1,
+          opacity: disabled ? 0.6 : pressed ? 0.92 : 1,
         },
       ]}
       android_ripple={{ color: palette.icon + "33" }}
@@ -304,6 +268,7 @@ function AccountCard({ account, palette, onSelect }: AccountCardProps) {
           {username}
         </Text>
       </View>
+      {busy ? <ActivityIndicator size="small" color={palette.tint} /> : null}
     </Pressable>
   );
 }
