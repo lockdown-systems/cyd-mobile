@@ -347,10 +347,8 @@ export class BlueskyIndexer {
           previewPost,
         });
 
-        // Debug: slow down to visualize progress updates.
-        console.log("[saveFeedPosts] before sleep");
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        console.log("[saveFeedPosts] after sleep");
+        // Sleep a small amount for better UX
+        await new Promise((resolve) => setTimeout(resolve, 20));
       }
     });
 

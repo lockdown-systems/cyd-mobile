@@ -40,7 +40,6 @@ export async function runSavePostsJob(
   await controller.waitForPause();
   await controller.indexPosts();
 
-  controller.pause();
   await controller.waitForPause();
 
   emit({ progressText: "Saved posts", progressPercent: 1 });
