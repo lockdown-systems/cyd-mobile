@@ -58,10 +58,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
   }, [message]);
 
   return (
-    <View
-      style={[styles.wrapper, { minHeight: BUBBLE_MIN_HEIGHT }]}
-      accessibilityRole="text"
-    >
+    <View style={styles.wrapper} accessibilityRole="text">
       <CydAvatar height={AVATAR_HEIGHT} style={styles.avatar} />
       <View
         style={[
@@ -82,7 +79,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
 const styles = StyleSheet.create({
   wrapper: {
     flexDirection: "row",
-    alignItems: "stretch",
+    alignItems: "center",
     gap: 0,
     paddingVertical: 0,
     marginBottom: 12,
@@ -95,12 +92,13 @@ const styles = StyleSheet.create({
   },
   bubble: {
     flex: 1,
+    alignSelf: "center",
     borderWidth: StyleSheet.hairlineWidth,
     borderTopRightRadius: 32,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     borderTopLeftRadius: 8,
-    paddingVertical: 16,
+    paddingVertical: 0,
     paddingHorizontal: 20,
     justifyContent: "center",
   },
