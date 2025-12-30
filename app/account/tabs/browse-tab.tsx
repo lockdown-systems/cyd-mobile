@@ -1,5 +1,5 @@
+import type { AccountTabProps } from "@/types/account-tabs";
 import { TabPlaceholder } from "./tab-placeholder";
-import type { AccountTabProps } from "./types";
 
 export function BrowseTab({
   accountId: _accountId,
@@ -13,3 +13,5 @@ export function BrowseTab({
     />
   );
 }
+
+export default BrowseTab;

@@ -7,11 +7,11 @@ import {
   Linking,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
@@ -292,6 +292,7 @@ const styles = StyleSheet.create({
   },
   wordmarkWrapper: {
     alignItems: "flex-start",
+    marginBottom: 20,
   },
   accountCard: {
     flexDirection: "row",

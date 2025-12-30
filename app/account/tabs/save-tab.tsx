@@ -14,7 +14,7 @@ import {
   getAccountSaveSettings,
   updateAccountSaveSettings,
 } from "@/database/save-settings";
-import type { AccountTabPalette, AccountTabProps } from "./types";
+import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
 
 type SaveFlowScreen = "form" | "review" | "automation";
 
@@ -700,3 +700,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+export default SaveTab;

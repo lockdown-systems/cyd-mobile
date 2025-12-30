@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import type { AccountTabProps } from "./types";
+import type { AccountTabProps } from "@/types/account-tabs";
 
 type TabPlaceholderProps = Pick<AccountTabProps, "palette"> & {
   message: string;
@@ -24,3 +24,5 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
+export default TabPlaceholder;

@@ -12,7 +12,7 @@ import iconArchive from "@/assets/images/icon-archive.png";
 import iconDatabase from "@/assets/images/icon-database.png";
 import iconDelete from "@/assets/images/icon-delete.png";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
-import type { AccountTabKey, AccountTabProps } from "./types";
+import type { AccountTabKey, AccountTabProps } from "@/types/account-tabs";
 
 type DashboardCard = {
   key: AccountTabKey;
@@ -118,3 +118,5 @@ const styles = StyleSheet.create({
     textAlign: "left",
   },
 });
+
+export default DashboardTab;

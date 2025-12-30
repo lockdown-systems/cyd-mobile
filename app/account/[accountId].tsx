@@ -24,11 +24,11 @@ import {
 } from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import type { AccountTabKey, AccountTabProps } from "@/types/account-tabs";
 import { BrowseTab } from "./tabs/browse-tab";
 import { DashboardTab } from "./tabs/dashboard-tab";
 import { DeleteTab } from "./tabs/delete-tab";
 import { SaveTab } from "./tabs/save-tab";
-import type { AccountTabKey, AccountTabProps } from "./tabs/types";
 
 export default function AccountPlaceholderScreen() {
   const params = useLocalSearchParams<{ accountId: string | string[] }>();
@@ -307,6 +307,7 @@ const TAB_COMPONENTS: Record<AccountTabKey, ComponentType<AccountTabProps>> = {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    paddingTop: 20,
   },
   container: {
     flex: 1,
