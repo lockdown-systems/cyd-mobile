@@ -34,7 +34,7 @@ describe("Account save settings helpers", () => {
       settingSavePosts: 1,
       settingSaveLikes: 0,
       settingSaveBookmarks: 1,
-      settingSaveChat: null,
+      settingSaveChats: 0,
       settingSaveFollowing: 1,
     });
 

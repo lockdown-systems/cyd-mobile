@@ -20,7 +20,7 @@ type SaveSettingsRow = {
   settingSavePosts: number | null;
   settingSaveLikes: number | null;
   settingSaveBookmarks: number | null;
-  settingSaveChat: number | null;
+  settingSaveChats: number | null;
   settingSaveFollowing: number | null;
 };
 
@@ -33,7 +33,7 @@ function mapRowToSettings(row: SaveSettingsRow | null): AccountSaveSettings {
     posts: Boolean(row.settingSavePosts),
     likes: Boolean(row.settingSaveLikes),
     bookmarks: Boolean(row.settingSaveBookmarks),
-    chat: Boolean(row.settingSaveChat),
+    chat: Boolean(row.settingSaveChats),
     following: Boolean(row.settingSaveFollowing),
   };
 }
@@ -82,7 +82,7 @@ export async function updateAccountSaveSettings(
      SET settingSavePosts = ?,
          settingSaveLikes = ?,
          settingSaveBookmarks = ?,
-         settingSaveChat = ?,
+         settingSaveChats = ?,
          settingSaveFollowing = ?,
          updatedAt = ?
      WHERE id = ?;`,
