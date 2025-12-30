@@ -9,7 +9,6 @@ import { CydAvatar } from "./CydAvatar";
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const TARGET_HEIGHT = Math.min(SCREEN_HEIGHT / 3, 260);
 const AVATAR_HEIGHT = Math.max(110, TARGET_HEIGHT * 0.65);
-const BUBBLE_MIN_HEIGHT = Math.max(100, TARGET_HEIGHT * 0.5);
 
 type SpeechBubbleProps = {
   message: string;
@@ -66,11 +65,12 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
           {
             backgroundColor: bubbleBackground,
             borderColor: bubbleBorder,
-            minHeight: BUBBLE_MIN_HEIGHT,
           },
         ]}
       >
-        <Markdown style={markdownStyles}>{normalizedMessage}</Markdown>
+        <Markdown key={normalizedMessage} style={markdownStyles}>
+          {normalizedMessage}
+        </Markdown>
       </View>
     </View>
   );
@@ -98,7 +98,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     borderTopLeftRadius: 8,
-    paddingVertical: 0,
+    paddingTop: 5,
+    paddingBottom: 10,
     paddingHorizontal: 20,
     justifyContent: "center",
   },
