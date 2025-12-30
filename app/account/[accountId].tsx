@@ -1,5 +1,10 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import {
   useCallback,
   useEffect,
@@ -226,40 +231,43 @@ export default function AccountPlaceholderScreen() {
     };
   }, [account]);
 
-  useEffect(() => {
-    if (!account) {
-      setVerifyingAuth(false);
-      return;
-    }
-
-    let cancelled = false;
-    setVerifyingAuth(true);
-
-    void (async () => {
-      try {
-        const nextStatus = await runWithAccountController(
-          account,
-          (controller) => verifyBlueskyAccountAuthStatus(controller, account)
-        );
-        if (!cancelled) {
-          setAuthStatus(nextStatus);
-        }
-      } catch (err) {
-        console.warn("[AccountScreen] verify auth -> error", account.id, err);
-        if (!cancelled) {
-          setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
-        }
-      } finally {
-        if (!cancelled) {
-          setVerifyingAuth(false);
-        }
+  useFocusEffect(
+    useCallback(() => {
+      if (!account) {
+        setVerifyingAuth(false);
+        setAuthStatus("unknown");
+        return undefined;
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [account]);
+      let cancelled = false;
+      setVerifyingAuth(true);
+
+      void (async () => {
+        try {
+          const nextStatus = await runWithAccountController(
+            account,
+            (controller) => verifyBlueskyAccountAuthStatus(controller, account)
+          );
+          if (!cancelled) {
+            setAuthStatus(nextStatus);
+          }
+        } catch (err) {
+          console.warn("[AccountScreen] verify auth -> error", account.id, err);
+          if (!cancelled) {
+            setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
+          }
+        } finally {
+          if (!cancelled) {
+            setVerifyingAuth(false);
+          }
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [account])
+  );
 
   const avatarUri = account?.avatarDataURI ?? null;
   const username = account?.handle

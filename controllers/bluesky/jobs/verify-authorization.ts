@@ -88,7 +88,6 @@ export async function runVerifyAuthorizationJob(
   });
 
   await controller.waitForPause();
-  await controller.initAgent();
   const status = await ensureAuthorized(controller, emit);
   if (status !== ACCOUNT_AUTH_STATUS.authenticated) {
     throw new Error("Authorization failed");
