@@ -13,8 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/theme";
+import { BlueskyAccountController } from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
 import {
   authenticateBlueskyAccount,
   normalizeHandle,
@@ -52,8 +54,25 @@ export default function AddAccountScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      await authenticateBlueskyAccount(handle);
-      router.back();
+      const savedAccount = await authenticateBlueskyAccount(handle);
+      try {
+        const controller = new BlueskyAccountController(
+          savedAccount.id,
+          savedAccount.uuid
+        );
+        await controller.initDB();
+        await verifyBlueskyAccountAuthStatus(controller, savedAccount);
+        await controller.cleanup();
+      } catch (verifyError) {
+        console.warn(
+          "[AddAccount] Failed to persist auth status after OAuth",
+          verifyError
+        );
+      }
+      router.replace({
+        pathname: "/account/[accountId]",
+        params: { accountId: savedAccount.uuid },
+      });
     } catch (err) {
       console.error("[Bluesky OAuth] Authentication failed", err);
       const message = err instanceof Error ? err.message : String(err);
