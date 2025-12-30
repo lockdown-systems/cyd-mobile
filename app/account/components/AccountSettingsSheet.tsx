@@ -323,3 +323,5 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
 });
+
+export default AccountSettingsSheet;
