@@ -22,6 +22,7 @@ export const Colors = {
       text: "#f4f7fb",
       ripple: "rgba(255, 255, 255, 0.2)",
     },
+    danger: "#ff5b5b",
   },
   dark: {
     text: "#f4f5f7",
@@ -36,6 +37,7 @@ export const Colors = {
       text: "#0f1724",
       ripple: "rgba(0, 0, 0, 0.15)",
     },
+    danger: "#ff7b7b",
   },
 };
 

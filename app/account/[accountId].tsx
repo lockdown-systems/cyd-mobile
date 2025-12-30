@@ -13,6 +13,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
+import { AccountSettingsSheet } from "@/components/account/AccountSettingsSheet";
 import { Colors } from "@/constants/theme";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -35,9 +36,16 @@ export default function AccountPlaceholderScreen() {
     [accounts, accountId]
   );
   const [activeTab, setActiveTab] = useState<AccountTabKey>("dashboard");
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const insets = useSafeAreaInsets();
   const handleSelectTab = useCallback((tab: AccountTabKey) => {
     setActiveTab(tab);
+  }, []);
+  const openSettings = useCallback(() => {
+    setSettingsVisible(true);
+  }, []);
+  const closeSettings = useCallback(() => {
+    setSettingsVisible(false);
   }, []);
 
   const avatarUri = account?.avatarDataURI ?? null;
@@ -59,125 +67,153 @@ export default function AccountPlaceholderScreen() {
   const ActiveTabComponent = TAB_COMPONENTS[activeTab];
 
   return (
-    <SafeAreaView
-      edges={["left", "right"]}
-      style={[styles.safeArea, { backgroundColor: palette.background }]}
-    >
-      <Stack.Screen
-        options={{
-          headerStyle: { backgroundColor: palette.background },
-          headerTintColor: palette.text,
-          headerShadowVisible: false,
-          headerBackTitle: "Back",
-          headerTitle: () => (
-            <View style={styles.headerTitle}>
-              {avatarUri ? (
-                <Image
-                  source={{ uri: avatarUri }}
-                  style={[
-                    styles.avatar,
-                    {
-                      borderColor: palette.icon + "33",
-                      backgroundColor: palette.icon + "20",
-                    },
-                  ]}
-                  accessibilityIgnoresInvertColors
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.avatarFallback,
-                    {
-                      borderColor: palette.icon + "33",
-                      backgroundColor: palette.icon + "20",
-                    },
-                  ]}
-                >
-                  <Text style={[styles.avatarInitial, { color: palette.text }]}>
-                    {initial}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.headerTextStack}>
-                <Text
-                  style={[styles.accountName, { color: palette.text }]}
-                  numberOfLines={1}
-                >
-                  {displayName}
-                </Text>
-                <Text
-                  style={[styles.accountUsername, { color: palette.icon }]}
-                  numberOfLines={1}
-                >
-                  {username ?? ""}
-                </Text>
-              </View>
-            </View>
-          ),
-        }}
-      />
-      <View style={styles.container}>
-        <View style={styles.contentArea}>
-          {accountStatus ? (
-            <View style={styles.statusContainer}>
-              <Text style={[styles.subtitle, { color: palette.icon }]}>
-                {accountStatus}
-              </Text>
-            </View>
-          ) : account ? (
-            <ActiveTabComponent
-              accountId={account.id}
-              handle={canonicalHandle}
-              palette={palette}
-              onSelectTab={handleSelectTab}
-            />
-          ) : null}
-        </View>
-        <View
-          style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}
-        >
-          <View
-            style={[
-              styles.tabBar,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            {TAB_CONFIG.map((tab) => {
-              const selected = tab.key === activeTab;
-              return (
-                <Pressable
-                  key={tab.key}
-                  onPress={() => handleSelectTab(tab.key)}
-                  style={[
-                    styles.tabButton,
-                    selected && { backgroundColor: palette.icon + "11" },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                >
-                  <MaterialIcons
-                    name={tab.icon}
-                    size={20}
-                    color={selected ? palette.tint : palette.icon}
-                  />
-                  <Text
+    <>
+      <SafeAreaView
+        edges={["left", "right"]}
+        style={[styles.safeArea, { backgroundColor: palette.background }]}
+      >
+        <Stack.Screen
+          options={{
+            headerStyle: { backgroundColor: palette.background },
+            headerTintColor: palette.text,
+            headerShadowVisible: false,
+            headerBackTitle: "Back",
+            headerTitle: () => (
+              <View style={styles.headerTitle}>
+                {avatarUri ? (
+                  <Image
+                    source={{ uri: avatarUri }}
                     style={[
-                      styles.tabLabel,
-                      { color: selected ? palette.tint : palette.icon },
+                      styles.avatar,
+                      {
+                        borderColor: palette.icon + "33",
+                        backgroundColor: palette.icon + "20",
+                      },
+                    ]}
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.avatarFallback,
+                      {
+                        borderColor: palette.icon + "33",
+                        backgroundColor: palette.icon + "20",
+                      },
                     ]}
                   >
-                    {tab.label}
+                    <Text
+                      style={[styles.avatarInitial, { color: palette.text }]}
+                    >
+                      {initial}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.headerTextStack}>
+                  <Text
+                    style={[styles.accountName, { color: palette.text }]}
+                    numberOfLines={1}
+                  >
+                    {displayName}
                   </Text>
-                </Pressable>
-              );
-            })}
+                  <Text
+                    style={[styles.accountUsername, { color: palette.icon }]}
+                    numberOfLines={1}
+                  >
+                    {username ?? ""}
+                  </Text>
+                </View>
+              </View>
+            ),
+            headerRight: () => (
+              <Pressable
+                onPress={openSettings}
+                style={({ pressed }) => [
+                  styles.headerActionButton,
+                  {
+                    borderColor: palette.icon + "33",
+                    backgroundColor: palette.card,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Account settings"
+              >
+                <MaterialIcons name="settings" size={20} color={palette.text} />
+              </Pressable>
+            ),
+          }}
+        />
+        <View style={styles.container}>
+          <View style={styles.contentArea}>
+            {accountStatus ? (
+              <View style={styles.statusContainer}>
+                <Text style={[styles.subtitle, { color: palette.icon }]}>
+                  {accountStatus}
+                </Text>
+              </View>
+            ) : account ? (
+              <ActiveTabComponent
+                accountId={account.id}
+                handle={canonicalHandle}
+                palette={palette}
+                onSelectTab={handleSelectTab}
+              />
+            ) : null}
+          </View>
+          <View
+            style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}
+          >
+            <View
+              style={[
+                styles.tabBar,
+                {
+                  borderColor: palette.icon + "22",
+                  backgroundColor: palette.card,
+                },
+              ]}
+            >
+              {TAB_CONFIG.map((tab) => {
+                const selected = tab.key === activeTab;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => handleSelectTab(tab.key)}
+                    style={[
+                      styles.tabButton,
+                      selected && { backgroundColor: palette.icon + "11" },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                  >
+                    <MaterialIcons
+                      name={tab.icon}
+                      size={20}
+                      color={selected ? palette.tint : palette.icon}
+                    />
+                    <Text
+                      style={[
+                        styles.tabLabel,
+                        { color: selected ? palette.tint : palette.icon },
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+      <AccountSettingsSheet
+        handle={canonicalHandle}
+        palette={palette}
+        visible={settingsVisible}
+        onClose={closeSettings}
+        bottomInset={insets.bottom}
+      />
+    </>
   );
 }
 
@@ -200,7 +236,6 @@ const TAB_COMPONENTS: Record<AccountTabKey, ComponentType<AccountTabProps>> = {
   delete: DeleteTab,
   browse: BrowseTab,
 };
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -282,5 +317,10 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  headerActionButton: {
+    padding: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });
