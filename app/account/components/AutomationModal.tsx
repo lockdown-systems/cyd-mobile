@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { BlueskyAccountController } from "@/controllers";
 import type {
   BlueskyJobRecord,
@@ -212,6 +213,53 @@ export function AutomationModal({
     return palette.icon;
   };
 
+  const totalJobs = jobs.length;
+  const completedCount = jobs.filter(
+    (job) => job.status === "completed"
+  ).length;
+  const runningJob = jobs.find((job) => job.status === "running");
+
+  const currentIndex = (() => {
+    if (runningJob) {
+      return jobs.findIndex((job) => job.id === runningJob.id) + 1;
+    }
+    if (completedCount >= totalJobs) {
+      return totalJobs || 0;
+    }
+    return completedCount + 1;
+  })();
+
+  const currentLabel = (() => {
+    if (runningJob) return jobLabel(runningJob.jobType);
+    if (completedCount < totalJobs && jobs[completedCount]) {
+      return jobLabel(jobs[completedCount].jobType);
+    }
+    if (totalJobs === 0) return "Preparing";
+    return "Finished";
+  })();
+
+  const progressPercent = (() => {
+    if (totalJobs === 0) return 0;
+    const hasVerify = jobs.some((job) => job.jobType === "verifyAuthorization");
+    const remainingCount = hasVerify ? Math.max(totalJobs - 1, 0) : totalJobs;
+    const verifyWeight = hasVerify ? 2 : 0;
+    const remainingWeight = hasVerify ? 98 : 100;
+    const perJobWeight =
+      remainingCount > 0 ? remainingWeight / remainingCount : 0;
+
+    const weightForJob = (job: BlueskyJobRecord) =>
+      job.jobType === "verifyAuthorization" ? verifyWeight : perJobWeight;
+
+    const completedWeight = jobs
+      .filter((job) => job.status === "completed")
+      .reduce((sum, job) => sum + weightForJob(job), 0);
+
+    const runningWeight = runningJob ? weightForJob(runningJob) * 0.5 : 0;
+
+    const percent = completedWeight + runningWeight;
+    return Math.max(0, Math.min(100, percent));
+  })();
+
   const handlePause = useCallback(async () => {
     const controller = await ensureController();
     controller.pause();
@@ -234,49 +282,30 @@ export function AutomationModal({
       <View
         style={[styles.modalContainer, { backgroundColor: palette.background }]}
       >
-        <View style={styles.modalHeader}>
-          <Text style={[styles.headline, { color: palette.text }]}>
-            Automation
-          </Text>
-          <Pressable
-            onPress={onClose}
-            accessibilityRole="button"
-            style={styles.closeButton}
-          >
-            <MaterialIcons name="close" size={24} color={palette.text} />
-          </Pressable>
-        </View>
+        <SpeechBubble message={speech ?? "Preparing to start…"} />
 
-        <View
-          style={[
-            styles.speechBubble,
-            { borderColor: palette.icon + "22", backgroundColor: palette.card },
-          ]}
-        >
-          <Text style={[styles.speechText, { color: palette.text }]}>
-            {speech ?? "Preparing to start…"}
+        <View style={styles.stepRow}>
+          <MaterialIcons
+            name={statusIcon(runningJob ? runningJob.status : "running")}
+            size={20}
+            color={statusColor(runningJob ? runningJob.status : "running")}
+          />
+          <Text style={[styles.stepText, { color: palette.text }]}>
+            Step {Math.max(currentIndex, 0)}/{Math.max(totalJobs, 0)}:{" "}
+            {currentLabel}
           </Text>
         </View>
 
-        <View style={styles.statusList}>
-          {jobs.map((job) => (
-            <View
-              key={job.id}
-              style={[styles.statusRow, { borderColor: palette.icon + "22" }]}
-            >
-              <MaterialIcons
-                name={statusIcon(job.status)}
-                size={20}
-                color={statusColor(job.status)}
-              />
-              <Text style={[styles.statusLabel, { color: palette.text }]}>
-                {jobLabel(job.jobType)}
-              </Text>
-              <Text style={[styles.statusValue, { color: palette.icon }]}>
-                {job.status}
-              </Text>
-            </View>
-          ))}
+        <View style={styles.progressBarContainer}>
+          <View
+            style={[
+              styles.progressBarFill,
+              {
+                width: `${progressPercent}%`,
+                backgroundColor: palette.tint,
+              },
+            ]}
+          />
         </View>
 
         <View
@@ -333,76 +362,24 @@ export function AutomationModal({
           </View>
         ) : null}
 
-        <View style={styles.modalFooter}>
+        <View style={styles.buttonRow}>
           {state === "running" ? (
-            <>
-              <SecondaryButton
-                label={paused ? "Resume" : "Pause"}
-                palette={palette}
-                onPress={paused ? handleResume : handlePause}
-              />
-              <PrimaryButton
-                label="Close"
-                palette={palette}
-                onPress={onClose}
-              />
-            </>
+            <SecondaryButton
+              label={paused ? "Resume" : "Pause"}
+              palette={palette}
+              onPress={paused ? handleResume : handlePause}
+            />
           ) : (
-            <>
-              <SecondaryButton
-                label={onRestart ? "Back to Save Options" : "Close"}
-                palette={palette}
-                onPress={onRestart ?? onClose}
-              />
-              <PrimaryButton
-                label="Close"
-                palette={palette}
-                onPress={onClose}
-              />
-            </>
+            <SecondaryButton
+              label={onRestart ? "Back to Save Options" : "Close"}
+              palette={palette}
+              onPress={onRestart ?? onClose}
+            />
           )}
+          <DangerButton label="Cancel" palette={palette} onPress={onClose} />
         </View>
       </View>
     </Modal>
-  );
-}
-
-function PrimaryButton({
-  label,
-  palette,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  disabled?: boolean;
-}) {
-  const backgroundColor = palette.button?.background ?? palette.tint;
-  const textColor = palette.button?.text ?? "#ffffff";
-  return (
-    <Pressable
-      onPress={
-        disabled
-          ? undefined
-          : () => {
-              void onPress();
-            }
-      }
-      style={({ pressed }) => [
-        styles.primaryButton,
-        {
-          backgroundColor,
-          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-    >
-      <Text style={[styles.primaryButtonText, { color: textColor }]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -437,6 +414,42 @@ function SecondaryButton({
   );
 }
 
+function DangerButton({
+  label,
+  palette,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  palette: AccountTabPalette;
+  onPress: () => void | Promise<void>;
+  disabled?: boolean;
+}) {
+  const backgroundColor = palette.danger ?? "#b00020";
+  return (
+    <Pressable
+      onPress={
+        disabled
+          ? undefined
+          : () => {
+              void onPress();
+            }
+      }
+      style={({ pressed }) => [
+        styles.dangerButton,
+        {
+          backgroundColor,
+          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+    >
+      <Text style={styles.dangerButtonText}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
@@ -444,48 +457,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
     gap: 16,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  headline: {
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  closeButton: {
-    padding: 8,
-    borderRadius: 999,
-  },
-  speechBubble: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    padding: 14,
-  },
-  speechText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  statusList: {
-    gap: 8,
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  statusLabel: {
-    flex: 1,
-    fontSize: 15,
-  },
-  statusValue: {
-    fontSize: 13,
-    textTransform: "capitalize",
   },
   progressCard: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -516,31 +487,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
   },
-  modalFooter: {
+  buttonRow: {
     marginTop: "auto",
-    gap: 12,
-  },
-  primaryButton: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    alignSelf: "center",
-    minWidth: 220,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
+    gap: 12,
   },
   secondaryButton: {
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignItems: "center",
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 32,
-    alignSelf: "center",
-    minWidth: 220,
   },
   secondaryButtonText: {
     fontSize: 15,
@@ -553,5 +512,34 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     textAlign: "center",
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  stepText: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  progressBarContainer: {
+    height: 10,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+  },
+  dangerButton: {
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  dangerButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

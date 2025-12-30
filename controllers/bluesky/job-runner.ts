@@ -15,7 +15,8 @@ export async function runJob(
   switch (job.jobType) {
     case "verifyAuthorization": {
       emit({
-        speechText: "Checking your Bluesky connection",
+        speechText:
+          "I'm making sure I still have access to your Bluesky account",
         progressText: "Verifying session…",
       });
       controller.pause();
@@ -26,9 +27,10 @@ export async function runJob(
     }
     case "savePosts": {
       emit({
-        speechText: "Saving your posts",
+        speechText: "I'm saving all of your posts",
         progressText: "Fetching posts…",
       });
+      controller.pause();
       await controller.waitForPause();
       if (!controller.isAgentReady()) {
         await controller.initAgent();

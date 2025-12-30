@@ -55,7 +55,7 @@ describe("BlueskyAccountController job pipeline", () => {
 
     const updates: string[] = [];
 
-    const autoResume = setTimeout(() => controller.resume(), 10);
+    const resumeInterval = setInterval(() => controller.resume(), 5);
 
     await controller.runJobs({
       jobs,
@@ -68,7 +68,7 @@ describe("BlueskyAccountController job pipeline", () => {
       },
     });
 
-    clearTimeout(autoResume);
+    clearInterval(resumeInterval);
 
     expect(initAgent).toHaveBeenCalledTimes(1);
     expect(indexPosts).toHaveBeenCalledTimes(1);
