@@ -29,6 +29,7 @@ export async function runSavePostsJob(
       progressText: formatProgress(progress.postsSaved, progress.postsTotal),
       progressPercent: fraction ?? undefined,
       detailText: progress.currentAction || undefined,
+      previewPost: progress.previewPost,
     });
   });
 

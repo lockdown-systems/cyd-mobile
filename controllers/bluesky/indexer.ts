@@ -8,7 +8,11 @@ import {
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import type { ApiRequestFn } from "./rate-limiter";
-import type { BlueskyProgress } from "./types";
+import type {
+  AutomationMediaAttachment,
+  AutomationPostPreviewData,
+  BlueskyProgress,
+} from "./types";
 
 type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
 type FeedPostView = FeedViewPost["post"];
@@ -257,12 +261,56 @@ export class BlueskyIndexer {
           ]
         );
 
+        const media = this.extractMedia(postView);
+
+        const author = postView.author;
+        const likeCount =
+          typeof postView.likeCount === "number" ? postView.likeCount : null;
+        const repostCount =
+          typeof postView.repostCount === "number"
+            ? postView.repostCount
+            : null;
+        const replyCount =
+          typeof postView.replyCount === "number" ? postView.replyCount : null;
+        const quoteCount =
+          typeof postView.quoteCount === "number" ? postView.quoteCount : null;
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const previewPost: AutomationPostPreviewData = {
+          uri: String(postView.uri ?? ""),
+          cid: String(postView.cid ?? ""),
+          text: String(text ?? ""),
+          createdAt:
+            postRecord?.createdAt ??
+            repostRecord?.createdAt ??
+            postView.indexedAt ??
+            new Date().toISOString(),
+          author: {
+            did: String(author.did ?? ""),
+            handle: String(author.handle ?? ""),
+            displayName: author.displayName ?? null,
+            avatarUrl: author.avatar ?? null,
+            avatarDataURI:
+              (author as { avatarDataURI?: string | null }).avatarDataURI ??
+              null,
+          },
+          likeCount,
+          repostCount,
+          replyCount,
+          quoteCount,
+          isRepost: recordInfo.kind === "repost",
+          quotedPostUri,
+          media,
+        } satisfies AutomationPostPreviewData;
+
         // Emit per-post progress for debugging UI visibility.
         saved += 1;
         this.deps.updateProgress({
           postsSaved: totalSavedSoFar + saved,
           postsTotal: postsTotal ?? undefined,
           currentAction: `Indexed ${totalSavedSoFar + saved} posts`,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          previewPost,
         });
 
         // Debug: slow down to visualize progress updates.
@@ -352,5 +400,39 @@ export class BlueskyIndexer {
     };
 
     return findUri(embed);
+  }
+
+  private extractMedia(postView: FeedPostView): AutomationMediaAttachment[] {
+    const embed = (postView as { embed?: unknown }).embed as
+      | { images?: Record<string, unknown>[] }
+      | undefined;
+
+    const images = Array.isArray(embed?.images) ? embed.images : [];
+
+    const attachments: AutomationMediaAttachment[] = [];
+
+    for (const image of images) {
+      const thumb = (image as { thumb?: string }).thumb ?? null;
+      const fullsize = (image as { fullsize?: string }).fullsize ?? null;
+      if (!thumb && !fullsize) continue;
+
+      const alt = (image as { alt?: string }).alt ?? null;
+      const aspect = (
+        image as { aspectRatio?: { width?: number; height?: number } }
+      ).aspectRatio;
+      const width = aspect?.width ?? null;
+      const height = aspect?.height ?? null;
+
+      attachments.push({
+        type: "image",
+        thumbUrl: thumb,
+        fullsizeUrl: fullsize,
+        alt,
+        width,
+        height,
+      });
+    }
+
+    return attachments;
   }
 }

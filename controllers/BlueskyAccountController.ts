@@ -106,6 +106,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     return {
       postsSaved: 0,
       postsTotal: null,
+      previewPost: null,
       likesSaved: 0,
       likesTotal: null,
       bookmarksSaved: 0,
@@ -488,6 +489,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         speechText: update.speechText,
         progressText: update.progressText,
         progressPercent: update.progressPercent,
+        previewPost: update.previewPost,
         detailText: update.detailText,
       });
     };
@@ -517,6 +519,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           speechText: update.speechText,
           progressText: update.progressText,
           progressPercent: update.progressPercent,
+          previewPost: update.previewPost,
           detailText: update.detailText,
         });
       };

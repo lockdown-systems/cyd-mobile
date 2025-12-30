@@ -15,7 +15,9 @@ import type {
   BlueskyJobRunUpdate,
   SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
+import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
+import { AutomationPostPreview } from "./AutomationPostPreview";
 import { AutomationProgressBar } from "./AutomationProgressBar";
 
 export type AutomationModalState = "idle" | "running" | "failed" | "completed";
@@ -48,6 +50,8 @@ export function AutomationModal({
   const [paused, setPaused] = useState(false);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [activeJobProgress, setActiveJobProgress] = useState(0);
+  const [previewPost, setPreviewPost] =
+    useState<AutomationPostPreviewData | null>(null);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
@@ -58,6 +62,7 @@ export function AutomationModal({
     setDetail(null);
     setError(null);
     setJobs([]);
+    setPreviewPost(null);
     latestJobsRef.current = [];
   };
 
@@ -112,6 +117,22 @@ export function AutomationModal({
     []
   );
 
+  const isPreviewPost = (
+    value: unknown
+  ): value is AutomationPostPreviewData => {
+    if (!value || typeof value !== "object") return false;
+    const candidate = value as Partial<AutomationPostPreviewData>;
+    return (
+      typeof candidate.uri === "string" &&
+      typeof candidate.cid === "string" &&
+      typeof candidate.text === "string" &&
+      typeof candidate.author === "object" &&
+      candidate.author !== null &&
+      typeof (candidate.author as { did?: unknown }).did === "string" &&
+      typeof (candidate.author as { handle?: unknown }).handle === "string"
+    );
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -152,12 +173,16 @@ export function AutomationModal({
             if (update.progressPercent !== undefined) {
               setActiveJobProgress(update.progressPercent);
             }
+            if (update.previewPost !== undefined) {
+              setPreviewPost(
+                isPreviewPost(update.previewPost) ? update.previewPost : null
+              );
+            }
             if (update.detailText !== undefined) {
               setDetail(update.detailText);
             }
           },
         });
-
         if (cancelled) return;
 
         const failed = latestJobsRef.current.some(
@@ -255,19 +280,28 @@ export function AutomationModal({
     (job) => job.status === "completed"
   ).length;
   const runningJob = jobs.find((job) => job.status === "running");
+  const activeJob = (() => {
+    if (activeJobId !== null) {
+      const byId = jobs.find((job) => job.id === activeJobId);
+      if (byId) return byId;
+    }
+    return runningJob;
+  })();
+  const statusForUi = activeJob?.status ?? runningJob?.status ?? "running";
 
   const currentIndex = (() => {
-    if (runningJob) {
-      return jobs.findIndex((job) => job.id === runningJob.id) + 1;
+    if (activeJob) {
+      return Math.max(jobs.findIndex((job) => job.id === activeJob.id) + 1, 1);
     }
     if (completedCount >= totalJobs) {
       return totalJobs || 0;
     }
+    if (totalJobs === 0) return 0;
     return completedCount + 1;
   })();
 
   const currentLabel = (() => {
-    if (runningJob) return jobLabel(runningJob.jobType);
+    if (activeJob) return jobLabel(activeJob.jobType);
     if (completedCount < totalJobs && jobs[completedCount]) {
       return jobLabel(jobs[completedCount].jobType);
     }
@@ -301,9 +335,9 @@ export function AutomationModal({
 
         <View style={styles.stepRow}>
           <MaterialIcons
-            name={statusIcon(runningJob ? runningJob.status : "running")}
+            name={statusIcon(statusForUi)}
             size={20}
-            color={statusColor(runningJob ? runningJob.status : "running")}
+            color={statusColor(statusForUi)}
           />
           <Text style={[styles.stepText, { color: palette.text }]}>
             Step {Math.max(currentIndex, 0)}/{Math.max(totalJobs, 0)}:{" "}
@@ -332,6 +366,10 @@ export function AutomationModal({
             </Text>
           ) : null}
         </View>
+
+        {previewPost ? (
+          <AutomationPostPreview post={previewPost} palette={palette} />
+        ) : null}
 
         {state === "failed" && error ? (
           <View

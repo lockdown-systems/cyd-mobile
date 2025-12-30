@@ -7,6 +7,7 @@ export interface BlueskyProgress {
   // Index (save) progress
   postsSaved: number;
   postsTotal: number | null;
+  previewPost?: AutomationPostPreviewData | null;
   likesSaved: number;
   likesTotal: number | null;
   bookmarksSaved: number;
@@ -47,6 +48,36 @@ export interface RateLimitInfo {
   resetAt: number; // Unix timestamp (seconds)
   isLimited: boolean;
 }
+
+export type AutomationMediaAttachment = {
+  type: "image" | "video";
+  thumbUrl?: string | null;
+  fullsizeUrl?: string | null;
+  alt?: string | null;
+  width?: number | null;
+  height?: number | null;
+};
+
+export type AutomationPostPreviewData = {
+  uri: string;
+  cid: string;
+  text: string;
+  createdAt: string;
+  author: {
+    did: string;
+    handle: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    avatarDataURI?: string | null;
+  };
+  likeCount?: number | null;
+  repostCount?: number | null;
+  replyCount?: number | null;
+  quoteCount?: number | null;
+  isRepost?: boolean;
+  quotedPostUri?: string | null;
+  media?: AutomationMediaAttachment[];
+};
 
 /**
  * Database statistics for the account

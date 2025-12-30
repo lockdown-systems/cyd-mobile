@@ -1,3 +1,5 @@
+import type { AutomationPostPreviewData } from "./types";
+
 export type BlueskyJobType =
   | "verifyAuthorization"
   | "savePosts"
@@ -26,6 +28,7 @@ export type BlueskyJobRunUpdate = {
   progressText?: string;
   progressPercent?: number;
   detailText?: string;
+  previewPost?: AutomationPostPreviewData | null;
 };
 
 export type JobEmit = (update: {
@@ -33,6 +36,7 @@ export type JobEmit = (update: {
   progressText?: string;
   progressPercent?: number;
   detailText?: string;
+  previewPost?: AutomationPostPreviewData | null;
 }) => void;
 
 export type SaveJobOptions = {
