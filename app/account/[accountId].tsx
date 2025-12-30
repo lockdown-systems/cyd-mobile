@@ -22,10 +22,14 @@ import {
   BlueskyAccountController,
   type AccountAuthStatusValue,
 } from "@/controllers";
+import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
-import { revokeBlueskyAuthorization } from "@/services/bluesky-oauth";
+import {
+  authenticateBlueskyAccount,
+  revokeBlueskyAuthorization,
+} from "@/services/bluesky-oauth";
 import type { AccountTabKey, AccountTabProps } from "@/types/account-tabs";
 import { BrowseTab } from "./tabs/browse-tab";
 import { DashboardTab } from "./tabs/dashboard-tab";
@@ -66,29 +70,63 @@ export default function AccountPlaceholderScreen() {
       );
     }
 
-    const controller = new BlueskyAccountController(account.id, account.uuid);
-
     try {
-      await controller.initDB();
+      console.log("[AccountScreen] handleSignOut -> start", account.id);
       await revokeBlueskyAuthorization(account.id);
-      const nextStatus = await verifyBlueskyAccountAuthStatus(
-        controller,
-        account
+      console.log(
+        "[AccountScreen] revokeBlueskyAuthorization complete",
+        account.id
+      );
+      setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
+      const nextStatus = await runWithAccountController(account, (controller) =>
+        verifyBlueskyAccountAuthStatus(controller, account)
+      );
+      console.log(
+        "[AccountScreen] handleSignOut -> verified",
+        account.id,
+        nextStatus
       );
       setAuthStatus(nextStatus);
     } catch (err) {
+      console.warn("[AccountScreen] handleSignOut -> error", account?.id, err);
       throw err instanceof Error
         ? err
         : new Error("Unable to sign out of Bluesky right now.");
-    } finally {
-      try {
-        await controller.cleanup();
-      } catch (cleanupErr) {
-        console.warn(
-          "Failed to cleanup controller after signing out",
-          cleanupErr
-        );
-      }
+    }
+  }, [account]);
+
+  const handleReauthenticate = useCallback(async () => {
+    if (!account) {
+      throw new Error(
+        "Account information is not available yet. Please try again in a moment."
+      );
+    }
+
+    try {
+      console.log("[AccountScreen] handleReauthenticate -> start", account.id);
+      await authenticateBlueskyAccount(account.handle);
+      console.log(
+        "[AccountScreen] authenticateBlueskyAccount -> success",
+        account.id
+      );
+      const nextStatus = await runWithAccountController(account, (controller) =>
+        verifyBlueskyAccountAuthStatus(controller, account)
+      );
+      console.log(
+        "[AccountScreen] handleReauthenticate -> verified",
+        account.id,
+        nextStatus
+      );
+      setAuthStatus(nextStatus);
+    } catch (err) {
+      console.warn(
+        "[AccountScreen] handleReauthenticate -> error",
+        account?.id,
+        err
+      );
+      throw err instanceof Error
+        ? err
+        : new Error("Unable to reauthenticate with Bluesky right now.");
     }
   }, [account]);
 
@@ -107,6 +145,11 @@ export default function AccountPlaceholderScreen() {
         const storedStatus = await controller.getConfig(
           ACCOUNT_CONFIG_KEYS.authStatus
         );
+        console.log(
+          "[AccountScreen] useEffect -> stored status",
+          account.id,
+          storedStatus
+        );
         if (!cancelled) {
           if (storedStatus === ACCOUNT_AUTH_STATUS.authenticated) {
             setAuthStatus(ACCOUNT_AUTH_STATUS.authenticated);
@@ -124,6 +167,7 @@ export default function AccountPlaceholderScreen() {
       } finally {
         try {
           await controller.cleanup();
+          console.log("[AccountScreen] useEffect -> cleanup", account.id);
         } catch (cleanupErr) {
           console.warn(
             "Failed to cleanup controller after reading status",
@@ -155,8 +199,10 @@ export default function AccountPlaceholderScreen() {
         : "Account not found";
   const canonicalHandle = username ?? account?.handle ?? accountId ?? "unknown";
   const ActiveTabComponent = TAB_COMPONENTS[activeTab];
-  const isSignedOut = authStatus === ACCOUNT_AUTH_STATUS.signedOut;
-  const statusIconColor = palette.warning ?? Colors.light.warning;
+  const showWarning = authStatus !== ACCOUNT_AUTH_STATUS.authenticated;
+  const statusIconColor = showWarning
+    ? (palette.warning ?? Colors.light.warning)
+    : palette.tint;
 
   return (
     <>
@@ -209,12 +255,20 @@ export default function AccountPlaceholderScreen() {
                     >
                       {displayName}
                     </Text>
-                    {isSignedOut ? (
+                    {showWarning ? (
                       <MaterialIcons
                         name="error-outline"
                         size={18}
                         color={statusIconColor}
                         accessibilityLabel="Signed out of Bluesky"
+                      />
+                    ) : null}
+                    {!showWarning ? (
+                      <MaterialIcons
+                        name="check-circle"
+                        size={18}
+                        color={statusIconColor}
+                        accessibilityLabel="Authenticated with Bluesky"
                       />
                     ) : null}
                   </View>
@@ -314,6 +368,8 @@ export default function AccountPlaceholderScreen() {
         visible={settingsVisible}
         onClose={closeSettings}
         bottomInset={insets.bottom}
+        authStatus={authStatus === "unknown" ? "unknown" : authStatus}
+        onReauthenticate={handleReauthenticate}
         onSignOut={handleSignOut}
       />
     </>
@@ -339,6 +395,33 @@ const TAB_COMPONENTS: Record<AccountTabKey, ComponentType<AccountTabProps>> = {
   delete: DeleteTab,
   browse: BrowseTab,
 };
+
+async function runWithAccountController<T>(
+  account: AccountListItem,
+  fn: (controller: BlueskyAccountController) => Promise<T>
+): Promise<T> {
+  console.log("[AccountScreen] runWithAccountController -> start", account.id);
+  const controller = new BlueskyAccountController(account.id, account.uuid);
+  try {
+    await controller.initDB();
+    console.log(
+      "[AccountScreen] runWithAccountController -> initDB",
+      account.id
+    );
+    return await fn(controller);
+  } finally {
+    try {
+      await controller.cleanup();
+      console.log(
+        "[AccountScreen] runWithAccountController -> cleanup",
+        account.id
+      );
+    } catch (cleanupErr) {
+      console.warn("Failed to cleanup controller", cleanupErr);
+    }
+  }
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

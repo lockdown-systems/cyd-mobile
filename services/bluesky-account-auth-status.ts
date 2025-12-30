@@ -41,30 +41,51 @@ export async function verifyBlueskyAccountAuthStatus(
   controller: BlueskyAccountController,
   account: AccountListItem
 ): Promise<AccountAuthStatusValue> {
-  let status: AccountAuthStatusValue = ACCOUNT_AUTH_STATUS.signedOut;
+  console.log("[AuthStatus] verify -> start", account.id, account.handle);
+  let storedStatus: AccountAuthStatusValue | null = null;
   try {
-    if (!(await controller.getConfig(ACCOUNT_CONFIG_KEYS.authStatus))) {
-      return status;
+    const rawStatus = await controller.getConfig(
+      ACCOUNT_CONFIG_KEYS.authStatus
+    );
+    if (
+      rawStatus === ACCOUNT_AUTH_STATUS.authenticated ||
+      rawStatus === ACCOUNT_AUTH_STATUS.signedOut
+    ) {
+      storedStatus = rawStatus;
     }
+    console.log("[AuthStatus] stored status", account.id, storedStatus);
   } catch (err) {
     console.warn("Failed to get Bluesky auth status", err);
   }
 
+  let status: AccountAuthStatusValue =
+    storedStatus ?? ACCOUNT_AUTH_STATUS.signedOut;
+
   try {
+    if (!controller.isAgentReady()) {
+      console.log("[AuthStatus] initAgent required", account.id);
+      await controller.initAgent();
+    }
     const profile = await controller.getProfile();
+    console.log("[AuthStatus] profile retrieved", account.id, Boolean(profile));
     if (profile && profileMatchesAccount(profile, account)) {
       status = ACCOUNT_AUTH_STATUS.authenticated;
+    } else {
+      status = ACCOUNT_AUTH_STATUS.signedOut;
     }
+    console.log("[AuthStatus] profile match result", account.id, status);
   } catch (err) {
     console.warn("Unable to verify Bluesky auth status", err);
-    status = ACCOUNT_AUTH_STATUS.signedOut;
+    status = storedStatus ?? ACCOUNT_AUTH_STATUS.signedOut;
   }
 
   try {
     await controller.setConfig(ACCOUNT_CONFIG_KEYS.authStatus, status);
+    console.log("[AuthStatus] status persisted", account.id, status);
   } catch (err) {
     console.warn("Failed to persist Bluesky auth status", err);
   }
 
+  console.log("[AuthStatus] verify -> end", account.id, status);
   return status;
 }

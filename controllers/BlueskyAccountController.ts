@@ -6,6 +6,7 @@ import {
   applyAccountMigrations,
   blueskyAccountMigrations,
 } from "@/database/account-db";
+import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import { BaseAccountController } from "./BaseAccountController";
 import { BlueskyIndexer } from "./bluesky/indexer";
 import { BlueskyRateLimiter, type ApiRequestFn } from "./bluesky/rate-limiter";
@@ -18,6 +19,30 @@ import type {
   DeleteRepostsOptions,
   RateLimitInfo,
 } from "./bluesky/types";
+
+type FetchRequestInfo = string | URL | Request;
+
+function isRequestLike(value: unknown): value is Request {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "url" in value &&
+    typeof (value as { url?: unknown }).url === "string"
+  );
+}
+
+function normalizeFetchUrl(input: FetchRequestInfo): string {
+  if (typeof input === "string") {
+    return input;
+  }
+  if (input instanceof URL) {
+    return input.toString();
+  }
+  if (isRequestLike(input)) {
+    return input.url;
+  }
+  throw new Error("Unable to normalize fetch request URL");
+}
 
 export type {
   BlueskyDatabaseStats,
@@ -130,21 +155,21 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       throw new Error("Account not found");
     }
 
-    if (!row.sessionJson) {
-      throw new Error("No session found for account");
-    }
-
     this.did = row.did;
     this.handle = row.handle;
+    if (!this.did) {
+      throw new Error("No DID found for account");
+    }
 
-    // Parse the session and create an agent
-    // Note: Full OAuth session restoration requires the OAuthClient
-    // For now, we'll need to re-authenticate if the session is expired
-    const session = JSON.parse(row.sessionJson) as OAuthSession;
-
-    // Create agent - this is a simplified version
-    // Full implementation will need to restore the OAuth session properly
-    this.agent = new Agent(session);
+    const session = await restoreBlueskyOAuthSession(this.did);
+    const sessionFetch = session.fetchHandler.bind(session);
+    this.agent = new Agent({
+      did: session.did,
+      fetchHandler: (url, init) => {
+        const target = normalizeFetchUrl(url);
+        return sessionFetch(target, init);
+      },
+    });
   }
 
   /**
@@ -218,8 +243,14 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       [JSON.stringify(newSession), Date.now(), this.accountId]
     );
 
-    // Reinitialize the agent
-    this.agent = new Agent(newSession);
+    const sessionFetch = newSession.fetchHandler.bind(newSession);
+    this.agent = new Agent({
+      did: newSession.did,
+      fetchHandler: (url, init) => {
+        const target = normalizeFetchUrl(url);
+        return sessionFetch(target, init);
+      },
+    });
   }
 
   /**

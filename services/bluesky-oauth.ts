@@ -8,6 +8,7 @@ import {
   type AuthorizeOptions,
   type DigestAlgorithm,
   type InternalStateData,
+  type OAuthSession,
   type Session as PersistedSession,
   type RuntimeImplementation,
   type SessionStore,
@@ -62,6 +63,18 @@ async function initClient(): Promise<OAuthClient> {
   });
 }
 
+export async function restoreBlueskyOAuthSession(
+  did: string,
+  refresh?: boolean | "auto"
+): Promise<OAuthSession> {
+  const normalizedDid = did?.trim();
+  if (!normalizedDid) {
+    throw new Error("Missing Bluesky DID for session restore");
+  }
+  const client = await getClient();
+  return client.restore(normalizedDid, refresh);
+}
+
 function stateKey(key: string): string {
   return `${STATE_PREFIX}${key}`;
 }
@@ -75,6 +88,7 @@ export async function authenticateBlueskyAccount(handleInput: string) {
   if (!sanitizedHandle) {
     throw new Error("Enter your Bluesky handle");
   }
+  console.log("[BlueskyOAuth] authenticate -> start", sanitizedHandle);
 
   const client = await getClient();
   const redirectUri = REDIRECT_URI as unknown as OAuthRedirectUri;
@@ -82,11 +96,13 @@ export async function authenticateBlueskyAccount(handleInput: string) {
   const authUrl = await client.authorize(sanitizedHandle, {
     redirect_uri: redirectUri,
   });
+  console.log("[BlueskyOAuth] authorize URL created", sanitizedHandle);
 
   const result = await WebBrowser.openAuthSessionAsync(
     authUrl.toString(),
     redirectUri
   );
+  console.log("[BlueskyOAuth] auth session result", result.type);
 
   if (result.type !== "success") {
     if (
@@ -103,9 +119,11 @@ export async function authenticateBlueskyAccount(handleInput: string) {
   const { session } = await client.callback(params, {
     redirect_uri: redirectUri,
   });
+  console.log("[BlueskyOAuth] callback complete", sanitizedHandle);
 
   const agent = new Agent(session);
   const profileResponse = await agent.getProfile({ actor: session.did });
+  console.log("[BlueskyOAuth] profile fetched", sanitizedHandle);
 
   return saveAuthenticatedBlueskyAccount({
     session,
@@ -116,6 +134,7 @@ export async function authenticateBlueskyAccount(handleInput: string) {
 export async function revokeBlueskyAuthorization(
   accountId: number
 ): Promise<void> {
+  console.log("[BlueskyOAuth] revoke -> start", accountId);
   const db = await getDatabase();
   const accountRow = await db.getFirstAsync<{
     bskyAccountID: number;
@@ -141,6 +160,7 @@ export async function revokeBlueskyAuthorization(
       const subject = storedSession.sub;
       if (typeof subject === "string" && subject.length > 0) {
         await sessionStore.del(subject);
+        console.log("[BlueskyOAuth] revoke -> cleared session store", subject);
       }
     } catch (err) {
       console.warn("Failed to clear cached Bluesky session", err);
@@ -156,6 +176,7 @@ export async function revokeBlueskyAuthorization(
       WHERE id = ?;`,
     [Date.now(), accountRow.bskyAccountID]
   );
+  console.log("[BlueskyOAuth] revoke -> db session cleared", accountId);
 }
 
 type SerializedState = Omit<InternalStateData, "dpopKey"> & {

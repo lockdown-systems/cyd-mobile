@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Colors } from "@/constants/theme";
@@ -10,6 +10,8 @@ export type AccountSettingsSheetProps = {
   onClose: () => void;
   bottomInset: number;
   onSignOut?: () => Promise<void>;
+  onReauthenticate?: () => Promise<void>;
+  authStatus: "authenticated" | "signed_out" | "unknown";
 };
 
 type SettingsItem =
@@ -34,7 +36,10 @@ export function AccountSettingsSheet({
   onClose,
   bottomInset,
   onSignOut,
+  onReauthenticate,
+  authStatus,
 }: AccountSettingsSheetProps) {
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const items = useMemo<SettingsItem[]>(
     () => [
       {
@@ -44,18 +49,26 @@ export function AccountSettingsSheet({
         log: `Schedule saving and deleting tapped for ${handle}`,
       },
       { type: "separator", key: "sep-1" },
-      {
-        type: "action",
-        key: "reauth",
-        label: "Reauthenticate to Bluesky",
-        log: `Reauthenticate tapped for ${handle}`,
-      },
-      {
-        type: "action",
-        key: "signout",
-        label: "Sign out of Bluesky",
-        log: `Sign out tapped for ${handle}`,
-      },
+      ...(authStatus !== "authenticated"
+        ? [
+            {
+              type: "action",
+              key: "reauth",
+              label: "Reauthenticate to Bluesky",
+              log: `Reauthenticate tapped for ${handle}`,
+            } as SettingsItem,
+          ]
+        : []),
+      ...(authStatus === "authenticated"
+        ? [
+            {
+              type: "action",
+              key: "signout",
+              label: "Sign out of Bluesky",
+              log: `Sign out tapped for ${handle}`,
+            } as SettingsItem,
+          ]
+        : []),
       { type: "separator", key: "sep-2" },
       {
         type: "action",
@@ -65,12 +78,16 @@ export function AccountSettingsSheet({
         variant: "danger",
       },
     ],
-    [handle]
+    [authStatus, handle]
   );
 
   const handleActionPress = useCallback(
     async (item: SettingsActionItem) => {
       console.log(`[Account Settings] ${item.log}`);
+
+      if (pendingAction) {
+        return;
+      }
 
       if (item.key === "schedule") {
         Alert.alert("TODO: This is not implemented yet.");
@@ -78,12 +95,14 @@ export function AccountSettingsSheet({
         return;
       }
 
+      setPendingAction(item.key);
       if (item.key === "signout") {
         if (!onSignOut) {
           Alert.alert(
             "Sign out unavailable",
             "This action is not supported here."
           );
+          setPendingAction(null);
           return;
         }
 
@@ -96,13 +115,41 @@ export function AccountSettingsSheet({
               ? err.message
               : "Unable to sign out of Bluesky right now.";
           Alert.alert("Sign out failed", message);
+        } finally {
+          setPendingAction(null);
+        }
+        return;
+      }
+
+      if (item.key === "reauth") {
+        if (!onReauthenticate) {
+          Alert.alert(
+            "Reauthentication unavailable",
+            "This action is not supported here."
+          );
+          setPendingAction(null);
+          return;
+        }
+
+        try {
+          await onReauthenticate();
+          onClose();
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Unable to reauthenticate with Bluesky right now.";
+          Alert.alert("Reauthentication failed", message);
+        } finally {
+          setPendingAction(null);
         }
         return;
       }
 
       onClose();
+      setPendingAction(null);
     },
-    [onClose, onSignOut]
+    [onClose, onReauthenticate, onSignOut, pendingAction]
   );
 
   const dangerColor = palette.danger ?? Colors.light.danger;
@@ -163,7 +210,7 @@ export function AccountSettingsSheet({
                   {
                     borderColor: palette.icon + "22",
                     backgroundColor: palette.background,
-                    opacity: pressed ? 0.9 : 1,
+                    opacity: pressed || pendingAction !== null ? 0.9 : 1,
                   },
                   isDanger && {
                     borderColor: dangerColor + "66",
@@ -171,6 +218,7 @@ export function AccountSettingsSheet({
                   },
                 ]}
                 accessibilityRole="button"
+                disabled={pendingAction !== null}
               >
                 <Text
                   style={[

@@ -33,15 +33,33 @@ export default function AccountSelectionScreen() {
 
   const verifyAccountAuthStatus = useCallback(
     async (account: AccountListItem) => {
+      console.log(
+        "[AccountSelectionScreen] verifyAccountAuthStatus -> start",
+        account.id,
+        account.handle
+      );
       const controller = new BlueskyAccountController(account.id, account.uuid);
       try {
         await controller.initDB();
+        console.log(
+          "[AccountSelectionScreen] initDB complete",
+          account.id,
+          account.handle
+        );
         try {
           await controller.initAgent();
         } catch (authError) {
           console.warn("Unable to initialize Bluesky agent", authError);
         }
-        await verifyBlueskyAccountAuthStatus(controller, account);
+        const status = await verifyBlueskyAccountAuthStatus(
+          controller,
+          account
+        );
+        console.log(
+          "[AccountSelectionScreen] verifyAccountAuthStatus -> status",
+          account.id,
+          status
+        );
       } catch (err) {
         console.warn(
           "Failed to verify auth status for account",
@@ -51,6 +69,11 @@ export default function AccountSelectionScreen() {
       } finally {
         try {
           await controller.cleanup();
+          console.log(
+            "[AccountSelectionScreen] cleanup complete",
+            account.id,
+            account.handle
+          );
         } catch (cleanupErr) {
           console.warn("Failed to cleanup controller", cleanupErr);
         }
@@ -66,11 +89,21 @@ export default function AccountSelectionScreen() {
   const handleSelectAccount = useCallback(
     (account: AccountListItem) => {
       void (async () => {
+        console.log(
+          "[AccountSelectionScreen] handleSelectAccount",
+          account.id,
+          account.handle
+        );
         await verifyAccountAuthStatus(account);
         router.push({
           pathname: "/account/[accountId]",
           params: { accountId: account.uuid },
         });
+        console.log(
+          "[AccountSelectionScreen] navigated to account",
+          account.id,
+          account.handle
+        );
       })();
     },
     [router, verifyAccountAuthStatus]
