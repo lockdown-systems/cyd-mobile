@@ -61,7 +61,9 @@ export default function AddAccountScreen() {
           savedAccount.uuid
         );
         await controller.initDB();
-        await verifyBlueskyAccountAuthStatus(controller, savedAccount);
+        await verifyBlueskyAccountAuthStatus(controller, savedAccount, {
+          force: true,
+        });
         await controller.cleanup();
       } catch (verifyError) {
         console.warn(

@@ -188,7 +188,7 @@ export function AutomationModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, options, onFinished, ensureController]);
+  }, [visible, options, onFinished, ensureController, accountId]);
 
   useEffect(() => {
     if (!visible) {

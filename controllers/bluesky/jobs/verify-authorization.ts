@@ -45,7 +45,8 @@ async function ensureAuthorized(
   const account = await loadAccount(controller);
   const initialStatus = await verifyBlueskyAccountAuthStatus(
     controller,
-    account
+    account,
+    { force: true }
   );
   if (initialStatus === ACCOUNT_AUTH_STATUS.authenticated) {
     return initialStatus;
@@ -70,7 +71,13 @@ async function ensureAuthorized(
 
   await controller.waitForPause();
 
-  const finalStatus = await verifyBlueskyAccountAuthStatus(controller, account);
+  const finalStatus = await verifyBlueskyAccountAuthStatus(
+    controller,
+    account,
+    {
+      force: true,
+    }
+  );
   if (finalStatus !== ACCOUNT_AUTH_STATUS.authenticated) {
     throw new Error("Unable to verify authorization after reauthentication");
   }

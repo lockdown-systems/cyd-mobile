@@ -55,8 +55,10 @@ function isMissingSessionError(err: unknown): boolean {
 
 export async function verifyBlueskyAccountAuthStatus(
   controller: BlueskyAccountController,
-  account: AccountListItem
+  account: AccountListItem,
+  options?: { force?: boolean }
 ): Promise<AccountAuthStatusValue> {
+  const force = options?.force ?? false;
   console.log("[AuthStatus] verify -> start", account.id, account.handle);
   let storedStatus: AccountAuthStatusValue | null = null;
   try {
@@ -79,7 +81,7 @@ export async function verifyBlueskyAccountAuthStatus(
 
   // If we already know the session is signed out, skip agent init to avoid
   // surfacing expected "session deleted" errors during job startup.
-  if (status === ACCOUNT_AUTH_STATUS.signedOut) {
+  if (!force && status === ACCOUNT_AUTH_STATUS.signedOut) {
     return status;
   }
 

@@ -130,7 +130,7 @@ export default function AccountPlaceholderScreen() {
         account.id
       );
       const nextStatus = await runWithAccountController(account, (controller) =>
-        verifyBlueskyAccountAuthStatus(controller, account)
+        verifyBlueskyAccountAuthStatus(controller, account, { force: true })
       );
       console.log(
         "[AccountScreen] handleReauthenticate -> verified",
