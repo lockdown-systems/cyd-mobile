@@ -64,6 +64,23 @@ describe("BlueskyAccountController job pipeline", () => {
     expect(jobs.every((job) => job.status === "pending")).toBe(true);
   });
 
+  it("adds likes and bookmarks jobs when enabled", async () => {
+    const { controller, mockDb } = setupControllerWithDb();
+    const jobs = await controller.defineJobs({
+      ...defaultOptions,
+      likes: true,
+      bookmarks: true,
+    });
+
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(4);
+    expect(jobs.map((job) => job.jobType)).toEqual([
+      "verifyAuthorization",
+      "savePosts",
+      "saveLikes",
+      "saveBookmarks",
+    ]);
+  });
+
   it("runs jobs sequentially and marks completion", async () => {
     const { controller, mockDb } = setupControllerWithDb();
     const jobs = await controller.defineJobs(defaultOptions);
@@ -98,6 +115,62 @@ describe("BlueskyAccountController job pipeline", () => {
     expect(indexPosts).toHaveBeenCalledTimes(1);
 
     // Two inserts + two status updates per job (running + completed)
+    expect(mockDb.runAsync).toHaveBeenCalled();
+    expect(updates.length).toBeGreaterThan(0);
+  });
+
+  it("runs likes and bookmarks jobs", async () => {
+    const { controller, mockDb } = setupControllerWithDb();
+    const now = Date.now();
+    const jobs = [
+      {
+        id: 1,
+        jobType: "saveLikes" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+      {
+        id: 2,
+        jobType: "saveBookmarks" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    (controller as unknown as { agent: unknown }).agent = {};
+
+    const indexLikes = jest
+      .spyOn(controller, "indexLikes")
+      .mockResolvedValue(undefined);
+    const indexBookmarks = jest
+      .spyOn(controller, "indexBookmarks")
+      .mockResolvedValue(undefined);
+
+    const updates: string[] = [];
+
+    const resumeInterval = setInterval(() => controller.resume(), 5);
+
+    await controller.runJobs({
+      jobs,
+      onUpdate: (update) => {
+        if (update.activeJobId) {
+          updates.push(`active:${update.activeJobId}`);
+        }
+      },
+    });
+
+    clearInterval(resumeInterval);
+
+    expect(indexLikes).toHaveBeenCalledTimes(1);
+    expect(indexBookmarks).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalled();
     expect(updates.length).toBeGreaterThan(0);
   });

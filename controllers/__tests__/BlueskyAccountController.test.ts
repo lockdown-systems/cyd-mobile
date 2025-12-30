@@ -2,8 +2,13 @@
  * @fileoverview Tests for BlueskyAccountController
  */
 
-import type { Agent, AppBskyFeedGetAuthorFeed } from "@atproto/api";
-import { downloadAsync, getInfoAsync } from "expo-file-system";
+import type {
+  Agent,
+  AppBskyBookmarkGetBookmarks,
+  AppBskyFeedGetActorLikes,
+  AppBskyFeedGetAuthorFeed,
+} from "@atproto/api";
+import { downloadAsync, getInfoAsync } from "expo-file-system/legacy";
 
 import {
   createMockDatabase,
@@ -337,6 +342,7 @@ describe("BlueskyAccountController", () => {
       await controller.indexPosts();
 
       const dbMocks = mockDb as unknown as MockDatabase;
+      console.log("runAsync call count", dbMocks.runAsync.mock.calls.length);
       const insertCalls = dbMocks.runAsync.mock.calls.filter(
         ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
       );
@@ -378,21 +384,213 @@ describe("BlueskyAccountController", () => {
     });
   });
 
-  describe("unimplemented save operations", () => {
-    it("indexLikes should throw not implemented", async () => {
+  describe("indexLikes", () => {
+    type LikesFeedItem = AppBskyFeedGetActorLikes.OutputSchema["feed"][number];
+
+    const createLikeItem = (suffix: number): LikesFeedItem => {
+      const createdAt = new Date(1700000000000 + suffix).toISOString();
+      return {
+        uri: `at://did:plc:test/app.bsky.feed.like/${suffix}`,
+        cid: `cid-like-${suffix}`,
+        createdAt,
+        indexedAt: createdAt,
+        subject: {
+          uri: `at://did:plc:test/app.bsky.feed.post/${suffix}`,
+          cid: `cid-${suffix}`,
+          author: {
+            did: "did:plc:test",
+            handle: "user.test",
+            displayName: "Test User",
+          },
+          likeCount: 10 + suffix,
+          repostCount: 20 + suffix,
+          replyCount: 30 + suffix,
+          quoteCount: 40 + suffix,
+          record: {
+            $type: "app.bsky.feed.post",
+            text: `Post ${suffix}`,
+            createdAt,
+          },
+          indexedAt: createdAt,
+        },
+      } as unknown as LikesFeedItem;
+    };
+
+    it("should fetch pages and store likes", async () => {
       const controller = new BlueskyAccountController(1);
+      const mockDb = createMockDatabase();
+      const getActorLikes = jest.fn();
+      const controllerState = controller as unknown as {
+        db: ReturnType<typeof createMockDatabase>;
+        agent: Agent | null;
+        did: string | null;
+        handle: string | null;
+      };
+      controllerState.db = mockDb;
+      controllerState.did = "did:plc:test";
+      controllerState.handle = "user.test";
+      controllerState.agent = {
+        app: { bsky: { feed: { getActorLikes } } },
+      } as unknown as Agent;
+
+      const likePage1 = [createLikeItem(1)];
+      const likePage2 = [createLikeItem(2)];
+
+      getActorLikes
+        .mockResolvedValueOnce({
+          data: { feed: likePage1, cursor: "cursor-2" },
+        })
+        .mockResolvedValueOnce({ data: { feed: likePage2 } });
+
+      await controller.indexLikes();
+
+      expect(getActorLikes).toHaveBeenCalledTimes(2);
+      expect(getActorLikes).toHaveBeenNthCalledWith(1, {
+        actor: "did:plc:test",
+        cursor: undefined,
+        limit: 100,
+      });
+      expect(getActorLikes).toHaveBeenNthCalledWith(2, {
+        actor: "did:plc:test",
+        cursor: "cursor-2",
+        limit: 100,
+      });
+
+      const dbMocks = mockDb as unknown as MockDatabase;
+      const likeInsertCalls = dbMocks.runAsync.mock.calls.filter(
+        ([sql]) =>
+          typeof sql === "string" && sql.includes("INSERT INTO like_record")
+      );
+      expect(likeInsertCalls).toHaveLength(2);
+
+      const postInsertCalls = dbMocks.runAsync.mock.calls.filter(
+        ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
+      );
+      expect(postInsertCalls).toHaveLength(2);
+      const firstArgs = postInsertCalls[0]?.[1] as unknown[];
+      expect(firstArgs?.[21]).toBe(1); // viewerLiked
+
+      expect(controller.progress.likesSaved).toBe(2);
+      expect(controller.progress.isRunning).toBe(false);
+    });
+
+    it("should fail when agent is not ready", async () => {
+      const controller = new BlueskyAccountController(1);
+      const controllerState = controller as unknown as {
+        db: ReturnType<typeof createMockDatabase>;
+      };
+      controllerState.db = createMockDatabase();
+
       await expect(controller.indexLikes()).rejects.toThrow(
-        "Not implemented yet"
+        "Agent not initialized"
       );
     });
+  });
 
-    it("indexBookmarks should throw not implemented", async () => {
+  describe("indexBookmarks", () => {
+    type BookmarkFeedItem =
+      AppBskyBookmarkGetBookmarks.OutputSchema["bookmarks"][number];
+
+    const createBookmarkItem = (suffix: number): BookmarkFeedItem => {
+      const createdAt = new Date(1700000000000 + suffix).toISOString();
+      return {
+        createdAt,
+        subject: {
+          uri: `at://did:plc:test/app.bsky.feed.post/${suffix}`,
+          cid: `cid-${suffix}`,
+        },
+        item: {
+          uri: `at://did:plc:test/app.bsky.feed.post/${suffix}`,
+          cid: `cid-${suffix}`,
+          author: {
+            did: "did:plc:test",
+            handle: "user.test",
+            displayName: "Test User",
+          },
+          likeCount: 5 + suffix,
+          repostCount: 6 + suffix,
+          replyCount: 7 + suffix,
+          quoteCount: 8 + suffix,
+          record: {
+            $type: "app.bsky.feed.post",
+            text: `Bookmark ${suffix}`,
+            createdAt,
+          },
+          indexedAt: createdAt,
+        },
+      } as unknown as BookmarkFeedItem;
+    };
+
+    it("should fetch pages and store bookmarks", async () => {
       const controller = new BlueskyAccountController(1);
-      await expect(controller.indexBookmarks()).rejects.toThrow(
-        "Not implemented yet"
+      const mockDb = createMockDatabase();
+      const getBookmarks = jest.fn();
+      const controllerState = controller as unknown as {
+        db: ReturnType<typeof createMockDatabase>;
+        agent: Agent | null;
+        did: string | null;
+        handle: string | null;
+      };
+      controllerState.db = mockDb;
+      controllerState.did = "did:plc:test";
+      controllerState.handle = "user.test";
+      controllerState.agent = {
+        app: { bsky: { bookmark: { getBookmarks } } },
+      } as unknown as Agent;
+
+      const bookmarkPage1 = [createBookmarkItem(1)];
+      const bookmarkPage2 = [createBookmarkItem(2)];
+
+      getBookmarks
+        .mockResolvedValueOnce({
+          data: { bookmarks: bookmarkPage1, cursor: "cursor-bookmark" },
+        })
+        .mockResolvedValueOnce({ data: { bookmarks: bookmarkPage2 } });
+
+      await controller.indexBookmarks();
+
+      expect(getBookmarks).toHaveBeenCalledTimes(2);
+      expect(getBookmarks).toHaveBeenNthCalledWith(1, {
+        cursor: undefined,
+        limit: 100,
+      });
+      expect(getBookmarks).toHaveBeenNthCalledWith(2, {
+        cursor: "cursor-bookmark",
+        limit: 100,
+      });
+
+      const dbMocks = mockDb as unknown as MockDatabase;
+      const bookmarkInsertCalls = dbMocks.runAsync.mock.calls.filter(
+        ([sql]) =>
+          typeof sql === "string" && sql.includes("INSERT INTO bookmark")
       );
+      expect(bookmarkInsertCalls).toHaveLength(2);
+
+      const postInsertCalls = dbMocks.runAsync.mock.calls.filter(
+        ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
+      );
+      expect(postInsertCalls).toHaveLength(2);
+      const firstArgs = postInsertCalls[0]?.[1] as unknown[];
+      expect(firstArgs?.[23]).toBe(1); // viewerBookmarked
+
+      expect(controller.progress.bookmarksSaved).toBe(2);
+      expect(controller.progress.isRunning).toBe(false);
     });
 
+    it("should fail when agent is not ready", async () => {
+      const controller = new BlueskyAccountController(1);
+      const controllerState = controller as unknown as {
+        db: ReturnType<typeof createMockDatabase>;
+      };
+      controllerState.db = createMockDatabase();
+
+      await expect(controller.indexBookmarks()).rejects.toThrow(
+        "Agent not initialized"
+      );
+    });
+  });
+
+  describe("unimplemented save operations", () => {
     it("indexFollowing should throw not implemented", async () => {
       const controller = new BlueskyAccountController(1);
       await expect(controller.indexFollowing()).rejects.toThrow(

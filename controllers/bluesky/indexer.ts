@@ -1,6 +1,8 @@
 import {
   Agent,
   type AppBskyActorDefs,
+  type AppBskyBookmarkGetBookmarks,
+  type AppBskyFeedGetActorLikes,
   type AppBskyFeedGetAuthorFeed,
   AppBskyFeedPost,
   AppBskyFeedRepost,
@@ -15,6 +17,9 @@ import type {
 } from "./types";
 
 type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
+type LikesFeedItem = AppBskyFeedGetActorLikes.OutputSchema["feed"][number];
+type BookmarksFeedItem =
+  AppBskyBookmarkGetBookmarks.OutputSchema["bookmarks"][number];
 type FeedPostView = FeedViewPost["post"];
 type FeedRecordInfo =
   | { kind: "post"; record: AppBskyFeedPost.Record }
@@ -116,6 +121,128 @@ export class BlueskyIndexer {
     }
   }
 
+  async indexLikes(): Promise<void> {
+    const db = this.requireDb();
+    const agent = this.requireAgent();
+    const did = this.requireDid();
+
+    this.deps.updateProgress({
+      likesSaved: 0,
+      likesTotal: null,
+      currentAction: "Indexing likes...",
+      isRunning: true,
+      error: null,
+    });
+
+    let cursor: string | undefined;
+    let totalSaved = 0;
+
+    try {
+      while (true) {
+        const response = await this.deps.makeApiRequest(() =>
+          agent.app.bsky.feed.getActorLikes({
+            actor: did,
+            cursor,
+            limit: this.pageSize,
+          })
+        );
+
+        const feed = response.feed ?? [];
+        const nextCursor = response.cursor;
+
+        if (feed.length > 0) {
+          const savedCount = await this.saveLikes(db, feed, totalSaved);
+          totalSaved += savedCount;
+
+          this.deps.updateProgress({
+            likesSaved: totalSaved,
+            likesTotal: null,
+            currentAction: `Indexed ${totalSaved} likes`,
+          });
+        }
+
+        if (!nextCursor) {
+          break;
+        }
+
+        cursor = nextCursor;
+      }
+
+      this.deps.updateProgress({
+        likesSaved: totalSaved,
+        likesTotal: totalSaved,
+        currentAction: "Like indexing complete",
+        isRunning: false,
+      });
+    } catch (error) {
+      this.deps.updateProgress({
+        isRunning: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
+    }
+  }
+
+  async indexBookmarks(): Promise<void> {
+    const db = this.requireDb();
+    const agent = this.requireAgent();
+
+    this.deps.updateProgress({
+      bookmarksSaved: 0,
+      bookmarksTotal: null,
+      currentAction: "Indexing bookmarks...",
+      isRunning: true,
+      error: null,
+    });
+
+    let cursor: string | undefined;
+    let totalSaved = 0;
+
+    try {
+      while (true) {
+        const response = await this.deps.makeApiRequest(() =>
+          agent.app.bsky.bookmark.getBookmarks({
+            cursor,
+            limit: this.pageSize,
+          })
+        );
+
+        const feed = response.bookmarks ?? [];
+        const nextCursor = response.cursor;
+
+        if (feed.length > 0) {
+          const savedCount = await this.saveBookmarks(db, feed, totalSaved);
+          totalSaved += savedCount;
+
+          this.deps.updateProgress({
+            bookmarksSaved: totalSaved,
+            bookmarksTotal: null,
+            currentAction: `Indexed ${totalSaved} bookmarks`,
+          });
+        }
+
+        if (!nextCursor) {
+          break;
+        }
+
+        cursor = nextCursor;
+      }
+
+      this.deps.updateProgress({
+        bookmarksSaved: totalSaved,
+        bookmarksTotal: totalSaved,
+        currentAction: "Bookmark indexing complete",
+        isRunning: false,
+      });
+    } catch (error) {
+      this.deps.updateProgress({
+        isRunning: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
+    }
+  }
+
   private requireDb(): SQLiteDatabase {
     const db = this.deps.getDb();
     if (!db) {
@@ -147,212 +274,419 @@ export class BlueskyIndexer {
     postsTotal: number | null
   ): Promise<number> {
     let saved = 0;
-    const did = this.requireDid();
 
     await db.withTransactionAsync(async () => {
       for (const item of feed) {
         await this.deps.waitForPause();
         const postView = item.post;
-        const recordInfo = this.getRecordInfo(postView.record);
-        if (!recordInfo) {
+
+        const previewPost = await this.persistPostView(db, postView);
+        if (!previewPost) {
           continue;
         }
 
-        await this.upsertProfile(db, postView.author);
-
-        const postRecord =
-          recordInfo.kind === "post" ? recordInfo.record : null;
-        const repostRecord =
-          recordInfo.kind === "repost" ? recordInfo.record : null;
-        const now = Date.now();
-
-        const text = postRecord?.text ?? "";
-        const facetsJSON =
-          postRecord?.facets && postRecord.facets.length > 0
-            ? JSON.stringify(postRecord.facets)
-            : null;
-        const embedType = postView.embed?.$type ?? null;
-        const embedJSON = postView.embed
-          ? JSON.stringify(postView.embed)
-          : null;
-        const langs =
-          postRecord?.langs && postRecord.langs.length > 0
-            ? postRecord.langs.join(",")
-            : null;
-
-        const replyParentUri = postRecord?.reply?.parent?.uri ?? null;
-        const replyRootUri = postRecord?.reply?.root?.uri ?? null;
-        const isReply = postRecord?.reply ? 1 : 0;
-
-        const quotedPostUri = postRecord
-          ? this.extractQuotedPostUri(postView.embed)
-          : null;
-        const isQuote = quotedPostUri ? 1 : 0;
-
-        const isRepost = recordInfo.kind === "repost" ? 1 : 0;
-        const repostUri = isRepost ? postView.uri : null;
-        const repostCid = isRepost ? postView.cid : null;
-        const originalPostUri = repostRecord ? repostRecord.subject.uri : null;
-
-        await db.runAsync(
-          `INSERT INTO post (
-            uri, cid, authorDid,
-            text, facetsJSON, embedType, embedJSON, langs,
-            isReply, replyParentUri, replyRootUri,
-            isQuote, quotedPostUri,
-            isRepost, repostUri, repostCid, originalPostUri,
-            likeCount, repostCount, replyCount, quoteCount,
-            viewerLiked, viewerReposted, viewerBookmarked,
-            createdAt, savedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(uri) DO UPDATE SET
-            cid = excluded.cid,
-            authorDid = excluded.authorDid,
-            text = excluded.text,
-            facetsJSON = excluded.facetsJSON,
-            embedType = excluded.embedType,
-            embedJSON = excluded.embedJSON,
-            langs = excluded.langs,
-            isReply = excluded.isReply,
-            replyParentUri = excluded.replyParentUri,
-            replyRootUri = excluded.replyRootUri,
-            isQuote = excluded.isQuote,
-            quotedPostUri = excluded.quotedPostUri,
-            isRepost = excluded.isRepost,
-            repostUri = excluded.repostUri,
-            repostCid = excluded.repostCid,
-            originalPostUri = excluded.originalPostUri,
-            likeCount = excluded.likeCount,
-            repostCount = excluded.repostCount,
-            replyCount = excluded.replyCount,
-            quoteCount = excluded.quoteCount,
-            viewerLiked = excluded.viewerLiked,
-            viewerReposted = excluded.viewerReposted,
-            viewerBookmarked = excluded.viewerBookmarked,
-            createdAt = excluded.createdAt,
-            savedAt = excluded.savedAt;`,
-          [
-            postView.uri,
-            postView.cid,
-            postView.author.did,
-            text,
-            facetsJSON,
-            embedType,
-            embedJSON,
-            langs,
-            isReply,
-            replyParentUri,
-            replyRootUri,
-            isQuote,
-            quotedPostUri,
-            isRepost,
-            repostUri,
-            repostCid,
-            originalPostUri,
-            postView.likeCount ?? 0,
-            postView.repostCount ?? 0,
-            postView.replyCount ?? 0,
-            postView.quoteCount ?? 0,
-            postView.viewer?.like ? 1 : 0,
-            postView.viewer?.repost ? 1 : 0,
-            postView.viewer?.bookmarked ? 1 : 0,
-            postRecord?.createdAt ??
-              repostRecord?.createdAt ??
-              postView.indexedAt,
-            now,
-          ]
-        );
-
-        const media = this.extractMedia(postView);
-
-        const downloadedMedia = await Promise.all(
-          media.map(async (attachment) => {
-            if (attachment.type === "image") {
-              let localThumbPath: string | null | undefined = null;
-              let localFullsizePath: string | null | undefined = null;
-              try {
-                if (attachment.thumbUrl) {
-                  localThumbPath = await this.deps.downloadMediaFromUrl(
-                    attachment.thumbUrl,
-                    did
-                  );
-                }
-                if (attachment.fullsizeUrl) {
-                  localFullsizePath = await this.deps.downloadMediaFromUrl(
-                    attachment.fullsizeUrl,
-                    did
-                  );
-                }
-              } catch (err) {
-                console.warn("[saveFeedPosts] Failed to download media", err);
-              }
-
-              return {
-                ...attachment,
-                localThumbPath,
-                localFullsizePath,
-              } satisfies AutomationMediaAttachment;
-            }
-
-            return attachment;
-          })
-        );
-
-        const author = postView.author;
-        const likeCount =
-          typeof postView.likeCount === "number" ? postView.likeCount : null;
-        const repostCount =
-          typeof postView.repostCount === "number"
-            ? postView.repostCount
-            : null;
-        const replyCount =
-          typeof postView.replyCount === "number" ? postView.replyCount : null;
-        const quoteCount =
-          typeof postView.quoteCount === "number" ? postView.quoteCount : null;
-
-        const previewPost: AutomationPostPreviewData = {
-          uri: String(postView.uri ?? ""),
-          cid: String(postView.cid ?? ""),
-          text: String(text ?? ""),
-          createdAt:
-            postRecord?.createdAt ??
-            repostRecord?.createdAt ??
-            postView.indexedAt ??
-            new Date().toISOString(),
-          author: {
-            did: String(author.did ?? ""),
-            handle: String(author.handle ?? ""),
-            displayName: author.displayName ?? null,
-            avatarUrl: author.avatar ?? null,
-            avatarDataURI:
-              (author as { avatarDataURI?: string | null }).avatarDataURI ??
-              null,
-          },
-          likeCount,
-          repostCount,
-          replyCount,
-          quoteCount,
-          isRepost: recordInfo.kind === "repost",
-          quotedPostUri,
-          media: downloadedMedia,
-        } satisfies AutomationPostPreviewData;
-
-        // Emit per-post progress for debugging UI visibility.
         saved += 1;
         this.deps.updateProgress({
           postsSaved: totalSavedSoFar + saved,
           postsTotal: postsTotal ?? undefined,
           currentAction: `Indexed ${totalSavedSoFar + saved} posts`,
-
           previewPost,
         });
 
-        // Sleep a small amount for better UX
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
     });
 
     return saved;
+  }
+
+  private async saveLikes(
+    db: SQLiteDatabase,
+    feed: LikesFeedItem[],
+    totalSavedSoFar: number
+  ): Promise<number> {
+    let saved = 0;
+
+    await db.withTransactionAsync(async () => {
+      for (const item of feed) {
+        await this.deps.waitForPause();
+        const postView = this.getPostViewFromFeedItem(item);
+        if (!postView) {
+          continue;
+        }
+
+        const savedAt = Date.now();
+        const previewPost = await this.persistPostView(db, postView, {
+          viewerLiked: 1,
+          savedAt,
+        });
+        if (!previewPost) {
+          continue;
+        }
+
+        const subjectUri = postView.uri;
+        const subjectCid = postView.cid;
+        const authorDid = postView.author.did ?? null;
+        const authorHandle = postView.author.handle ?? null;
+        const viewerLikeUri = (postView.viewer as { like?: string } | null)
+          ?.like;
+        const likeUri =
+          viewerLikeUri ?? (item as { uri?: string }).uri ?? subjectUri;
+        const likeCid = (item as { cid?: string }).cid ?? subjectCid;
+        const createdAt =
+          (item as { createdAt?: string }).createdAt ??
+          (postView as { indexedAt?: string }).indexedAt ??
+          new Date().toISOString();
+
+        await db.runAsync(
+          `INSERT INTO like_record (
+            uri, cid, subjectUri, subjectCid,
+            postAuthorDid, postAuthorHandle, postText,
+            createdAt, savedAt, deletedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          ON CONFLICT(uri) DO UPDATE SET
+            cid = excluded.cid,
+            subjectUri = excluded.subjectUri,
+            subjectCid = excluded.subjectCid,
+            postAuthorDid = excluded.postAuthorDid,
+            postAuthorHandle = excluded.postAuthorHandle,
+            postText = excluded.postText,
+            createdAt = excluded.createdAt,
+            savedAt = excluded.savedAt,
+            deletedAt = NULL;`,
+          [
+            likeUri,
+            likeCid,
+            subjectUri,
+            subjectCid,
+            authorDid,
+            authorHandle,
+            previewPost.text,
+            createdAt,
+            savedAt,
+          ]
+        );
+
+        saved += 1;
+        this.deps.updateProgress({
+          likesSaved: totalSavedSoFar + saved,
+          likesTotal: null,
+          currentAction: `Indexed ${totalSavedSoFar + saved} likes`,
+          previewPost,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    });
+
+    return saved;
+  }
+
+  private async saveBookmarks(
+    db: SQLiteDatabase,
+    feed: BookmarksFeedItem[],
+    totalSavedSoFar: number
+  ): Promise<number> {
+    let saved = 0;
+
+    await db.withTransactionAsync(async () => {
+      for (const item of feed) {
+        await this.deps.waitForPause();
+        const postView = this.getPostViewFromFeedItem(item);
+        if (!postView) {
+          continue;
+        }
+
+        const savedAt = Date.now();
+        const previewPost = await this.persistPostView(db, postView, {
+          viewerBookmarked: 1,
+          savedAt,
+        });
+        if (!previewPost) {
+          continue;
+        }
+
+        const subjectUri =
+          (item as { subject?: { uri?: string } }).subject?.uri ?? postView.uri;
+        const subjectCid =
+          (item as { subject?: { cid?: string } }).subject?.cid ?? postView.cid;
+        const authorDid = postView.author.did ?? null;
+        const authorHandle = postView.author.handle ?? null;
+        const postCreatedAt =
+          (postView as { indexedAt?: string }).indexedAt ??
+          previewPost.createdAt;
+
+        await db.runAsync(
+          `INSERT INTO bookmark (
+            subjectUri, subjectCid,
+            postAuthorDid, postAuthorHandle, postText, postCreatedAt,
+            savedAt, deletedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+          ON CONFLICT(subjectUri) DO UPDATE SET
+            subjectCid = excluded.subjectCid,
+            postAuthorDid = excluded.postAuthorDid,
+            postAuthorHandle = excluded.postAuthorHandle,
+            postText = excluded.postText,
+            postCreatedAt = excluded.postCreatedAt,
+            savedAt = excluded.savedAt,
+            deletedAt = NULL;`,
+          [
+            subjectUri,
+            subjectCid,
+            authorDid,
+            authorHandle,
+            previewPost.text,
+            postCreatedAt,
+            savedAt,
+          ]
+        );
+
+        saved += 1;
+        this.deps.updateProgress({
+          bookmarksSaved: totalSavedSoFar + saved,
+          bookmarksTotal: null,
+          currentAction: `Indexed ${totalSavedSoFar + saved} bookmarks`,
+          previewPost,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    });
+
+    return saved;
+  }
+
+  private async persistPostView(
+    db: SQLiteDatabase,
+    postView: FeedPostView,
+    options?: {
+      viewerLiked?: number;
+      viewerReposted?: number;
+      viewerBookmarked?: number;
+      savedAt?: number;
+    }
+  ): Promise<AutomationPostPreviewData | null> {
+    const recordInfo = this.getRecordInfo(postView.record);
+    if (!recordInfo) {
+      console.warn(
+        "[Indexer] Skipping feed item without recognized record",
+        postView.record
+      );
+      return null;
+    }
+
+    const did = this.requireDid();
+    await this.upsertProfile(db, postView.author);
+
+    const postRecord = recordInfo.kind === "post" ? recordInfo.record : null;
+    const repostRecord =
+      recordInfo.kind === "repost" ? recordInfo.record : null;
+    const savedAt = options?.savedAt ?? Date.now();
+
+    const text = postRecord?.text ?? "";
+    const facetsJSON =
+      postRecord?.facets && postRecord.facets.length > 0
+        ? JSON.stringify(postRecord.facets)
+        : null;
+    const embedType = postView.embed?.$type ?? null;
+    const embedJSON = postView.embed ? JSON.stringify(postView.embed) : null;
+    const langs =
+      postRecord?.langs && postRecord.langs.length > 0
+        ? postRecord.langs.join(",")
+        : null;
+
+    const replyParentUri = postRecord?.reply?.parent?.uri ?? null;
+    const replyRootUri = postRecord?.reply?.root?.uri ?? null;
+    const isReply = postRecord?.reply ? 1 : 0;
+
+    const quotedPostUri = postRecord
+      ? this.extractQuotedPostUri(postView.embed)
+      : null;
+    const isQuote = quotedPostUri ? 1 : 0;
+
+    const isRepost = recordInfo.kind === "repost" ? 1 : 0;
+    const repostUri = isRepost ? postView.uri : null;
+    const repostCid = isRepost ? postView.cid : null;
+    const originalPostUri = repostRecord ? repostRecord.subject.uri : null;
+
+    const viewerLiked = options?.viewerLiked ?? (postView.viewer?.like ? 1 : 0);
+    const viewerReposted =
+      options?.viewerReposted ?? (postView.viewer?.repost ? 1 : 0);
+    const viewerBookmarked =
+      options?.viewerBookmarked ?? (postView.viewer?.bookmarked ? 1 : 0);
+
+    const createdAt =
+      postRecord?.createdAt ??
+      repostRecord?.createdAt ??
+      (postView as { indexedAt?: string }).indexedAt ??
+      new Date().toISOString();
+
+    await db.runAsync(
+      `INSERT INTO post (
+        uri, cid, authorDid,
+        text, facetsJSON, embedType, embedJSON, langs,
+        isReply, replyParentUri, replyRootUri,
+        isQuote, quotedPostUri,
+        isRepost, repostUri, repostCid, originalPostUri,
+        likeCount, repostCount, replyCount, quoteCount,
+        viewerLiked, viewerReposted, viewerBookmarked,
+        createdAt, savedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(uri) DO UPDATE SET
+        cid = excluded.cid,
+        authorDid = excluded.authorDid,
+        text = excluded.text,
+        facetsJSON = excluded.facetsJSON,
+        embedType = excluded.embedType,
+        embedJSON = excluded.embedJSON,
+        langs = excluded.langs,
+        isReply = excluded.isReply,
+        replyParentUri = excluded.replyParentUri,
+        replyRootUri = excluded.replyRootUri,
+        isQuote = excluded.isQuote,
+        quotedPostUri = excluded.quotedPostUri,
+        isRepost = excluded.isRepost,
+        repostUri = excluded.repostUri,
+        repostCid = excluded.repostCid,
+        originalPostUri = excluded.originalPostUri,
+        likeCount = excluded.likeCount,
+        repostCount = excluded.repostCount,
+        replyCount = excluded.replyCount,
+        quoteCount = excluded.quoteCount,
+        viewerLiked = excluded.viewerLiked,
+        viewerReposted = excluded.viewerReposted,
+        viewerBookmarked = excluded.viewerBookmarked,
+        createdAt = excluded.createdAt,
+        savedAt = excluded.savedAt;`,
+      [
+        postView.uri,
+        postView.cid,
+        postView.author.did,
+        text,
+        facetsJSON,
+        embedType,
+        embedJSON,
+        langs,
+        isReply,
+        replyParentUri,
+        replyRootUri,
+        isQuote,
+        quotedPostUri,
+        isRepost,
+        repostUri,
+        repostCid,
+        originalPostUri,
+        postView.likeCount ?? 0,
+        postView.repostCount ?? 0,
+        postView.replyCount ?? 0,
+        postView.quoteCount ?? 0,
+        viewerLiked,
+        viewerReposted,
+        viewerBookmarked,
+        createdAt,
+        savedAt,
+      ]
+    );
+
+    const media = this.extractMedia(postView);
+
+    const downloadedMedia = await Promise.all(
+      media.map(async (attachment) => {
+        if (attachment.type === "image") {
+          let localThumbPath: string | null | undefined = null;
+          let localFullsizePath: string | null | undefined = null;
+          try {
+            if (attachment.thumbUrl) {
+              localThumbPath = await this.deps.downloadMediaFromUrl(
+                attachment.thumbUrl,
+                did
+              );
+            }
+            if (attachment.fullsizeUrl) {
+              localFullsizePath = await this.deps.downloadMediaFromUrl(
+                attachment.fullsizeUrl,
+                did
+              );
+            }
+          } catch (err) {
+            console.warn("[persistPostView] Failed to download media", err);
+          }
+
+          return {
+            ...attachment,
+            localThumbPath,
+            localFullsizePath,
+          } satisfies AutomationMediaAttachment;
+        }
+
+        return attachment;
+      })
+    );
+
+    const author = postView.author;
+    const likeCount =
+      typeof postView.likeCount === "number" ? postView.likeCount : null;
+    const repostCount =
+      typeof postView.repostCount === "number" ? postView.repostCount : null;
+    const replyCount =
+      typeof postView.replyCount === "number" ? postView.replyCount : null;
+    const quoteCount =
+      typeof postView.quoteCount === "number" ? postView.quoteCount : null;
+
+    const previewPost: AutomationPostPreviewData = {
+      uri: String(postView.uri ?? ""),
+      cid: String(postView.cid ?? ""),
+      text: String(text ?? ""),
+      createdAt:
+        postRecord?.createdAt ??
+        repostRecord?.createdAt ??
+        (postView as { indexedAt?: string }).indexedAt ??
+        new Date().toISOString(),
+      author: {
+        did: String(author.did ?? ""),
+        handle: String(author.handle ?? ""),
+        displayName: author.displayName ?? null,
+        avatarUrl: author.avatar ?? null,
+        avatarDataURI:
+          (author as { avatarDataURI?: string | null }).avatarDataURI ?? null,
+      },
+      likeCount,
+      repostCount,
+      replyCount,
+      quoteCount,
+      isRepost: recordInfo.kind === "repost",
+      quotedPostUri,
+      media: downloadedMedia,
+    } satisfies AutomationPostPreviewData;
+
+    return previewPost;
+  }
+
+  private getPostViewFromFeedItem(
+    item: FeedViewPost | BookmarksFeedItem
+  ): FeedPostView | null {
+    const fromPost = (item as { post?: FeedPostView }).post;
+    if (this.hasRecord(fromPost)) {
+      return fromPost;
+    }
+
+    const fromItem = (item as { item?: FeedPostView }).item;
+    if (this.hasRecord(fromItem)) {
+      return fromItem;
+    }
+
+    const fromSubject = (item as { subject?: FeedPostView }).subject;
+    if (this.hasRecord(fromSubject)) {
+      return fromSubject;
+    }
+
+    return null;
+  }
+
+  private hasRecord(
+    view?: FeedPostView | null
+  ): view is FeedPostView & { record: FeedPostView["record"] } {
+    return Boolean(view && (view as { record?: unknown }).record);
   }
 
   private async upsertProfile(

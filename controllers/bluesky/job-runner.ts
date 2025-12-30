@@ -1,5 +1,7 @@
 import type { BlueskyAccountController } from "../BlueskyAccountController";
 import type { BlueskyJobRecord, JobEmit } from "./job-types";
+import { runSaveBookmarksJob } from "./jobs/save-bookmarks";
+import { runSaveLikesJob } from "./jobs/save-likes";
 import { runSavePostsJob } from "./jobs/save-posts";
 import { runVerifyAuthorizationJob } from "./jobs/verify-authorization";
 
@@ -13,6 +15,8 @@ export async function runJob(
   > = {
     verifyAuthorization: () => runVerifyAuthorizationJob(controller, job, emit),
     savePosts: () => runSavePostsJob(controller, job, emit),
+    saveLikes: () => runSaveLikesJob(controller, job, emit),
+    saveBookmarks: () => runSaveBookmarksJob(controller, job, emit),
   };
 
   const handler = handlers[job.jobType];
@@ -22,8 +26,6 @@ export async function runJob(
   }
 
   switch (job.jobType) {
-    case "saveLikes":
-    case "saveBookmarks":
     case "saveChats":
     case "saveFollowing": {
       // TODO: implement in later phases

@@ -1,6 +1,7 @@
 import { Agent, type AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
-import { Directory, downloadAsync, getInfoAsync } from "expo-file-system";
+import { Directory } from "expo-file-system";
+import { downloadAsync, getInfoAsync } from "expo-file-system/legacy";
 
 import { getDatabase } from "@/database";
 import {
@@ -437,7 +438,15 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       jobTypes.push("savePosts");
     }
 
-    // TODO: add likes, bookmarks, chats, and following when implemented in later phases
+    if (options.likes) {
+      jobTypes.push("saveLikes");
+    }
+
+    if (options.bookmarks) {
+      jobTypes.push("saveBookmarks");
+    }
+
+    // TODO: add chats and following when implemented in later phases
 
     const inserted: BlueskyJobRecord[] = [];
 
@@ -651,16 +660,14 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Index (save) the user's likes
    */
   async indexLikes(): Promise<void> {
-    // TODO: Implement in Phase 3
-    throw new Error("Not implemented yet");
+    await this.indexer.indexLikes();
   }
 
   /**
    * Index (save) the user's bookmarks
    */
   async indexBookmarks(): Promise<void> {
-    // TODO: Implement in Phase 3
-    throw new Error("Not implemented yet");
+    await this.indexer.indexBookmarks();
   }
 
   /**
