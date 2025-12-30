@@ -69,8 +69,20 @@ export function AutomationModal({
       // progress is reported via job events
     });
     await controller.initDB();
-    await controller.initAgent();
-    console.log("[AutomationModal] ensureController -> ready", accountId);
+    try {
+      await controller.initAgent();
+      console.log("[AutomationModal] ensureController -> ready", accountId);
+    } catch (err) {
+      if (err instanceof Error && err.name === "MissingBlueskySessionError") {
+        // Expected when user is signed out; verifyAuthorization job will reauth.
+        console.log(
+          "[AutomationModal] ensureController -> missing session (signed out)",
+          accountId
+        );
+      } else {
+        throw err;
+      }
+    }
     return controller;
   }, [accountId]);
 

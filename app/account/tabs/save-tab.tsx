@@ -132,6 +132,8 @@ export function SaveTab({
     setPersistError(null);
     setSaving(false);
     setLoading(true);
+    setAutomationVisible(false);
+    setAutomationOptions(null);
 
     console.log("[SaveTab] load settings -> start", accountId);
 
