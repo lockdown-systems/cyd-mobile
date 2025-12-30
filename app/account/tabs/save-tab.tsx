@@ -255,7 +255,7 @@ function SaveOptionsForm({
           Choose what to save
         </Text>
         <Text style={[styles.subhead, { color: palette.icon }]}>
-          {`Pick which Bluesky data you’d like Cyd to archive for ${handle}.`}
+          What data would you like Cyd to archive?
         </Text>
 
         {loading ? (
@@ -393,7 +393,7 @@ function SaveReviewScreen({
       />
       <ScrollView contentContainerStyle={styles.reviewContent}>
         <Text style={[styles.reviewIntro, { color: palette.text }]}>
-          Here’s what Cyd will save on this device:
+          Here’s what Cyd will archive on this device:
         </Text>
         <View style={[styles.reviewCard, { borderColor: palette.icon + "22" }]}>
           {chosen.map((option) => (
