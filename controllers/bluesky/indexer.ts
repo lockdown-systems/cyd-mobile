@@ -23,6 +23,7 @@ interface IndexerDeps {
   getAgent: () => Agent | null;
   getDid: () => string | null;
   updateProgress: (updates: Partial<BlueskyProgress>) => void;
+  waitForPause: () => Promise<void>;
   makeApiRequest: RequestExecutor;
 }
 
@@ -144,6 +145,7 @@ export class BlueskyIndexer {
 
     await db.withTransactionAsync(async () => {
       for (const item of feed) {
+        await this.deps.waitForPause();
         const postView = item.post;
         const recordInfo = this.getRecordInfo(postView.record);
         if (!recordInfo) {

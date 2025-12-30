@@ -92,6 +92,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       getAgent: () => this.agent,
       getDid: () => this.did,
       updateProgress: (updates) => this.updateProgress(updates),
+      waitForPause: () => this.waitForPause(),
       makeApiRequest: <T>(requestFn: ApiRequestFn<T>) =>
         this.makeApiRequest<T>(requestFn),
     });
