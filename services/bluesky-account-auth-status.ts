@@ -37,6 +37,19 @@ function profileMatchesAccount(
   return didMatches || handleMatches;
 }
 
+function isMissingSessionError(err: unknown): boolean {
+  if (!(err instanceof Error)) {
+    return false;
+  }
+  const message = err.message?.toLowerCase() ?? "";
+  return (
+    message.includes("session was deleted") ||
+    message.includes("no session found") ||
+    message.includes("missing bluesky did") ||
+    message.includes("account not found")
+  );
+}
+
 export async function verifyBlueskyAccountAuthStatus(
   controller: BlueskyAccountController,
   account: AccountListItem
@@ -76,7 +89,11 @@ export async function verifyBlueskyAccountAuthStatus(
     console.log("[AuthStatus] profile match result", account.id, status);
   } catch (err) {
     console.warn("Unable to verify Bluesky auth status", err);
-    status = storedStatus ?? ACCOUNT_AUTH_STATUS.signedOut;
+    if (isMissingSessionError(err)) {
+      status = ACCOUNT_AUTH_STATUS.signedOut;
+    } else {
+      status = storedStatus ?? ACCOUNT_AUTH_STATUS.signedOut;
+    }
   }
 
   try {

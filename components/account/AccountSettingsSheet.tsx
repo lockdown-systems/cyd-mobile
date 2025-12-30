@@ -45,7 +45,7 @@ export function AccountSettingsSheet({
       {
         type: "action",
         key: "schedule",
-        label: "Schedule Saving and Deleting",
+        label: "Schedule Backing Up and Deleting",
         log: `Schedule saving and deleting tapped for ${handle}`,
       },
       { type: "separator", key: "sep-1" },

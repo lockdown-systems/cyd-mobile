@@ -8,7 +8,7 @@ import {
   type ComponentProps,
   type ComponentType,
 } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -53,6 +53,7 @@ export default function AccountPlaceholderScreen() {
   const [authStatus, setAuthStatus] = useState<
     AccountAuthStatusValue | "unknown"
   >("unknown");
+  const [statusActionPending, setStatusActionPending] = useState(false);
   const insets = useSafeAreaInsets();
   const handleSelectTab = useCallback((tab: AccountTabKey) => {
     setActiveTab(tab);
@@ -203,6 +204,34 @@ export default function AccountPlaceholderScreen() {
   const statusIconColor = showWarning
     ? (palette.warning ?? Colors.light.warning)
     : palette.tint;
+  const statusIconDisabled = showWarning && statusActionPending;
+  const handleStatusIconPress = useCallback(() => {
+    if (showWarning) {
+      if (statusActionPending) {
+        return;
+      }
+      setStatusActionPending(true);
+      void (async () => {
+        try {
+          await handleReauthenticate();
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Unable to reauthenticate with Bluesky right now.";
+          Alert.alert("Reauthentication failed", message);
+        } finally {
+          setStatusActionPending(false);
+        }
+      })();
+      return;
+    }
+
+    Alert.alert(
+      "Authenticated with Bluesky",
+      "Cyd is currently authorized to control your Bluesky account."
+    );
+  }, [handleReauthenticate, showWarning, statusActionPending]);
 
   return (
     <>
@@ -255,22 +284,34 @@ export default function AccountPlaceholderScreen() {
                     >
                       {displayName}
                     </Text>
-                    {showWarning ? (
+                    <Pressable
+                      onPress={handleStatusIconPress}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.statusIconButton,
+                        pressed && !statusIconDisabled && { opacity: 0.8 },
+                        statusIconDisabled && styles.statusIconDisabled,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        showWarning
+                          ? "Signed out of Bluesky"
+                          : "Authenticated with Bluesky"
+                      }
+                      accessibilityHint={
+                        showWarning
+                          ? "Double tap to reauthenticate with Bluesky."
+                          : "Double tap to confirm your Bluesky connection."
+                      }
+                      accessibilityState={{ busy: statusIconDisabled }}
+                      disabled={statusIconDisabled}
+                    >
                       <MaterialIcons
-                        name="error-outline"
+                        name={showWarning ? "error-outline" : "check-circle"}
                         size={18}
                         color={statusIconColor}
-                        accessibilityLabel="Signed out of Bluesky"
                       />
-                    ) : null}
-                    {!showWarning ? (
-                      <MaterialIcons
-                        name="check-circle"
-                        size={18}
-                        color={statusIconColor}
-                        accessibilityLabel="Authenticated with Bluesky"
-                      />
-                    ) : null}
+                    </Pressable>
                   </View>
                   <Text
                     style={[styles.accountUsername, { color: palette.icon }]}
@@ -472,6 +513,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  statusIconButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  statusIconDisabled: {
+    opacity: 0.5,
   },
   accountUsername: {
     fontSize: 14,
