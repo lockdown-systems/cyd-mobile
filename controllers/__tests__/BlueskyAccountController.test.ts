@@ -212,6 +212,68 @@ describe("BlueskyAccountController", () => {
       expect(controller.progress.isRunning).toBe(false);
     });
 
+    it("should upsert posts by uri to avoid duplicates", async () => {
+      const controller = new BlueskyAccountController(1);
+      const mockDb = createMockDatabase();
+      const getAuthorFeed = jest.fn();
+      const controllerState = controller as unknown as {
+        db: ReturnType<typeof createMockDatabase>;
+        agent: Agent | null;
+        did: string | null;
+        handle: string | null;
+      };
+      controllerState.db = mockDb;
+      controllerState.did = "did:plc:test";
+      controllerState.handle = "user.test";
+      controllerState.agent = {
+        app: {
+          bsky: {
+            feed: {
+              getAuthorFeed,
+            },
+          },
+        },
+      } as unknown as Agent;
+
+      const original = createFeedPost(1);
+      const updated: FeedViewPost = {
+        ...original,
+        post: {
+          ...original.post,
+          cid: "cid-updated",
+          likeCount: 999,
+          repostCount: 888,
+          replyCount: 777,
+          quoteCount: 666,
+          record: {
+            ...(original.post.record as {
+              $type: string;
+              text: string;
+              createdAt: string;
+            }),
+            text: "Updated text",
+          },
+        },
+      };
+
+      getAuthorFeed.mockResolvedValueOnce({
+        data: { feed: [original, updated] },
+      });
+
+      await controller.indexPosts();
+
+      const dbMocks = mockDb as unknown as MockDatabase;
+      const insertCalls = dbMocks.runAsync.mock.calls.filter(
+        ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
+      );
+      expect(insertCalls).toHaveLength(2);
+      const sqlText = insertCalls[0]?.[0] as string;
+      expect(sqlText).toContain("ON CONFLICT(uri) DO UPDATE");
+      const secondArgs = insertCalls[1]?.[1] as unknown[];
+      expect(secondArgs?.[1]).toBe("cid-updated");
+      expect(secondArgs?.slice(17, 21)).toEqual([999, 888, 777, 666]);
+    });
+
     it("should fail when database is not ready", async () => {
       const controller = new BlueskyAccountController(1);
       const getAuthorFeed = jest.fn();
