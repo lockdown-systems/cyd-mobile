@@ -171,7 +171,7 @@ export function SaveTab({
       pushScreen("review");
     } catch (err) {
       console.error("Failed to update save settings", err);
-      setPersistError("We couldn’t save your selections. Please try again.");
+      setPersistError("Failed to save your selections. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -289,8 +289,16 @@ function SaveOptionsForm({
               color={palette.tint}
             />
             <Text style={[styles.statusText, { color: palette.icon }]}>
-              We couldn’t load your existing preferences.
+              Failed to load your existing preferences.
             </Text>
+            {error?.message ? (
+              <Text
+                style={[styles.statusTextDetail, { color: palette.icon }]}
+                numberOfLines={3}
+              >
+                {error.message}
+              </Text>
+            ) : null}
             <SecondaryButton
               label="Try again"
               palette={palette}
@@ -456,8 +464,7 @@ function SaveAutomationScreen({
         <Text
           style={[styles.subhead, { color: palette.icon, textAlign: "center" }]}
         >
-          We’ll guide you through saving your data here. For now, you can head
-          back to the save options or return to the dashboard.
+          Not implemented yet
         </Text>
         <PrimaryButton
           label="Back to Save Options"
@@ -596,6 +603,12 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 15,
     textAlign: "center",
+  },
+  statusTextDetail: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    opacity: 0.85,
   },
   errorText: {
     fontSize: 14,

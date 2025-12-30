@@ -47,7 +47,7 @@ export async function getAccountSaveSettings(
        b.settingSavePosts,
        b.settingSaveLikes,
        b.settingSaveBookmarks,
-       b.settingSaveChat,
+       b.settingSaveChats,
        b.settingSaveFollowing
      FROM bsky_account b
      INNER JOIN account a ON a.bskyAccountID = b.id
