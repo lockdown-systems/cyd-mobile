@@ -303,7 +303,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         COUNT(*) FILTER (WHERE deletedRepostAt IS NOT NULL) as deletedReposts
       FROM post;
     `);
-
     if (counts) {
       stats.postsCount = counts.posts;
       stats.repostsCount = counts.reposts;
@@ -506,6 +505,21 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   async downloadMedia(_blobCid: string, _did: string): Promise<string> {
     // TODO: Implement in Phase 4
     throw new Error("Not implemented yet");
+  }
+
+  async deleteAccountStorage(): Promise<void> {
+    await this.cleanup();
+    try {
+      const accountDir = this.getAccountDirectoryHandle();
+      if (accountDir.exists) {
+        accountDir.delete();
+      }
+    } catch (err) {
+      console.warn("Failed to delete account storage", err);
+      throw err instanceof Error
+        ? err
+        : new Error("Unable to delete account storage");
+    }
   }
 
   /**

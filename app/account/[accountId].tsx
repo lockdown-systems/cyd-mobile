@@ -1,5 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   useCallback,
   useEffect,
@@ -22,7 +22,7 @@ import {
   BlueskyAccountController,
   type AccountAuthStatusValue,
 } from "@/controllers";
-import type { AccountListItem } from "@/database/accounts";
+import { deleteAccount, type AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
@@ -41,6 +41,7 @@ export default function AccountPlaceholderScreen() {
   const accountId = Array.isArray(params.accountId)
     ? params.accountId[0]
     : params.accountId;
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const palette = Colors[colorScheme];
   const { accounts, loading, error } = useAccounts();
@@ -130,6 +131,37 @@ export default function AccountPlaceholderScreen() {
         : new Error("Unable to reauthenticate with Bluesky right now.");
     }
   }, [account]);
+
+  const handleRemoveAccount = useCallback(async () => {
+    if (!account) {
+      throw new Error(
+        "Account information is not available yet. Please try again in a moment."
+      );
+    }
+
+    await handleSignOut();
+
+    try {
+      const controller = new BlueskyAccountController(account.id, account.uuid);
+      await controller.deleteAccountStorage();
+    } catch (err) {
+      console.warn("Failed to delete account storage", err);
+      throw err instanceof Error
+        ? err
+        : new Error("Unable to delete account data from this device.");
+    }
+
+    try {
+      await deleteAccount(account.id);
+    } catch (err) {
+      console.warn("Failed to delete account record", err);
+      throw err instanceof Error
+        ? err
+        : new Error("Unable to delete this account right now.");
+    }
+
+    router.replace("/");
+  }, [account, handleSignOut, router]);
 
   useEffect(() => {
     if (!account) {
@@ -412,6 +444,7 @@ export default function AccountPlaceholderScreen() {
         authStatus={authStatus === "unknown" ? "unknown" : authStatus}
         onReauthenticate={handleReauthenticate}
         onSignOut={handleSignOut}
+        onRemoveAccount={handleRemoveAccount}
       />
     </>
   );

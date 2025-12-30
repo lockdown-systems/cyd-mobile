@@ -11,6 +11,7 @@ export type AccountSettingsSheetProps = {
   bottomInset: number;
   onSignOut?: () => Promise<void>;
   onReauthenticate?: () => Promise<void>;
+  onRemoveAccount?: () => Promise<void>;
   authStatus: "authenticated" | "signed_out" | "unknown";
 };
 
@@ -37,6 +38,7 @@ export function AccountSettingsSheet({
   bottomInset,
   onSignOut,
   onReauthenticate,
+  onRemoveAccount,
   authStatus,
 }: AccountSettingsSheetProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -146,10 +148,50 @@ export function AccountSettingsSheet({
         return;
       }
 
+      if (item.key === "remove") {
+        if (!onRemoveAccount) {
+          Alert.alert(
+            "Removal unavailable",
+            "This action is not supported here."
+          );
+          return;
+        }
+
+        Alert.alert(
+          "Remove account?",
+          "This will delete any data you've backed up from this account from your device.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Remove",
+              style: "destructive",
+              onPress: () => {
+                setPendingAction(item.key);
+                void (async () => {
+                  try {
+                    await onRemoveAccount();
+                    onClose();
+                  } catch (err) {
+                    const message =
+                      err instanceof Error
+                        ? err.message
+                        : "Unable to remove this account right now.";
+                    Alert.alert("Removal failed", message);
+                  } finally {
+                    setPendingAction(null);
+                  }
+                })();
+              },
+            },
+          ]
+        );
+        return;
+      }
+
       onClose();
       setPendingAction(null);
     },
-    [onClose, onReauthenticate, onSignOut, pendingAction]
+    [onClose, onReauthenticate, onRemoveAccount, onSignOut, pendingAction]
   );
 
   const dangerColor = palette.danger ?? Colors.light.danger;

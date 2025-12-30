@@ -62,7 +62,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
   /**
    * Get the directory path for this account's data
    */
-  private getAccountDirectoryHandle(): Directory {
+  protected getAccountDirectoryHandle(): Directory {
     const type = this.getAccountType();
     const baseDirectory =
       Paths?.document ??

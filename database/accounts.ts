@@ -263,6 +263,25 @@ export async function saveAuthenticatedBlueskyAccount(params: {
   return savedAccount;
 }
 
+export async function deleteAccount(accountId: number): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const row = await db.getFirstAsync<{ bskyAccountID: number }>(
+      `SELECT bskyAccountID FROM account WHERE id = ? LIMIT 1;`,
+      [accountId]
+    );
+
+    if (!row?.bskyAccountID) {
+      throw new Error("Account not found");
+    }
+
+    await db.runAsync(`DELETE FROM account WHERE id = ?;`, [accountId]);
+    await db.runAsync(`DELETE FROM bsky_account WHERE id = ?;`, [
+      row.bskyAccountID,
+    ]);
+  });
+}
+
 function createUUID(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
