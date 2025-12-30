@@ -18,6 +18,8 @@ export async function runJob(
         speechText: "Checking your Bluesky connection",
         progressText: "Verifying session…",
       });
+      controller.pause();
+      await controller.waitForPause();
       await controller.initAgent();
       emit({ progressText: "Session verified" });
       return;
@@ -27,9 +29,11 @@ export async function runJob(
         speechText: "Saving your posts",
         progressText: "Fetching posts…",
       });
+      await controller.waitForPause();
       if (!controller.isAgentReady()) {
         await controller.initAgent();
       }
+      await controller.waitForPause();
       await controller.indexPosts();
       emit({ progressText: "Saved posts" });
       return;
@@ -43,7 +47,7 @@ export async function runJob(
     }
     default: {
       const exhaustiveCheck: never = job.jobType;
-      throw new Error(`Unknown job type: ${exhaustiveCheck}`);
+      throw new Error(`Unknown job type: ${exhaustiveCheck as string}`);
     }
   }
 }

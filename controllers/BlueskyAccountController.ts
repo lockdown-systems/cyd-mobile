@@ -469,6 +469,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     emit({ activeJobId: null });
 
     for (const job of jobs) {
+      await this.waitForPause();
       const startedAt = Date.now();
       await this.updateJobStatus(job.id, "running", startedAt, null, null);
       jobs = jobs.map((existing) =>

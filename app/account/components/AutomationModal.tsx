@@ -43,6 +43,7 @@ export function AutomationModal({
   const [detail, setDetail] = useState<string | null>(null);
   const [state, setState] = useState<AutomationModalState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
@@ -102,6 +103,7 @@ export function AutomationModal({
       }
       isRunningRef.current = true;
       setState("running");
+      setPaused(false);
       resetUi();
 
       try {
@@ -162,6 +164,12 @@ export function AutomationModal({
   }, [visible, options, onFinished, ensureController]);
 
   useEffect(() => {
+    if (!visible) {
+      setPaused(false);
+    }
+  }, [visible]);
+
+  useEffect(() => {
     return () => {
       const controller = controllerRef.current;
       if (controller) {
@@ -170,6 +178,25 @@ export function AutomationModal({
       }
     };
   }, []);
+
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+
+    void (async () => {
+      const controller = await ensureController();
+      if (cancelled) return;
+      setPaused(controller.isPaused());
+      unsub = controller.onPauseChange((next) => {
+        setPaused(next);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [ensureController]);
 
   const statusIcon = (status: BlueskyJobRecord["status"]) => {
     if (status === "completed") return "check-circle" as const;
@@ -184,6 +211,18 @@ export function AutomationModal({
     if (status === "running") return palette.tint;
     return palette.icon;
   };
+
+  const handlePause = useCallback(async () => {
+    const controller = await ensureController();
+    controller.pause();
+    setPaused(true);
+  }, [ensureController]);
+
+  const handleResume = useCallback(async () => {
+    const controller = await ensureController();
+    controller.resume();
+    setPaused(false);
+  }, [ensureController]);
 
   return (
     <Modal
@@ -296,21 +335,32 @@ export function AutomationModal({
 
         <View style={styles.modalFooter}>
           {state === "running" ? (
-            <SecondaryButton
-              label="Close"
-              palette={palette}
-              onPress={onClose}
-            />
+            <>
+              <SecondaryButton
+                label={paused ? "Resume" : "Pause"}
+                palette={palette}
+                onPress={paused ? handleResume : handlePause}
+              />
+              <PrimaryButton
+                label="Close"
+                palette={palette}
+                onPress={onClose}
+              />
+            </>
           ) : (
-            <SecondaryButton
-              label={onRestart ? "Back to Save Options" : "Close"}
-              palette={palette}
-              onPress={onRestart ?? onClose}
-            />
+            <>
+              <SecondaryButton
+                label={onRestart ? "Back to Save Options" : "Close"}
+                palette={palette}
+                onPress={onRestart ?? onClose}
+              />
+              <PrimaryButton
+                label="Close"
+                palette={palette}
+                onPress={onClose}
+              />
+            </>
           )}
-          {state !== "running" ? (
-            <PrimaryButton label="Close" palette={palette} onPress={onClose} />
-          ) : null}
         </View>
       </View>
     </Modal>

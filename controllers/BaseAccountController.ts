@@ -15,12 +15,19 @@ export abstract class BaseAccountController<TProgress = unknown> {
   protected accountUUID: string;
   protected db: SQLiteDatabase | null = null;
   protected _progress: TProgress;
+  private paused = false;
+  private pauseResolvers: (() => void)[] = [];
+  private pauseListeners: ((paused: boolean) => void)[] = [];
 
   constructor(accountId: number, accountUUID?: string) {
     this.accountId = accountId;
     // If UUID not provided, generate one (will be overwritten when fetched from DB)
     this.accountUUID = accountUUID ?? Crypto.randomUUID();
     this._progress = this.resetProgress();
+  }
+
+  isPaused(): boolean {
+    return this.paused;
   }
 
   /**
@@ -57,6 +64,49 @@ export abstract class BaseAccountController<TProgress = unknown> {
    */
   getAccountUUID(): string {
     return this.accountUUID;
+  }
+
+  /**
+   * Pause any long-running work. Call resume() to continue.
+   */
+  pause(): void {
+    this.paused = true;
+    this.pauseListeners.forEach((listener) => listener(true));
+  }
+
+  /**
+   * Resume work that was previously paused.
+   */
+  resume(): void {
+    if (!this.paused) {
+      return;
+    }
+    this.paused = false;
+    this.pauseListeners.forEach((listener) => listener(false));
+    const resolvers = [...this.pauseResolvers];
+    this.pauseResolvers = [];
+    resolvers.forEach((resolve) => resolve());
+  }
+
+  /**
+   * Wait until the controller is no longer paused. Safe to call repeatedly.
+   */
+  async waitForPause(): Promise<void> {
+    while (this.paused) {
+      await new Promise<void>((resolve) => {
+        this.pauseResolvers.push(resolve);
+      });
+    }
+  }
+
+  /**
+   * Subscribe to pause state changes. Returns an unsubscribe function.
+   */
+  onPauseChange(listener: (paused: boolean) => void): () => void {
+    this.pauseListeners.push(listener);
+    return () => {
+      this.pauseListeners = this.pauseListeners.filter((cb) => cb !== listener);
+    };
   }
 
   /**
