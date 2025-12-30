@@ -78,10 +78,10 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         originalPostUri TEXT,
 
         -- Engagement counts (at time of indexing)
-        likeCount INTEGER DEFAULT 0,
-        repostCount INTEGER DEFAULT 0,
-        replyCount INTEGER DEFAULT 0,
-        quoteCount INTEGER DEFAULT 0,
+        likeCount INTEGER NOT NULL DEFAULT 0,
+        repostCount INTEGER NOT NULL DEFAULT 0,
+        replyCount INTEGER NOT NULL DEFAULT 0,
+        quoteCount INTEGER NOT NULL DEFAULT 0,
 
         -- Viewer state (at time of indexing)
         viewerLiked INTEGER DEFAULT 0,

@@ -37,7 +37,12 @@ export function AutomationPostPreview({
   palette,
 }: AutomationPostPreviewProps): JSX.Element {
   return (
-    <View style={[styles.container]}>
+    <View
+      style={[
+        styles.container,
+        { borderColor: palette.icon + "22", backgroundColor: palette.card },
+      ]}
+    >
       <View style={styles.headerRow}>
         <Avatar
           uri={post.author.avatarDataURI ?? post.author.avatarUrl ?? undefined}
@@ -63,7 +68,7 @@ export function AutomationPostPreview({
       <View style={styles.metaRow}>
         <Text style={[styles.meta, { color: palette.icon }]} numberOfLines={1}>
           ❤ {post.likeCount ?? 0} 🔁 {post.repostCount ?? 0} 💬{" "}
-          {post.replyCount ?? 0}
+          {post.replyCount ?? 0} ❝ {post.quoteCount ?? 0}
         </Text>
       </View>
     </View>
@@ -72,10 +77,10 @@ export function AutomationPostPreview({
 
 const styles = StyleSheet.create({
   container: {
-    borderWidth: 0,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
     padding: 12,
     gap: 8,
-    marginBottom: 50,
   },
   headerRow: {
     flexDirection: "row",

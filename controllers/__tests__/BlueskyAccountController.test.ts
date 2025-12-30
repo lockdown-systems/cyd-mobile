@@ -140,6 +140,10 @@ describe("BlueskyAccountController", () => {
             handle: "user.test",
             displayName: "Test User",
           },
+          likeCount: 10 + suffix,
+          repostCount: 20 + suffix,
+          replyCount: 30 + suffix,
+          quoteCount: 40 + suffix,
           record: {
             $type: "app.bsky.feed.post",
             text: `Post ${suffix}`,
@@ -200,6 +204,10 @@ describe("BlueskyAccountController", () => {
         ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
       );
       expect(insertCalls).toHaveLength(2);
+      const firstArgs = insertCalls[0]?.[1] as unknown[];
+      const secondArgs = insertCalls[1]?.[1] as unknown[];
+      expect(firstArgs?.slice(17, 21)).toEqual([11, 21, 31, 41]);
+      expect(secondArgs?.slice(17, 21)).toEqual([12, 22, 32, 42]);
       expect(controller.progress.postsSaved).toBe(2);
       expect(controller.progress.isRunning).toBe(false);
     });
