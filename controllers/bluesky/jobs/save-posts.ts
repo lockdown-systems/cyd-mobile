@@ -1,5 +1,13 @@
-import type { BlueskyAccountController } from "../BlueskyAccountController";
+import type { BlueskyAccountController } from "../../BlueskyAccountController";
 import type { BlueskyJobRecord, JobEmit } from "../job-types";
+import type { BlueskyProgress } from "../types";
+
+function formatProgress(postsSaved: number, postsTotal: number | null): string {
+  if (postsTotal === null || postsTotal === 0) {
+    return `Saved ${postsSaved} posts`;
+  }
+  return `Saved ${postsSaved}/${postsTotal} posts`;
+}
 
 export async function runSavePostsJob(
   controller: BlueskyAccountController,
@@ -10,12 +18,24 @@ export async function runSavePostsJob(
     speechText: "I'm saving all of your posts",
     progressText: "Fetching posts…",
   });
-  controller.pause();
-  await controller.waitForPause();
+
+  // Forward indexer progress to the job emitter so AutomationModal can display it.
+  controller.setProgressCallback((progress: BlueskyProgress) => {
+    emit({
+      progressText: formatProgress(progress.postsSaved, progress.postsTotal),
+      detailText: progress.currentAction || undefined,
+    });
+  });
+
   if (!controller.isAgentReady()) {
     await controller.initAgent();
   }
+
   await controller.waitForPause();
   await controller.indexPosts();
+
+  controller.pause();
+  await controller.waitForPause();
+
   emit({ progressText: "Saved posts" });
 }

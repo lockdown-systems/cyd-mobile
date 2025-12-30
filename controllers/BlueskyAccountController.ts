@@ -10,12 +10,13 @@ import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import { BaseAccountController } from "./BaseAccountController";
 import { BlueskyIndexer } from "./bluesky/indexer";
 import { mapJobRow, type JobRow } from "./bluesky/job-helpers";
-import { runJob, type JobEmit } from "./bluesky/job-runner";
+import { runJob } from "./bluesky/job-runner";
 import {
   type BlueskyJobRecord,
   type BlueskyJobRunUpdate,
   type BlueskyJobStatus,
   type BlueskyJobType,
+  type JobEmit,
   type SaveJobOptions,
 } from "./bluesky/job-types";
 import { BlueskyRateLimiter, type ApiRequestFn } from "./bluesky/rate-limiter";
@@ -508,7 +509,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       );
       emit({ activeJobId: job.id });
 
-      const emitForJob: JobEmit = (update) => {
+      const emitForJob: JobEmit = (update: Parameters<JobEmit>[0]) => {
         emit({
           activeJobId: job.id,
           speechText: update.speechText,
