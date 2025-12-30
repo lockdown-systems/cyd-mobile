@@ -22,7 +22,8 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import { AccountSettingsSheet } from "@/components/account/AccountSettingsSheet";
+import { AccountSettingsSheet } from "@/app/account/components/AccountSettingsSheet";
+
 import { Colors } from "@/constants/theme";
 import {
   ACCOUNT_AUTH_STATUS,
