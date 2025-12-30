@@ -133,6 +133,8 @@ export function SaveTab({
     setSaving(false);
     setLoading(true);
 
+    console.log("[SaveTab] load settings -> start", accountId);
+
     void (async () => {
       try {
         const settings = await getAccountSaveSettings(accountId);
@@ -147,6 +149,7 @@ export function SaveTab({
       } finally {
         if (!cancelled) {
           setLoading(false);
+          console.log("[SaveTab] load settings -> done", accountId);
         }
       }
     })();
@@ -157,14 +160,17 @@ export function SaveTab({
   }, [accountId]);
 
   const pushScreen = useCallback((next: SaveFlowScreen) => {
+    console.log("[SaveTab] push screen", accountId, next);
     setScreenStack((prev) => [...prev, next]);
   }, []);
 
   const popScreen = useCallback(() => {
+    console.log("[SaveTab] pop screen", accountId);
     setScreenStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
   }, []);
 
   const resetToForm = useCallback(() => {
+    console.log("[SaveTab] reset to form", accountId);
     setScreenStack(["form"]);
     setPersistError(null);
     setSaving(false);
@@ -179,11 +185,13 @@ export function SaveTab({
     if (!canContinue || !state) {
       return;
     }
+    console.log("[SaveTab] continue -> start", accountId);
     setSaving(true);
     setPersistError(null);
     try {
       await updateAccountSaveSettings(accountId, state);
       pushScreen("review");
+      console.log("[SaveTab] continue -> review", accountId);
     } catch (err) {
       console.error("Failed to update save settings", err);
       setPersistError("Failed to save your selections. Please try again.");
@@ -194,6 +202,7 @@ export function SaveTab({
 
   const handleConfirm = useCallback(() => {
     if (!state) return;
+    console.log("[SaveTab] confirm automation", accountId);
     setAutomationOptions(state);
     setAutomationVisible(true);
   }, [state]);

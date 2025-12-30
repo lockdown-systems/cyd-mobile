@@ -62,6 +62,7 @@ export function AutomationModal({
     if (controllerRef.current) {
       return controllerRef.current;
     }
+    console.log("[AutomationModal] ensureController -> create", accountId);
     const controller = new BlueskyAccountController(accountId);
     controllerRef.current = controller;
     controller.setProgressCallback(() => {
@@ -69,6 +70,7 @@ export function AutomationModal({
     });
     await controller.initDB();
     await controller.initAgent();
+    console.log("[AutomationModal] ensureController -> ready", accountId);
     return controller;
   }, [accountId]);
 
@@ -102,6 +104,7 @@ export function AutomationModal({
       if (!visible || isRunningRef.current) {
         return;
       }
+      console.log("[AutomationModal] run -> start", accountId);
       isRunningRef.current = true;
       setState("running");
       setPaused(false);
@@ -110,6 +113,11 @@ export function AutomationModal({
       try {
         const controller = await ensureController();
         const definedJobs = await controller.defineJobs(options);
+        console.log(
+          "[AutomationModal] jobs defined",
+          accountId,
+          definedJobs.length
+        );
         latestJobsRef.current = definedJobs;
         setJobs(definedJobs);
 
@@ -146,12 +154,18 @@ export function AutomationModal({
         } else {
           onFinished("completed");
         }
+        console.log(
+          "[AutomationModal] run -> finished",
+          accountId,
+          failed ? "failed" : "completed"
+        );
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
         setState("failed");
         onFinished("failed");
+        console.warn("[AutomationModal] run -> error", accountId, err);
       } finally {
         isRunningRef.current = false;
       }

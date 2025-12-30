@@ -136,15 +136,18 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Initialize the account-specific database
    */
   async initDB(): Promise<void> {
+    console.log("[BlueskyController] initDB -> start", this.accountId);
     this.db = await this.openAccountDatabase();
     applyAccountMigrations(this.db, blueskyAccountMigrations);
     await this.updateAccessedAt();
+    console.log("[BlueskyController] initDB -> done", this.accountId);
   }
 
   /**
    * Initialize the authenticated API agent
    */
   async initAgent(): Promise<void> {
+    console.log("[BlueskyController] initAgent -> start", this.accountId);
     const mainDb = await getDatabase();
 
     // Get the session from the main database
@@ -179,6 +182,12 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         return sessionFetch(target, init);
       },
     });
+    console.log(
+      "[BlueskyController] initAgent -> ready",
+      this.accountId,
+      this.did,
+      this.handle
+    );
   }
 
   /**
@@ -407,6 +416,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   // ==================== Job Management ====================
 
   async defineJobs(options: SaveJobOptions): Promise<BlueskyJobRecord[]> {
+    console.log("[BlueskyController] defineJobs -> start", this.accountId, {
+      posts: options.posts,
+      likes: options.likes,
+      bookmarks: options.bookmarks,
+      chat: options.chat,
+      following: options.following,
+    });
     const db = this.requireDb();
     const scheduledAt = Date.now();
     const jobTypes: BlueskyJobType[] = ["verifyAuthorization"];
@@ -437,6 +453,12 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       });
     }
 
+    console.log(
+      "[BlueskyController] defineJobs -> inserted",
+      this.accountId,
+      inserted.map((j) => j.jobType)
+    );
+
     return inserted;
   }
 
@@ -455,6 +477,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     jobs?: BlueskyJobRecord[];
     onUpdate?: (update: BlueskyJobRunUpdate) => void;
   }): Promise<void> {
+    console.log("[BlueskyController] runJobs -> start", this.accountId);
     let jobs = params?.jobs ?? (await this.getPendingJobs());
     const emit = (update: Partial<BlueskyJobRunUpdate>) => {
       params?.onUpdate?.({
@@ -470,6 +493,12 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
     for (const job of jobs) {
       await this.waitForPause();
+      console.log(
+        "[BlueskyController] runJobs -> job start",
+        this.accountId,
+        job.id,
+        job.jobType
+      );
       const startedAt = Date.now();
       await this.updateJobStatus(job.id, "running", startedAt, null, null);
       jobs = jobs.map((existing) =>
@@ -508,6 +537,12 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
             : existing
         );
         emit({ activeJobId: null });
+        console.log(
+          "[BlueskyController] runJobs -> job complete",
+          this.accountId,
+          job.id,
+          job.jobType
+        );
       } catch (err) {
         const finishedAt = Date.now();
         const message = err instanceof Error ? err.message : String(err);
@@ -552,9 +587,18 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           progressText: message,
           speechText: "Automation failed",
         });
+        console.warn(
+          "[BlueskyController] runJobs -> job failed",
+          this.accountId,
+          job.id,
+          job.jobType,
+          message
+        );
         break;
       }
     }
+
+    console.log("[BlueskyController] runJobs -> done", this.accountId);
   }
 
   private async updateJobStatus(

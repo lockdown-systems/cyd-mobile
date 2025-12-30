@@ -72,12 +72,15 @@ export default function AccountPlaceholderScreen() {
   const [verifyingAuth, setVerifyingAuth] = useState(false);
   const insets = useSafeAreaInsets();
   const handleSelectTab = useCallback((tab: AccountTabKey) => {
+    console.log("[AccountScreen] select tab", tab);
     setActiveTab(tab);
   }, []);
   const openSettings = useCallback(() => {
+    console.log("[AccountScreen] open settings");
     setSettingsVisible(true);
   }, []);
   const closeSettings = useCallback(() => {
+    console.log("[AccountScreen] close settings");
     setSettingsVisible(false);
   }, []);
   const handleSignOut = useCallback(async () => {
