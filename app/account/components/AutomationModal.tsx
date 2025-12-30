@@ -16,6 +16,7 @@ import type {
   SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
 import type { AccountTabPalette } from "@/types/account-tabs";
+import { AutomationProgressBar } from "./AutomationProgressBar";
 
 export type AutomationModalState = "idle" | "running" | "failed" | "completed";
 
@@ -274,39 +275,6 @@ export function AutomationModal({
     return "Finished";
   })();
 
-  const progressPercent = (() => {
-    if (totalJobs === 0) return 0;
-
-    const hasVerify = jobs.some((job) => job.jobType === "verifyAuthorization");
-    const verifyWeight = hasVerify ? 2 : 0;
-    const remainingWeight = 100 - verifyWeight;
-    const nonVerifyJobs = jobs.filter(
-      (job) => job.jobType !== "verifyAuthorization"
-    );
-    const perJobWeight =
-      nonVerifyJobs.length > 0 ? remainingWeight / nonVerifyJobs.length : 0;
-
-    let percent = 0;
-
-    for (const job of jobs) {
-      if (job.jobType === "verifyAuthorization") {
-        if (job.status === "completed") {
-          percent += verifyWeight;
-        }
-        continue;
-      }
-
-      if (job.status === "completed") {
-        percent += perJobWeight;
-      } else if (job.status === "running") {
-        const clampedProgress = Math.max(0, Math.min(1, activeJobProgress));
-        percent += perJobWeight * clampedProgress;
-      }
-    }
-
-    return Math.max(0, Math.min(100, percent));
-  })();
-
   const handlePause = useCallback(async () => {
     const controller = await ensureController();
     controller.pause();
@@ -343,17 +311,11 @@ export function AutomationModal({
           </Text>
         </View>
 
-        <View style={styles.progressBarContainer}>
-          <View
-            style={[
-              styles.progressBarFill,
-              {
-                width: `${progressPercent}%`,
-                backgroundColor: palette.tint,
-              },
-            ]}
-          />
-        </View>
+        <AutomationProgressBar
+          palette={palette}
+          jobs={jobs}
+          activeJobProgress={activeJobProgress}
+        />
 
         <View
           style={[
@@ -568,15 +530,6 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 15,
     fontWeight: "600",
-  },
-  progressBarContainer: {
-    height: 10,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
   },
   dangerButton: {
     borderRadius: 14,
