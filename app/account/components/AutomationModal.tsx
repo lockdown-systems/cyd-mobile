@@ -377,6 +377,8 @@ export function AutomationModal({
               label={paused ? "Resume" : "Pause"}
               palette={palette}
               onPress={paused ? handleResume : handlePause}
+              iconName={paused ? "play-arrow" : "pause"}
+              variant={paused ? "resume" : "pause"}
             />
           ) : (
             <SecondaryButton
@@ -396,11 +398,23 @@ function SecondaryButton({
   label,
   palette,
   onPress,
+  iconName,
+  variant = "default",
 }: {
   label: string;
   palette: AccountTabPalette;
   onPress: () => void | Promise<void>;
+  iconName?: React.ComponentProps<typeof MaterialIcons>["name"];
+  variant?: "default" | "pause" | "resume";
 }) {
+  const isResume = variant === "resume";
+  const isPause = variant === "pause";
+  const backgroundColor = isResume ? "#1fa971" : palette.card;
+  const borderColor = isResume ? "#1fa971" : palette.icon + "33";
+  const textColor = isResume ? "#ffffff" : palette.text;
+  const paddingVertical = isResume ? 12 : 10;
+  const paddingHorizontal = isResume ? 24 : 20;
+
   return (
     <Pressable
       onPress={() => {
@@ -409,16 +423,28 @@ function SecondaryButton({
       style={({ pressed }) => [
         styles.secondaryButton,
         {
-          borderColor: palette.icon + "33",
-          backgroundColor: palette.card,
+          borderColor,
+          backgroundColor,
+          paddingVertical,
+          paddingHorizontal,
           opacity: pressed ? 0.85 : 1,
         },
       ]}
       accessibilityRole="button"
     >
-      <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
-        {label}
-      </Text>
+      <View style={styles.buttonContent}>
+        {iconName ? (
+          <MaterialIcons
+            name={iconName}
+            size={18}
+            color={textColor}
+            style={{ marginRight: 6, opacity: isPause ? 0.8 : 1 }}
+          />
+        ) : null}
+        <Text style={[styles.secondaryButtonText, { color: textColor }]}>
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -505,10 +531,13 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
     alignItems: "center",
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryButtonText: {
     fontSize: 15,
