@@ -72,7 +72,23 @@ export async function restoreBlueskyOAuthSession(
     throw new Error("Missing Bluesky DID for session restore");
   }
   const client = await getClient();
-  return client.restore(normalizedDid, refresh);
+  try {
+    return await client.restore(normalizedDid, refresh);
+  } catch (err) {
+    const message =
+      err instanceof Error && err.message ? err.message.toLowerCase() : "";
+    const isDeleted =
+      message.includes("session was deleted") ||
+      message.includes("no session found") ||
+      message.includes("missing bluesky did") ||
+      message.includes("account not found");
+    if (isDeleted) {
+      const missing = new Error("Missing Bluesky session (signed out)");
+      missing.name = "MissingBlueskySessionError";
+      throw missing;
+    }
+    throw err;
+  }
 }
 
 function stateKey(key: string): string {

@@ -41,6 +41,9 @@ function isMissingSessionError(err: unknown): boolean {
   if (!(err instanceof Error)) {
     return false;
   }
+  if (err.name === "MissingBlueskySessionError") {
+    return true;
+  }
   const message = err.message?.toLowerCase() ?? "";
   return (
     message.includes("session was deleted") ||
@@ -73,6 +76,12 @@ export async function verifyBlueskyAccountAuthStatus(
 
   let status: AccountAuthStatusValue =
     storedStatus ?? ACCOUNT_AUTH_STATUS.signedOut;
+
+  // If we already know the session is signed out, skip agent init to avoid
+  // surfacing expected "session deleted" errors during job startup.
+  if (status === ACCOUNT_AUTH_STATUS.signedOut) {
+    return status;
+  }
 
   try {
     if (!controller.isAgentReady()) {
