@@ -367,9 +367,11 @@ export function AutomationModal({
           ) : null}
         </View>
 
-        {previewPost ? (
-          <AutomationPostPreview post={previewPost} palette={palette} />
-        ) : null}
+        <View style={styles.previewArea}>
+          {previewPost ? (
+            <AutomationPostPreview post={previewPost} palette={palette} />
+          ) : null}
+        </View>
 
         {state === "failed" && error ? (
           <View
@@ -597,6 +599,11 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 15,
     fontWeight: "600",
+  },
+  previewArea: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "stretch",
   },
   dangerButton: {
     borderRadius: 14,

@@ -37,12 +37,7 @@ export function AutomationPostPreview({
   palette,
 }: AutomationPostPreviewProps): JSX.Element {
   return (
-    <View
-      style={[
-        styles.container,
-        { borderColor: palette.icon + "22", backgroundColor: palette.card },
-      ]}
-    >
+    <View style={[styles.container]}>
       <View style={styles.headerRow}>
         <Avatar
           uri={post.author.avatarDataURI ?? post.author.avatarUrl ?? undefined}
@@ -77,10 +72,10 @@ export function AutomationPostPreview({
 
 const styles = StyleSheet.create({
   container: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
+    borderWidth: 0,
     padding: 12,
     gap: 8,
+    marginBottom: 50,
   },
   headerRow: {
     flexDirection: "row",
@@ -91,16 +86,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   displayName: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
   },
   handle: {
-    fontSize: 13,
+    fontSize: 15,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "#ccc",
   },
   avatarPlaceholder: {
@@ -108,14 +103,15 @@ const styles = StyleSheet.create({
     borderColor: "#0001",
   },
   bodyText: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   metaRow: {
     flexDirection: "row",
     justifyContent: "flex-start",
+    marginTop: 10,
   },
   meta: {
-    fontSize: 12,
+    fontSize: 14,
   },
 });
