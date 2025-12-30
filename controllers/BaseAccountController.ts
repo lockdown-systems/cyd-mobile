@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
-import * as FileSystem from "expo-file-system";
-import { Paths } from "expo-file-system";
+import { Directory, Paths } from "expo-file-system";
+import * as LegacyFileSystem from "expo-file-system/legacy";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
@@ -62,28 +62,29 @@ export abstract class BaseAccountController<TProgress = unknown> {
   /**
    * Get the directory path for this account's data
    */
-  protected getAccountDirectory(): string {
+  private getAccountDirectoryHandle(): Directory {
     const type = this.getAccountType();
-    const legacyFs = FileSystem as typeof FileSystem & {
-      documentDirectory?: string | null;
-      cacheDirectory?: string | null;
-    };
+    const baseDirectory =
+      Paths?.document ??
+      Paths?.cache ??
+      (LegacyFileSystem.documentDirectory
+        ? new Directory(LegacyFileSystem.documentDirectory)
+        : null) ??
+      (LegacyFileSystem.cacheDirectory
+        ? new Directory(LegacyFileSystem.cacheDirectory)
+        : null);
 
-    const documentUri =
-      Paths?.document?.uri ??
-      legacyFs.documentDirectory ??
-      Paths?.cache?.uri ??
-      legacyFs.cacheDirectory;
-
-    if (!documentUri) {
+    if (!baseDirectory) {
       throw new Error("Unable to resolve a writable document directory");
     }
 
-    const normalizedUri = documentUri.endsWith("/")
-      ? documentUri
-      : `${documentUri}/`;
+    return new Directory(baseDirectory, `${type}-accounts`, this.accountUUID);
+  }
 
-    return `${normalizedUri}${type}-accounts/${this.accountUUID}/`;
+  protected getAccountDirectory(): string {
+    const accountDir = this.getAccountDirectoryHandle();
+    const uri = accountDir.uri;
+    return uri.endsWith("/") ? uri : `${uri}/`;
   }
 
   /**
@@ -97,10 +98,10 @@ export abstract class BaseAccountController<TProgress = unknown> {
    * Ensure the account directory exists
    */
   protected async ensureAccountDirectory(): Promise<void> {
-    const dir = this.getAccountDirectory();
-    const info = await FileSystem.getInfoAsync(dir);
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+    const accountDir = this.getAccountDirectoryHandle();
+
+    if (!accountDir.exists) {
+      accountDir.create({ intermediates: true, idempotent: true });
     }
   }
 
