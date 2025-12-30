@@ -2,6 +2,30 @@ import { createMockDatabase } from "@/testUtils/mockDatabase";
 import { BlueskyAccountController } from "../BlueskyAccountController";
 import type { SaveJobOptions } from "../bluesky/job-types";
 
+jest.mock("@/database", () => ({
+  getDatabase: jest.fn(async () => ({
+    getFirstAsync: jest.fn(async () => ({
+      id: 1,
+      uuid: "uuid-1",
+      sortOrder: 0,
+      type: "bluesky",
+      bskyAccountID: 1,
+      handle: "tester",
+      displayName: null,
+      avatarDataURI: null,
+      did: "did:plc:tester",
+    })),
+  })),
+}));
+
+jest.mock("@/services/bluesky-account-auth-status", () => ({
+  verifyBlueskyAccountAuthStatus: jest.fn(async () => "authenticated"),
+}));
+
+jest.mock("@/services/bluesky-oauth", () => ({
+  authenticateBlueskyAccount: jest.fn(async () => undefined),
+}));
+
 describe("BlueskyAccountController job pipeline", () => {
   const defaultOptions: SaveJobOptions = {
     posts: true,

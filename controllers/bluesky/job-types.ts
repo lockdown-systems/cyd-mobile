@@ -27,6 +27,12 @@ export type BlueskyJobRunUpdate = {
   detailText?: string;
 };
 
+export type JobEmit = (update: {
+  speechText?: string;
+  progressText?: string;
+  detailText?: string;
+}) => void;
+
 export type SaveJobOptions = {
   posts: boolean;
   likes: boolean;

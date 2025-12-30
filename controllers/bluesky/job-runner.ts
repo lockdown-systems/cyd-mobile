@@ -1,45 +1,27 @@
 import type { BlueskyAccountController } from "../BlueskyAccountController";
-import type { BlueskyJobRecord } from "./job-types";
-
-export type JobEmit = (update: {
-  speechText?: string;
-  progressText?: string;
-  detailText?: string;
-}) => void;
+import type { BlueskyJobRecord, JobEmit } from "./job-types";
+import { runSavePostsJob } from "./jobs/save-posts";
+import { runVerifyAuthorizationJob } from "./jobs/verify-authorization";
 
 export async function runJob(
   controller: BlueskyAccountController,
   job: BlueskyJobRecord,
   emit: JobEmit
 ): Promise<void> {
+  const handlers: Partial<
+    Record<BlueskyJobRecord["jobType"], () => Promise<void>>
+  > = {
+    verifyAuthorization: () => runVerifyAuthorizationJob(controller, job, emit),
+    savePosts: () => runSavePostsJob(controller, job, emit),
+  };
+
+  const handler = handlers[job.jobType];
+  if (handler) {
+    await handler();
+    return;
+  }
+
   switch (job.jobType) {
-    case "verifyAuthorization": {
-      emit({
-        speechText:
-          "I'm making sure I still have access to your Bluesky account",
-        progressText: "Verifying session…",
-      });
-      controller.pause();
-      await controller.waitForPause();
-      await controller.initAgent();
-      emit({ progressText: "Session verified" });
-      return;
-    }
-    case "savePosts": {
-      emit({
-        speechText: "I'm saving all of your posts",
-        progressText: "Fetching posts…",
-      });
-      controller.pause();
-      await controller.waitForPause();
-      if (!controller.isAgentReady()) {
-        await controller.initAgent();
-      }
-      await controller.waitForPause();
-      await controller.indexPosts();
-      emit({ progressText: "Saved posts" });
-      return;
-    }
     case "saveLikes":
     case "saveBookmarks":
     case "saveChats":
@@ -48,8 +30,7 @@ export async function runJob(
       throw new Error(`${job.jobType} is not implemented yet`);
     }
     default: {
-      const exhaustiveCheck: never = job.jobType;
-      throw new Error(`Unknown job type: ${exhaustiveCheck as string}`);
+      throw new Error(`Unknown job type: ${String(job.jobType)}`);
     }
   }
 }

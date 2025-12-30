@@ -453,7 +453,7 @@ function DangerButton({
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    paddingTop: 32,
+    paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 24,
     gap: 16,
