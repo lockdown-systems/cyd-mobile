@@ -37,8 +37,6 @@ interface IndexerDeps {
   downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
 }
 
-const SLEEP_PER_LOOP_MS = 20;
-
 export class BlueskyIndexer {
   private readonly pageSize = 100;
 
@@ -281,22 +279,20 @@ export class BlueskyIndexer {
     let saved = 0;
     let lastPreviewPost: AutomationPostPreviewData | null = null;
 
-    await db.withTransactionAsync(async () => {
-      for (const item of feed) {
-        await this.deps.waitForPause();
-        const postView = item.post;
+    for (const item of feed) {
+      await this.deps.waitForPause();
+      const postView = item.post;
 
+      await db.withTransactionAsync(async () => {
         const previewPost = await this.persistPostView(db, postView);
         if (!previewPost) {
-          continue;
+          return;
         }
 
         saved += 1;
         lastPreviewPost = previewPost;
-
-        await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
-      }
-    });
+      });
+    }
 
     // Update progress after transaction completes
     if (saved > 0) {
@@ -322,28 +318,26 @@ export class BlueskyIndexer {
     let saved = 0;
     let lastPreviewPost: AutomationPostPreviewData | null = null;
 
-    await db.withTransactionAsync(async () => {
-      for (const item of feed) {
-        await this.deps.waitForPause();
-        const postView = this.getPostViewFromFeedItem(item);
-        if (!postView) {
-          continue;
-        }
+    for (const item of feed) {
+      await this.deps.waitForPause();
+      const postView = this.getPostViewFromFeedItem(item);
+      if (!postView) {
+        continue;
+      }
 
+      await db.withTransactionAsync(async () => {
         const previewPost = await this.persistPostView(db, postView, {
           viewerLiked: 1,
           savedAt: Date.now(),
         });
         if (!previewPost) {
-          continue;
+          return;
         }
 
         saved += 1;
         lastPreviewPost = previewPost;
-
-        await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
-      }
-    });
+      });
+    }
 
     // Update progress after transaction completes
     if (saved > 0) {
@@ -369,21 +363,22 @@ export class BlueskyIndexer {
     let saved = 0;
     let lastPreviewPost: AutomationPostPreviewData | null = null;
 
-    await db.withTransactionAsync(async () => {
-      for (const item of feed) {
-        await this.deps.waitForPause();
-        const postView = this.getPostViewFromFeedItem(item);
-        if (!postView) {
-          continue;
-        }
+    for (const item of feed) {
+      await this.deps.waitForPause();
+      const postView = this.getPostViewFromFeedItem(item);
+      if (!postView) {
+        continue;
+      }
 
-        const savedAt = Date.now();
+      const savedAt = Date.now();
+
+      await db.withTransactionAsync(async () => {
         const previewPost = await this.persistPostView(db, postView, {
           viewerBookmarked: 1,
           savedAt,
         });
         if (!previewPost) {
-          continue;
+          return;
         }
 
         const subjectUri =
@@ -423,10 +418,8 @@ export class BlueskyIndexer {
 
         saved += 1;
         lastPreviewPost = previewPost;
-
-        await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
-      }
-    });
+      });
+    }
 
     // Update progress after transaction completes
     if (saved > 0) {
