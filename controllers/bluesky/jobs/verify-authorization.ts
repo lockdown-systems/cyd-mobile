@@ -91,7 +91,7 @@ export async function runVerifyAuthorizationJob(
 ): Promise<void> {
   emit({
     speechText: "I'm making sure I still have access to your Bluesky account",
-    progressMessage: "Verifying session…",
+    progressMessage: "Verifying Bluesky session…",
   });
 
   await controller.waitForPause();
@@ -99,5 +99,5 @@ export async function runVerifyAuthorizationJob(
   if (status !== ACCOUNT_AUTH_STATUS.authenticated) {
     throw new Error("Authorization failed");
   }
-  emit({ progressMessage: "Session verified" });
+  emit({ progressMessage: "Bluesky session verified" });
 }
