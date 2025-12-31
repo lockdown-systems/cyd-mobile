@@ -49,7 +49,6 @@ export class BlueskyIndexer {
     const agent = this.requireAgent();
     const did = this.requireDid();
 
-    // Posts have unknown total - we don't rely on profile.postsCount
     this.deps.updateProgress({
       postsProgress: { current: 0, total: null, unknownTotal: true },
       currentAction: "Saving posts...",
@@ -321,57 +320,13 @@ export class BlueskyIndexer {
           continue;
         }
 
-        const savedAt = Date.now();
         const previewPost = await this.persistPostView(db, postView, {
           viewerLiked: 1,
-          savedAt,
+          savedAt: Date.now(),
         });
         if (!previewPost) {
           continue;
         }
-
-        const subjectUri = postView.uri;
-        const subjectCid = postView.cid;
-        const authorDid = postView.author.did ?? null;
-        const authorHandle = postView.author.handle ?? null;
-        const viewerLikeUri = (postView.viewer as { like?: string } | null)
-          ?.like;
-        const likeUri =
-          viewerLikeUri ?? (item as { uri?: string }).uri ?? subjectUri;
-        const likeCid = (item as { cid?: string }).cid ?? subjectCid;
-        const createdAt =
-          (item as { createdAt?: string }).createdAt ??
-          (postView as { indexedAt?: string }).indexedAt ??
-          new Date().toISOString();
-
-        await db.runAsync(
-          `INSERT INTO like_record (
-            uri, cid, subjectUri, subjectCid,
-            postAuthorDid, postAuthorHandle, postText,
-            createdAt, savedAt, deletedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-          ON CONFLICT(uri) DO UPDATE SET
-            cid = excluded.cid,
-            subjectUri = excluded.subjectUri,
-            subjectCid = excluded.subjectCid,
-            postAuthorDid = excluded.postAuthorDid,
-            postAuthorHandle = excluded.postAuthorHandle,
-            postText = excluded.postText,
-            createdAt = excluded.createdAt,
-            savedAt = excluded.savedAt,
-            deletedAt = NULL;`,
-          [
-            likeUri,
-            likeCid,
-            subjectUri,
-            subjectCid,
-            authorDid,
-            authorHandle,
-            previewPost.text,
-            createdAt,
-            savedAt,
-          ]
-        );
 
         saved += 1;
         this.deps.updateProgress({

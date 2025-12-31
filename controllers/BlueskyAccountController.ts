@@ -319,9 +319,9 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       deleted: number;
     }>(`
       SELECT 
-        COUNT(*) FILTER (WHERE deletedAt IS NULL) as total,
-        COUNT(*) FILTER (WHERE deletedAt IS NOT NULL) as deleted
-      FROM like_record;
+        COUNT(*) FILTER (WHERE viewerLiked = 1 AND deletedLikeAt IS NULL) as total,
+        COUNT(*) FILTER (WHERE deletedLikeAt IS NOT NULL) as deleted
+      FROM post;
     `);
 
     if (likeCounts) {

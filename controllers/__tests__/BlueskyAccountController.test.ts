@@ -475,12 +475,6 @@ describe("BlueskyAccountController", () => {
       });
 
       const dbMocks = mockDb as unknown as MockDatabase;
-      const likeInsertCalls = dbMocks.runAsync.mock.calls.filter(
-        ([sql]) =>
-          typeof sql === "string" && sql.includes("INSERT INTO like_record")
-      );
-      expect(likeInsertCalls).toHaveLength(2);
-
       const postInsertCalls = dbMocks.runAsync.mock.calls.filter(
         ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
       );

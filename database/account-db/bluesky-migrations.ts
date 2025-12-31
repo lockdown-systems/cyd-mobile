@@ -157,28 +157,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         FOREIGN KEY (postUri) REFERENCES post(uri)
       );`,
 
-      // Likes (posts the user has liked)
-      `CREATE TABLE IF NOT EXISTS like_record (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        uri TEXT NOT NULL UNIQUE,
-        cid TEXT NOT NULL,
-        subjectUri TEXT NOT NULL,
-        subjectCid TEXT NOT NULL,
-
-        -- Denormalized post info for display without joins
-        postAuthorDid TEXT,
-        postAuthorHandle TEXT,
-        postText TEXT,
-
-        createdAt TEXT NOT NULL,
-        savedAt INTEGER NOT NULL,
-        deletedAt INTEGER,
-
-        FOREIGN KEY (subjectUri) REFERENCES post(uri)
-      );`,
-      `CREATE INDEX IF NOT EXISTS idx_like_subject ON like_record(subjectUri);`,
-      `CREATE INDEX IF NOT EXISTS idx_like_created ON like_record(createdAt);`,
-
       // Bookmarks
       `CREATE TABLE IF NOT EXISTS bookmark (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
