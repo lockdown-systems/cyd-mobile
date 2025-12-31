@@ -95,13 +95,18 @@ jest.mock("expo-file-system", () => {
 
 describe("BlueskyAccountController", () => {
   beforeEach(() => {
-    const fsMock = require("expo-file-system") as {
-      __mockState: {
-        infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
-      };
-    };
+    const fsMock = jest.mocked(
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("expo-file-system") as {
+        __mockState: {
+          infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
+        };
+      }
+    );
     fsMock.__mockState.infoMap.clear();
-    (File.downloadFileAsync as jest.Mock).mockClear();
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const mockedDownload = jest.mocked(File.downloadFileAsync);
+    mockedDownload.mockClear();
   });
 
   afterEach(() => {
@@ -322,8 +327,8 @@ describe("BlueskyAccountController", () => {
         ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
       );
       expect(insertCalls).toHaveLength(2);
-      const firstArgs = insertCalls[0]?.[1] as unknown[];
-      const secondArgs = insertCalls[1]?.[1] as unknown[];
+      const firstArgs = (insertCalls[0] as unknown[])?.[1] as unknown[];
+      const secondArgs = (insertCalls[1] as unknown[])?.[1] as unknown[];
       expect(firstArgs?.slice(17, 21)).toEqual([11, 21, 31, 41]);
       expect(secondArgs?.slice(17, 21)).toEqual([12, 22, 32, 42]);
       expect(controller.progress.postsProgress.current).toBe(2);
@@ -434,9 +439,9 @@ describe("BlueskyAccountController", () => {
         ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
       );
       expect(insertCalls).toHaveLength(2);
-      const sqlText = insertCalls[0]?.[0] as string;
+      const sqlText = (insertCalls[0] as unknown[])?.[0] as string;
       expect(sqlText).toContain("ON CONFLICT(uri) DO UPDATE");
-      const secondArgs = insertCalls[1]?.[1] as unknown[];
+      const secondArgs = (insertCalls[1] as unknown[])?.[1] as unknown[];
       expect(secondArgs?.[1]).toBe("cid-updated");
       expect(secondArgs?.slice(17, 21)).toEqual([999, 888, 777, 666]);
     });
@@ -548,7 +553,7 @@ describe("BlueskyAccountController", () => {
         ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
       );
       expect(postInsertCalls).toHaveLength(2);
-      const firstArgs = postInsertCalls[0]?.[1] as unknown[];
+      const firstArgs = (postInsertCalls[0] as unknown[])?.[1] as unknown[];
       expect(firstArgs?.[21]).toBe(1); // viewerLiked
 
       expect(controller.progress.likesProgress.current).toBe(2);
@@ -651,7 +656,7 @@ describe("BlueskyAccountController", () => {
         ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO post")
       );
       expect(postInsertCalls).toHaveLength(2);
-      const firstArgs = postInsertCalls[0]?.[1] as unknown[];
+      const firstArgs = (postInsertCalls[0] as unknown[])?.[1] as unknown[];
       expect(firstArgs?.[23]).toBe(1); // viewerBookmarked
 
       expect(controller.progress.bookmarksProgress.current).toBe(2);
@@ -744,11 +749,14 @@ describe("BlueskyAccountController", () => {
       (controller as unknown as { agent: Agent | null }).agent = {} as Agent;
       const uuid = controller.getAccountUUID();
       const paths = buildAccountPaths("bluesky", uuid);
-      const fsMock = require("expo-file-system") as {
-        __mockState: {
-          infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
-        };
-      };
+      const fsMock = jest.mocked(
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        require("expo-file-system") as {
+          __mockState: {
+            infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
+          };
+        }
+      );
       const infoMap = fsMock.__mockState.infoMap;
       const safeDid = encodeURIComponent("did:plc:123");
       const targetPath = `${paths.mediaDir}${safeDid}/blob-cid`;
@@ -763,7 +771,9 @@ describe("BlueskyAccountController", () => {
 
       const path = await controller.downloadMedia("blob-cid", "did:plc:123");
 
-      expect(File.downloadFileAsync).not.toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const mockedDownload = jest.mocked(File.downloadFileAsync);
+      expect(mockedDownload).not.toHaveBeenCalled();
       expect(path).toBe(targetPath);
     });
 
@@ -772,11 +782,14 @@ describe("BlueskyAccountController", () => {
       (controller as unknown as { agent: Agent | null }).agent = {} as Agent;
       const uuid = controller.getAccountUUID();
       const paths = buildAccountPaths("bluesky", uuid);
-      const fsMock = require("expo-file-system") as {
-        __mockState: {
-          infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
-        };
-      };
+      const fsMock = jest.mocked(
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        require("expo-file-system") as {
+          __mockState: {
+            infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
+          };
+        }
+      );
       const infoMap = fsMock.__mockState.infoMap;
       const safeDid = encodeURIComponent("did:plc:123");
       const safeName = encodeURIComponent("bafy/test");
@@ -788,8 +801,10 @@ describe("BlueskyAccountController", () => {
 
       const path = await controller.downloadMedia("bafy/test", "did:plc:123");
 
-      expect(File.downloadFileAsync).toHaveBeenCalledTimes(1);
-      const [url, dest] = (File.downloadFileAsync as jest.Mock).mock.calls[0];
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const mockedDownload = jest.mocked(File.downloadFileAsync);
+      expect(mockedDownload).toHaveBeenCalledTimes(1);
+      const [url, dest] = mockedDownload.mock.calls[0] as [string, File];
       expect(url).toBe("https://cdn.bsky.app/blob/did%3Aplc%3A123/bafy%2Ftest");
       expect(dest).toBeInstanceOf(File);
       expect(path).toBe(targetPath);
