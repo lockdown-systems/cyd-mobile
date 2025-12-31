@@ -39,6 +39,9 @@ export async function runSaveLikesJob(
   await controller.indexLikes();
   await controller.waitForPause();
 
+  // Clear the progress callback to prevent interference with subsequent jobs
+  controller.clearProgressCallback();
+
   emit({
     progressMessage: "Saved likes",
     progressPercent: 1,

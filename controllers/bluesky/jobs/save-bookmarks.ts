@@ -39,6 +39,9 @@ export async function runSaveBookmarksJob(
   await controller.indexBookmarks();
   await controller.waitForPause();
 
+  // Clear the progress callback to prevent interference with subsequent jobs
+  controller.clearProgressCallback();
+
   emit({
     progressMessage: "Saved bookmarks",
     progressPercent: 1,

@@ -192,6 +192,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
+   * Clear the progress callback
+   */
+  clearProgressCallback(): void {
+    this.progressCallback = undefined;
+  }
+
+  /**
    * Update progress and notify listeners
    */
   protected updateProgress(updates: Partial<BlueskyProgress>): void {

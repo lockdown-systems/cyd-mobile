@@ -38,8 +38,10 @@ export async function runSavePostsJob(
 
   await controller.waitForPause();
   await controller.indexPosts();
-
   await controller.waitForPause();
+
+  // Clear the progress callback to prevent interference with subsequent jobs
+  controller.clearProgressCallback();
 
   emit({
     progressMessage: "Saved posts",
