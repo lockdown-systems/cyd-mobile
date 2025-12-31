@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
 
-import { JSX } from "react/jsx-runtime";
 import { BrowseBookmarks } from "./browse/BrowseBookmarks";
 import { BrowseFollowing } from "./browse/BrowseFollowing";
 import { BrowseLikes } from "./browse/BrowseLikes";
@@ -20,9 +19,10 @@ type BrowseCategory =
 type CategoryComponentProps = {
   handle: string;
   palette: AccountTabPalette;
+  accountId?: number;
 };
 
-type CategoryComponent = (props: CategoryComponentProps) => JSX.Element;
+type CategoryComponent = ComponentType<CategoryComponentProps>;
 
 const CATEGORY_DEFINITIONS: { key: BrowseCategory; label: string }[] = [
   { key: "posts", label: "Posts" },
@@ -40,11 +40,7 @@ const CATEGORY_COMPONENTS: Record<BrowseCategory, CategoryComponent> = {
   messages: BrowseMessages,
 };
 
-export function BrowseTab({
-  accountId: _accountId,
-  handle,
-  palette,
-}: AccountTabProps) {
+export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
   const [category, setCategory] = useState<BrowseCategory>("posts");
 
   const ActiveCategory = useMemo(
@@ -94,7 +90,7 @@ export function BrowseTab({
         </ScrollView>
       </View>
 
-      <ActiveCategory handle={handle} palette={palette} />
+      <ActiveCategory handle={handle} palette={palette} accountId={accountId} />
     </View>
   );
 }
