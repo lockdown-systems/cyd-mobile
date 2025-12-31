@@ -266,8 +266,8 @@ describe("BlueskyAccountController", () => {
             $type: "app.bsky.embed.images#view",
             images: [
               {
-                thumb: `https://img.test/thumb-${suffix}.jpg`,
-                fullsize: `https://img.test/full-${suffix}.jpg`,
+                thumb: `https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:test/bafyimage${suffix}@jpeg`,
+                fullsize: `https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:test/bafyimage${suffix}@jpeg`,
                 alt: `Alt ${suffix}`,
                 aspectRatio: { width: 800, height: 600 },
               },
@@ -374,11 +374,11 @@ describe("BlueskyAccountController", () => {
 
       expect(downloadSpy).toHaveBeenCalledTimes(2);
       expect(downloadSpy).toHaveBeenCalledWith(
-        "https://img.test/thumb-1.jpg",
+        "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:test/bafyimage1@jpeg",
         "did:plc:test"
       );
       expect(downloadSpy).toHaveBeenCalledWith(
-        "https://img.test/full-1.jpg",
+        "https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:test/bafyimage1@jpeg",
         "did:plc:test"
       );
     });

@@ -17,6 +17,24 @@ import type {
 } from "./types";
 
 type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
+
+/**
+ * Internal type for extracted media with additional metadata for database storage
+ */
+type ExtractedMedia = AutomationMediaAttachment & {
+  blobCid: string;
+  mimeType?: string | null;
+};
+
+/**
+ * Internal type for extracted external link embeds
+ */
+type ExtractedExternal = {
+  uri: string;
+  title: string;
+  description?: string | null;
+  thumbUrl?: string | null;
+};
 type LikesFeedItem = AppBskyFeedGetActorLikes.OutputSchema["feed"][number];
 type BookmarksFeedItem =
   AppBskyBookmarkGetBookmarks.OutputSchema["bookmarks"][number];
@@ -572,7 +590,7 @@ export class BlueskyIndexer {
     const media = this.extractMedia(postView);
 
     const downloadedMedia = await Promise.all(
-      media.map(async (attachment) => {
+      media.map(async (attachment, position) => {
         if (attachment.type === "image") {
           let localThumbPath: string | null | undefined = null;
           let localFullsizePath: string | null | undefined = null;
@@ -593,16 +611,97 @@ export class BlueskyIndexer {
             console.warn("[persistPostView] Failed to download media", err);
           }
 
+          // Insert into post_media table
+          const downloadedAt =
+            localThumbPath || localFullsizePath ? Date.now() : null;
+          await db.runAsync(
+            `INSERT INTO post_media (
+              postUri, position, mediaType, blobCid, mimeType, alt,
+              width, height, aspectRatioWidth, aspectRatioHeight,
+              thumbUrl, fullsizeUrl, localThumbPath, localFullsizePath, downloadedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(postUri, position) DO UPDATE SET
+              mediaType = excluded.mediaType,
+              blobCid = excluded.blobCid,
+              mimeType = excluded.mimeType,
+              alt = excluded.alt,
+              width = excluded.width,
+              height = excluded.height,
+              aspectRatioWidth = excluded.aspectRatioWidth,
+              aspectRatioHeight = excluded.aspectRatioHeight,
+              thumbUrl = excluded.thumbUrl,
+              fullsizeUrl = excluded.fullsizeUrl,
+              localThumbPath = COALESCE(excluded.localThumbPath, post_media.localThumbPath),
+              localFullsizePath = COALESCE(excluded.localFullsizePath, post_media.localFullsizePath),
+              downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt);`,
+            [
+              postView.uri,
+              position,
+              attachment.type,
+              attachment.blobCid,
+              attachment.mimeType ?? null,
+              attachment.alt ?? null,
+              attachment.width ?? null,
+              attachment.height ?? null,
+              attachment.width ?? null, // aspectRatioWidth
+              attachment.height ?? null, // aspectRatioHeight
+              attachment.thumbUrl ?? null,
+              attachment.fullsizeUrl ?? null,
+              localThumbPath ?? null,
+              localFullsizePath ?? null,
+              downloadedAt,
+            ]
+          );
+
           return {
             ...attachment,
             localThumbPath,
             localFullsizePath,
-          } satisfies AutomationMediaAttachment;
+          } satisfies AutomationMediaAttachment & ExtractedMedia;
         }
 
         return attachment;
       })
     );
+
+    // Extract and save external link embeds
+    const external = this.extractExternal(postView);
+    if (external) {
+      let thumbLocalPath: string | null = null;
+      if (external.thumbUrl) {
+        try {
+          thumbLocalPath = await this.deps.downloadMediaFromUrl(
+            external.thumbUrl,
+            did
+          );
+        } catch (err) {
+          console.warn(
+            "[persistPostView] Failed to download external thumb",
+            err
+          );
+        }
+      }
+
+      await db.runAsync(
+        `INSERT INTO post_external (
+          postUri, uri, title, description, thumbUrl, thumbLocalPath
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(postUri) DO UPDATE SET
+          uri = excluded.uri,
+          title = excluded.title,
+          description = excluded.description,
+          thumbUrl = excluded.thumbUrl,
+          thumbLocalPath = COALESCE(excluded.thumbLocalPath, post_external.thumbLocalPath);`,
+        [
+          postView.uri,
+          external.uri,
+          external.title,
+          external.description ?? null,
+          external.thumbUrl ?? null,
+          thumbLocalPath,
+        ]
+      );
+    }
 
     const author = postView.author;
     const likeCount =
@@ -749,19 +848,40 @@ export class BlueskyIndexer {
     return findUri(embed);
   }
 
-  private extractMedia(postView: FeedPostView): AutomationMediaAttachment[] {
+  private extractMedia(postView: FeedPostView): ExtractedMedia[] {
     const embed = (postView as { embed?: unknown }).embed as
       | { images?: Record<string, unknown>[] }
       | undefined;
 
     const images = Array.isArray(embed?.images) ? embed.images : [];
 
-    const attachments: AutomationMediaAttachment[] = [];
+    const attachments: ExtractedMedia[] = [];
 
     for (const image of images) {
       const thumb = (image as { thumb?: string }).thumb ?? null;
       const fullsize = (image as { fullsize?: string }).fullsize ?? null;
       if (!thumb && !fullsize) continue;
+
+      // Try to extract blobCid from the image object (record embed has image.ref.$link)
+      const imageData = image as {
+        image?: { ref?: { $link?: string }; mimeType?: string };
+      };
+      let blobCid = imageData.image?.ref?.$link ?? null;
+      const mimeType = imageData.image?.mimeType ?? null;
+
+      // If no blobCid in the image object, try to extract from the URL
+      // Bluesky CDN URLs look like: https://cdn.bsky.app/img/feed_fullsize/plain/{did}/{cid}@jpeg
+      if (!blobCid && fullsize) {
+        blobCid = this.extractBlobCidFromUrl(fullsize);
+      }
+      if (!blobCid && thumb) {
+        blobCid = this.extractBlobCidFromUrl(thumb);
+      }
+
+      // Generate a fallback blobCid from the URL if we still don't have one
+      if (!blobCid) {
+        blobCid = fullsize ?? thumb ?? `unknown-${Date.now()}`;
+      }
 
       const alt = (image as { alt?: string }).alt ?? null;
       const aspect = (
@@ -772,6 +892,8 @@ export class BlueskyIndexer {
 
       attachments.push({
         type: "image",
+        blobCid,
+        mimeType,
         thumbUrl: thumb,
         fullsizeUrl: fullsize,
         alt,
@@ -781,5 +903,51 @@ export class BlueskyIndexer {
     }
 
     return attachments;
+  }
+
+  /**
+   * Extract blob CID from Bluesky CDN URL
+   * URLs look like: https://cdn.bsky.app/img/feed_fullsize/plain/{did}/{cid}@jpeg
+   */
+  private extractBlobCidFromUrl(url: string): string | null {
+    try {
+      // Match patterns like /plain/did:plc:xxx/bafyxxx@jpeg
+      const match = url.match(/\/plain\/[^/]+\/([^@/]+)/);
+      if (match?.[1]) {
+        return match[1];
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private extractExternal(postView: FeedPostView): ExtractedExternal | null {
+    const embed = (postView as { embed?: unknown }).embed as
+      | { external?: Record<string, unknown>; $type?: string }
+      | undefined;
+
+    // Check for app.bsky.embed.external#view or similar
+    if (!embed?.external) {
+      return null;
+    }
+
+    const external = embed.external as {
+      uri?: string;
+      title?: string;
+      description?: string;
+      thumb?: string;
+    };
+
+    if (!external.uri || !external.title) {
+      return null;
+    }
+
+    return {
+      uri: external.uri,
+      title: external.title,
+      description: external.description ?? null,
+      thumbUrl: external.thumb ?? null,
+    };
   }
 }
