@@ -161,22 +161,25 @@ export function SaveTab({
     };
   }, [accountId]);
 
-  const pushScreen = useCallback((next: SaveFlowScreen) => {
-    console.log("[SaveTab] push screen", accountId, next);
-    setScreenStack((prev) => [...prev, next]);
-  }, []);
+  const pushScreen = useCallback(
+    (next: SaveFlowScreen) => {
+      console.log("[SaveTab] push screen", accountId, next);
+      setScreenStack((prev) => [...prev, next]);
+    },
+    [accountId]
+  );
 
   const popScreen = useCallback(() => {
     console.log("[SaveTab] pop screen", accountId);
     setScreenStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
-  }, []);
+  }, [accountId]);
 
   const resetToForm = useCallback(() => {
     console.log("[SaveTab] reset to form", accountId);
     setScreenStack(["form"]);
     setPersistError(null);
     setSaving(false);
-  }, []);
+  }, [accountId]);
 
   const handleToggle = useCallback((key: SaveOptionKey) => {
     setPersistError(null);
@@ -207,7 +210,7 @@ export function SaveTab({
     console.log("[SaveTab] confirm automation", accountId);
     setAutomationOptions(state);
     setAutomationVisible(true);
-  }, [state]);
+  }, [accountId, state]);
 
   return (
     <View style={styles.container}>

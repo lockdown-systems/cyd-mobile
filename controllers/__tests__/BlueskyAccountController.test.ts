@@ -8,6 +8,12 @@ import type {
   AppBskyFeedGetActorLikes,
   AppBskyFeedGetAuthorFeed,
 } from "@atproto/api";
+
+jest.mock("expo-file-system/legacy", () => ({
+  getInfoAsync: jest.fn(),
+  downloadAsync: jest.fn(),
+}));
+
 import { downloadAsync, getInfoAsync } from "expo-file-system/legacy";
 
 import {
@@ -20,6 +26,15 @@ import {
 } from "../BlueskyAccountController";
 
 describe("BlueskyAccountController", () => {
+  beforeEach(() => {
+    if (jest.isMockFunction(getInfoAsync)) {
+      (getInfoAsync as jest.Mock).mockReset();
+    }
+    if (jest.isMockFunction(downloadAsync)) {
+      (downloadAsync as jest.Mock).mockReset();
+    }
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });
