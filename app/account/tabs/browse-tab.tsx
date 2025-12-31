@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import type { AccountTabProps } from "@/types/account-tabs";
+import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
+
+import { JSX } from "react/jsx-runtime";
+import { BrowseBookmarks } from "./browse/BrowseBookmarks";
+import { BrowseFollowing } from "./browse/BrowseFollowing";
+import { BrowseLikes } from "./browse/BrowseLikes";
+import { BrowseMessages } from "./browse/BrowseMessages";
+import { BrowsePosts } from "./browse/BrowsePosts";
 
 type BrowseCategory =
   | "posts"
@@ -9,6 +16,13 @@ type BrowseCategory =
   | "bookmarks"
   | "following"
   | "messages";
+
+type CategoryComponentProps = {
+  handle: string;
+  palette: AccountTabPalette;
+};
+
+type CategoryComponent = (props: CategoryComponentProps) => JSX.Element;
 
 const CATEGORY_DEFINITIONS: { key: BrowseCategory; label: string }[] = [
   { key: "posts", label: "Posts" },
@@ -18,12 +32,12 @@ const CATEGORY_DEFINITIONS: { key: BrowseCategory; label: string }[] = [
   { key: "messages", label: "Messages" },
 ];
 
-const PLACEHOLDER_COPY: Record<BrowseCategory, (handle: string) => string> = {
-  posts: (handle) => `Saved posts for ${handle} will show up here soon.`,
-  likes: (handle) => `Likes for ${handle} will show up here soon.`,
-  bookmarks: (handle) => `Bookmarks for ${handle} will show up here soon.`,
-  following: (handle) => `Following data for ${handle} will show up here soon.`,
-  messages: (handle) => `Messages for ${handle} will show up here soon.`,
+const CATEGORY_COMPONENTS: Record<BrowseCategory, CategoryComponent> = {
+  posts: BrowsePosts,
+  likes: BrowseLikes,
+  bookmarks: BrowseBookmarks,
+  following: BrowseFollowing,
+  messages: BrowseMessages,
 };
 
 export function BrowseTab({
@@ -33,14 +47,9 @@ export function BrowseTab({
 }: AccountTabProps) {
   const [category, setCategory] = useState<BrowseCategory>("posts");
 
-  const categoryLabel = useMemo(
-    () => CATEGORY_DEFINITIONS.find((item) => item.key === category)?.label,
+  const ActiveCategory = useMemo(
+    () => CATEGORY_COMPONENTS[category],
     [category]
-  );
-
-  const placeholderMessage = useMemo(
-    () => PLACEHOLDER_COPY[category](handle),
-    [category, handle]
   );
 
   return (
@@ -85,14 +94,7 @@ export function BrowseTab({
         </ScrollView>
       </View>
 
-      <View style={[styles.card, { backgroundColor: palette.card }]}>
-        <Text style={[styles.cardTitle, { color: palette.text }]}>
-          {categoryLabel}
-        </Text>
-        <Text style={[styles.cardBody, { color: palette.icon }]}>
-          {placeholderMessage}
-        </Text>
-      </View>
+      <ActiveCategory handle={handle} palette={palette} />
     </View>
   );
 }
@@ -121,21 +123,6 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 14,
     fontWeight: "600",
-  },
-  card: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 16,
-    justifyContent: "center",
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  cardBody: {
-    fontSize: 15,
-    lineHeight: 22,
   },
 });
 
