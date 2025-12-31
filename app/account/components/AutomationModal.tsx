@@ -43,8 +43,7 @@ export function AutomationModal({
 }: AutomationModalProps) {
   const [jobs, setJobs] = useState<BlueskyJobRecord[]>([]);
   const [speech, setSpeech] = useState<string | null>(null);
-  const [progress, setProgress] = useState<string | null>(null);
-  const [detail, setDetail] = useState<string | null>(null);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [state, setState] = useState<AutomationModalState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
@@ -59,8 +58,7 @@ export function AutomationModal({
 
   const resetUi = () => {
     setSpeech(null);
-    setProgress(null);
-    setDetail(null);
+    setProgressMessage(null);
     setError(null);
     setJobs([]);
     setPreviewPost(null);
@@ -169,8 +167,10 @@ export function AutomationModal({
             if (update.speechText !== undefined) {
               setSpeech(update.speechText);
             }
-            if (update.progressText !== undefined) {
-              setProgress(update.progressText);
+            if (update.progressMessage !== undefined) {
+              setProgressMessage(
+                (update.progressMessage as string | undefined) ?? null
+              );
             }
             if (update.progressPercent !== undefined) {
               setActiveJobProgress(update.progressPercent);
@@ -182,9 +182,6 @@ export function AutomationModal({
               setPreviewPost(
                 isPreviewPost(update.previewPost) ? update.previewPost : null
               );
-            }
-            if (update.detailText !== undefined) {
-              setDetail(update.detailText);
             }
           },
         });
@@ -357,27 +354,15 @@ export function AutomationModal({
           activeJobUnknownTotal={activeJobUnknownTotal}
         />
 
-        <View
-          style={[
-            styles.progressCard,
-            { borderColor: palette.icon + "22", backgroundColor: palette.card },
-          ]}
-        >
-          <Text style={[styles.progressLabel, { color: palette.icon }]}>
-            {progress ?? "Awaiting progress…"}
+        <View style={styles.progressCard}>
+          <Text style={[styles.progressMessage, { color: palette.text }]}>
+            {progressMessage ?? "Awaiting progress…"}
           </Text>
-          {detail ? (
-            <Text style={[styles.progressDetail, { color: palette.text }]}>
-              {detail}
-            </Text>
-          ) : null}
         </View>
 
-        <View style={styles.previewArea}>
-          {previewPost ? (
-            <AutomationPostPreview post={previewPost} palette={palette} />
-          ) : null}
-        </View>
+        {previewPost ? (
+          <AutomationPostPreview post={previewPost} palette={palette} />
+        ) : null}
 
         {state === "failed" && error ? (
           <View
@@ -540,17 +525,13 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   progressCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 12,
-    gap: 4,
+    alignItems: "center",
+    paddingVertical: 8,
   },
-  progressLabel: {
-    fontSize: 14,
-  },
-  progressDetail: {
-    fontSize: 13,
-    lineHeight: 18,
+  progressMessage: {
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: "center",
   },
   errorCard: {
     flexDirection: "row",
@@ -605,11 +586,6 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 15,
     fontWeight: "600",
-  },
-  previewArea: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "stretch",
   },
   dangerButton: {
     borderRadius: 14,

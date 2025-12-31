@@ -4,9 +4,9 @@ import type { BlueskyProgress, JobProgressSegment } from "../types";
 
 function formatProgress(segment: JobProgressSegment): string {
   if (segment.unknownTotal || segment.total === null) {
-    return `Saved ${segment.current} posts`;
+    return `Saved ${segment.current.toLocaleString()} posts`;
   }
-  return `Saved ${segment.current}/${segment.total} posts`;
+  return `Saved ${segment.current.toLocaleString()}/${segment.total.toLocaleString()} posts`;
 }
 
 export async function runSavePostsJob(
@@ -16,18 +16,18 @@ export async function runSavePostsJob(
 ): Promise<void> {
   emit({
     speechText: "I'm saving all of your posts",
-    progressText: "Fetching posts…",
+    progressMessage: "Fetching posts…",
     unknownTotal: true,
   });
 
   // Forward indexer progress to the job emitter so AutomationModal can display it.
   controller.setProgressCallback((progress: BlueskyProgress) => {
     const segment = progress.postsProgress;
+    const message = progress.currentAction || formatProgress(segment);
     emit({
-      progressText: formatProgress(segment),
+      progressMessage: message,
       progressPercent: undefined, // No percent for unknown total
       unknownTotal: segment.unknownTotal,
-      detailText: progress.currentAction || undefined,
       previewPost: progress.previewPost,
     });
   });
@@ -42,7 +42,7 @@ export async function runSavePostsJob(
   await controller.waitForPause();
 
   emit({
-    progressText: "Saved posts",
+    progressMessage: "Saved posts",
     progressPercent: 1,
     unknownTotal: false,
   });

@@ -471,11 +471,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         jobs,
         activeJobId: update.activeJobId ?? null,
         speechText: update.speechText,
-        progressText: update.progressText,
+        progressMessage: update.progressMessage as string | undefined,
         progressPercent: update.progressPercent,
         unknownTotal: update.unknownTotal,
         previewPost: update.previewPost,
-        detailText: update.detailText,
       });
     };
 
@@ -502,11 +501,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         emit({
           activeJobId: job.id,
           speechText: update.speechText,
-          progressText: update.progressText,
+          progressMessage: update.progressMessage as string | undefined,
           progressPercent: update.progressPercent,
           unknownTotal: update.unknownTotal,
           previewPost: update.previewPost,
-          detailText: update.detailText,
         });
       };
 
@@ -577,7 +575,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         );
         emit({
           activeJobId: null,
-          progressText: message,
+          progressMessage: message,
           speechText: "Automation failed",
         });
         console.warn(

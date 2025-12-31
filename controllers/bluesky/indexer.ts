@@ -37,7 +37,7 @@ interface IndexerDeps {
   downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
 }
 
-const SLEEP_PER_LOOP_MS = 500;
+const SLEEP_PER_LOOP_MS = 20;
 
 export class BlueskyIndexer {
   private readonly pageSize = 100;
@@ -52,7 +52,7 @@ export class BlueskyIndexer {
     // Posts have unknown total - we don't rely on profile.postsCount
     this.deps.updateProgress({
       postsProgress: { current: 0, total: null, unknownTotal: true },
-      currentAction: "Indexing posts...",
+      currentAction: "Saving posts...",
       isRunning: true,
       error: null,
     });
@@ -83,7 +83,7 @@ export class BlueskyIndexer {
               total: null,
               unknownTotal: true,
             },
-            currentAction: `Indexed ${totalSaved} posts`,
+            currentAction: `Saved ${totalSaved} posts`,
           });
         }
 
@@ -101,7 +101,7 @@ export class BlueskyIndexer {
           total: totalSaved,
           unknownTotal: false,
         },
-        currentAction: "Post indexing complete",
+        currentAction: "Finished saving posts",
         isRunning: false,
       });
     } catch (error) {
@@ -120,7 +120,7 @@ export class BlueskyIndexer {
 
     this.deps.updateProgress({
       likesProgress: { current: 0, total: null, unknownTotal: true },
-      currentAction: "Indexing likes...",
+      currentAction: "Saving likes...",
       isRunning: true,
       error: null,
     });
@@ -151,7 +151,7 @@ export class BlueskyIndexer {
               total: null,
               unknownTotal: true,
             },
-            currentAction: `Indexed ${totalSaved} likes`,
+            currentAction: `Saved ${totalSaved} likes`,
           });
         }
 
@@ -169,7 +169,7 @@ export class BlueskyIndexer {
           total: totalSaved,
           unknownTotal: false,
         },
-        currentAction: "Like indexing complete",
+        currentAction: "Finished saving likes",
         isRunning: false,
       });
     } catch (error) {
@@ -187,7 +187,7 @@ export class BlueskyIndexer {
 
     this.deps.updateProgress({
       bookmarksProgress: { current: 0, total: null, unknownTotal: true },
-      currentAction: "Indexing bookmarks...",
+      currentAction: "Saving bookmarks...",
       isRunning: true,
       error: null,
     });
@@ -217,7 +217,7 @@ export class BlueskyIndexer {
               total: null,
               unknownTotal: true,
             },
-            currentAction: `Indexed ${totalSaved} bookmarks`,
+            currentAction: `Saved ${totalSaved} bookmarks`,
           });
         }
 
@@ -235,7 +235,7 @@ export class BlueskyIndexer {
           total: totalSaved,
           unknownTotal: false,
         },
-        currentAction: "Bookmark indexing complete",
+        currentAction: "Finished saving bookmarks",
         isRunning: false,
       });
     } catch (error) {
@@ -295,7 +295,7 @@ export class BlueskyIndexer {
             total: null,
             unknownTotal: true,
           },
-          currentAction: `Indexed ${totalSavedSoFar + saved} posts`,
+          currentAction: `Saved ${totalSavedSoFar + saved} posts`,
           previewPost,
         });
 
@@ -380,7 +380,7 @@ export class BlueskyIndexer {
             total: null,
             unknownTotal: true,
           },
-          currentAction: `Indexed ${totalSavedSoFar + saved} likes`,
+          currentAction: `Saved ${totalSavedSoFar + saved} likes`,
           previewPost,
         });
 
@@ -457,7 +457,7 @@ export class BlueskyIndexer {
             total: null,
             unknownTotal: true,
           },
-          currentAction: `Indexed ${totalSavedSoFar + saved} bookmarks`,
+          currentAction: `Saved ${totalSavedSoFar + saved} bookmarks`,
           previewPost,
         });
 

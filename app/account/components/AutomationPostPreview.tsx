@@ -3,6 +3,11 @@ import type { AccountTabPalette } from "@/types/account-tabs";
 import React, { type JSX } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
+function formatNumber(num: number | null | undefined): string {
+  if (num == null) return "0";
+  return num.toLocaleString();
+}
+
 type AutomationPostPreviewProps = {
   post: AutomationPostPreviewData;
   palette: AccountTabPalette;
@@ -87,8 +92,8 @@ export function AutomationPostPreview({
       ) : null}
       <View style={styles.metaRow}>
         <Text style={[styles.meta, { color: palette.icon }]} numberOfLines={1}>
-          ❤ {post.likeCount ?? 0} 🔁 {post.repostCount ?? 0} 💬{" "}
-          {post.replyCount ?? 0} ❝ {post.quoteCount ?? 0}
+          ❤ {formatNumber(post.likeCount)} 🔁 {formatNumber(post.repostCount)}{" "}
+          💬 {formatNumber(post.replyCount)} ❝ {formatNumber(post.quoteCount)}
         </Text>
       </View>
     </View>

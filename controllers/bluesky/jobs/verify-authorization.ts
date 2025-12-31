@@ -53,8 +53,8 @@ async function ensureAuthorized(
   }
 
   emit({
-    progressText: "Reauthentication required",
-    detailText: "Opening Bluesky to refresh your session…",
+    progressMessage:
+      "Reauthentication required — Opening Bluesky to refresh your session…",
   });
 
   await controller.waitForPause();
@@ -91,7 +91,7 @@ export async function runVerifyAuthorizationJob(
 ): Promise<void> {
   emit({
     speechText: "I'm making sure I still have access to your Bluesky account",
-    progressText: "Verifying session…",
+    progressMessage: "Verifying session…",
   });
 
   await controller.waitForPause();
@@ -99,5 +99,5 @@ export async function runVerifyAuthorizationJob(
   if (status !== ACCOUNT_AUTH_STATUS.authenticated) {
     throw new Error("Authorization failed");
   }
-  emit({ progressText: "Session verified" });
+  emit({ progressMessage: "Session verified" });
 }

@@ -4,9 +4,9 @@ import type { BlueskyProgress, JobProgressSegment } from "../types";
 
 function formatProgress(segment: JobProgressSegment): string {
   if (segment.unknownTotal || segment.total === null) {
-    return `Saved ${segment.current} likes`;
+    return `Saved ${segment.current.toLocaleString()} likes`;
   }
-  return `Saved ${segment.current}/${segment.total} likes`;
+  return `Saved ${segment.current.toLocaleString()}/${segment.total.toLocaleString()} likes`;
 }
 
 export async function runSaveLikesJob(
@@ -16,17 +16,17 @@ export async function runSaveLikesJob(
 ): Promise<void> {
   emit({
     speechText: "I'm saving all of your likes",
-    progressText: "Fetching likes…",
+    progressMessage: "Fetching likes…",
     unknownTotal: true,
   });
 
   controller.setProgressCallback((progress: BlueskyProgress) => {
     const segment = progress.likesProgress;
+    const message = progress.currentAction || formatProgress(segment);
     emit({
-      progressText: formatProgress(segment),
-      progressPercent: undefined, // No percent for unknown total
+      progressMessage: message,
+      progressPercent: undefined,
       unknownTotal: segment.unknownTotal,
-      detailText: progress.currentAction || undefined,
       previewPost: progress.previewPost,
     });
   });
@@ -40,7 +40,7 @@ export async function runSaveLikesJob(
   await controller.waitForPause();
 
   emit({
-    progressText: "Saved likes",
+    progressMessage: "Saved likes",
     progressPercent: 1,
     unknownTotal: false,
   });
