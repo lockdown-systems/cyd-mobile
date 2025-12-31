@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { PostPreview } from "@/components/PostPreview";
+import { buildAccountPaths } from "@/controllers/BaseAccountController";
 import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
 import { getDatabase } from "@/database";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -134,7 +135,7 @@ export function BrowsePosts({ handle, palette, accountId }: Props) {
       }
 
       const db = await openDatabaseAsync(
-        `bluesky-accounts/${meta.uuid}/data.sqlite3`
+        buildAccountPaths("bluesky", meta.uuid).dbPathForSQLite
       );
       await db.execAsync("PRAGMA foreign_keys = ON;");
       accountDbRef.current = db;

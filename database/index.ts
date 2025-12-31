@@ -13,7 +13,7 @@ export async function getDatabase(): Promise<SQLiteDatabase> {
 }
 
 async function openAndMigrate(): Promise<SQLiteDatabase> {
-  const db = await openDatabaseAsync("cyd-main.db");
+  const db = await openDatabaseAsync("../main.db");
   await db.execAsync("PRAGMA foreign_keys = ON;");
   await applyPendingMigrations(db);
   return db;

@@ -1,7 +1,6 @@
 import { Agent, type AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
-import { Directory } from "expo-file-system";
-import { downloadAsync, getInfoAsync } from "expo-file-system/legacy";
+import { Directory, File, Paths } from "expo-file-system";
 
 import { getDatabase } from "@/database";
 import {
@@ -9,7 +8,10 @@ import {
   blueskyAccountMigrations,
 } from "@/database/account-db";
 import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
-import { BaseAccountController } from "./BaseAccountController";
+import {
+  BaseAccountController,
+  buildAccountPaths,
+} from "./BaseAccountController";
 import { BlueskyIndexer } from "./bluesky/indexer";
 import { mapJobRow, type JobRow } from "./bluesky/job-helpers";
 import { runJob } from "./bluesky/job-runner";
@@ -478,7 +480,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         jobs,
         activeJobId: update.activeJobId ?? null,
         speechText: update.speechText,
-        progressMessage: update.progressMessage as string | undefined,
+        progressMessage: update.progressMessage,
         progressPercent: update.progressPercent,
         unknownTotal: update.unknownTotal,
         previewPost: update.previewPost,
@@ -508,7 +510,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         emit({
           activeJobId: job.id,
           speechText: update.speechText,
-          progressMessage: update.progressMessage as string | undefined,
+          progressMessage: update.progressMessage,
           progressPercent: update.progressPercent,
           unknownTotal: update.unknownTotal,
           previewPost: update.previewPost,
@@ -765,29 +767,58 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     await this.ensureAccountDirectory();
-    const accountDir = this.getAccountDirectoryHandle();
+    const accountPaths = buildAccountPaths(
+      this.getAccountType(),
+      this.getAccountUUID()
+    );
     const safeDid = encodeURIComponent(did);
     const safeName = encodeURIComponent(filename);
-    const mediaDir = new Directory(accountDir, "media", safeDid);
-    mediaDir.create({ intermediates: true, idempotent: true });
+    const mediaDir = new Directory(accountPaths.mediaDir, safeDid);
 
-    const targetPath = `${mediaDir.uri}${safeName}`;
-    const info = await getInfoAsync(targetPath);
-    if (info?.exists) {
-      return targetPath;
+    if (!mediaDir.exists) {
+      mediaDir.create({ intermediates: true, idempotent: true });
     }
 
-    await downloadAsync(url, targetPath);
-    return targetPath;
+    const targetFile = new File(mediaDir, safeName);
+    if (targetFile.exists) {
+      return targetFile.uri;
+    }
+
+    const downloaded = await File.downloadFileAsync(url, targetFile);
+    return downloaded.uri;
   }
 
   async deleteAccountStorage(): Promise<void> {
     await this.cleanup();
     try {
-      const accountDir = this.getAccountDirectoryHandle();
-      if (accountDir.exists) {
-        accountDir.delete();
-      }
+      const accountPaths = buildAccountPaths(
+        this.getAccountType(),
+        this.getAccountUUID()
+      );
+
+      const deleteIfExists = (path: string) => {
+        const info = Paths.info(path);
+        if (!info.exists) return;
+        if (info.isDirectory) {
+          new Directory(path).delete();
+        } else {
+          new File(path).delete();
+        }
+      };
+
+      // Remove the canonical account folder (db + media)
+      deleteIfExists(accountPaths.accountDir);
+
+      // Clean up legacy paths that may still exist from earlier builds
+      deleteIfExists(
+        `${accountPaths.base}bluesky-accounts/${this.getAccountUUID()}`
+      );
+      deleteIfExists(
+        `${accountPaths.base}SQLite/bluesky-accounts/${this.getAccountUUID()}`
+      );
+      deleteIfExists(
+        `${accountPaths.base}SQLite/accounts/${this.getAccountType()}-${this.getAccountUUID()}`
+      );
     } catch (err) {
       console.warn("Failed to delete account storage", err);
       throw err instanceof Error

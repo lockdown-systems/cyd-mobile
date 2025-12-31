@@ -9,30 +9,99 @@ import type {
   AppBskyFeedGetAuthorFeed,
 } from "@atproto/api";
 
-jest.mock("expo-file-system/legacy", () => ({
-  getInfoAsync: jest.fn(),
-  downloadAsync: jest.fn(),
-}));
-
-import { downloadAsync, getInfoAsync } from "expo-file-system/legacy";
+import { File } from "expo-file-system";
 
 import {
   createMockDatabase,
   type MockDatabase,
 } from "@/testUtils/mockDatabase";
+import { buildAccountPaths } from "../BaseAccountController";
 import {
   BlueskyAccountController,
   type BlueskyProgress,
 } from "../BlueskyAccountController";
 
+jest.mock("expo-file-system", () => {
+  const infoMap = new Map<string, { exists: boolean; isDirectory: boolean }>();
+
+  const joinUri = (uris: (string | Directory | File)[]) =>
+    uris
+      .map((u) => (typeof u === "string" ? u : u.uri))
+      .filter((part) => part.length > 0)
+      .reduce((acc, part, index) => {
+        if (index === 0) return part;
+        if (!acc.endsWith("/") && !part.startsWith("/")) {
+          return `${acc}/${part}`;
+        }
+        if (acc.endsWith("/") && part.startsWith("/")) {
+          return `${acc}${part.slice(1)}`;
+        }
+        return `${acc}${part}`;
+      }, "");
+
+  class Directory {
+    uri: string;
+    exists: boolean;
+
+    constructor(...uris: (string | Directory | File)[]) {
+      this.uri = joinUri(uris);
+      const entry = infoMap.get(this.uri);
+      this.exists = entry?.exists ?? false;
+    }
+
+    create(options?: { intermediates?: boolean; idempotent?: boolean }) {
+      this.exists = true;
+      infoMap.set(this.uri, { exists: true, isDirectory: true });
+      return options;
+    }
+
+    delete() {
+      infoMap.delete(this.uri);
+    }
+  }
+
+  class File {
+    uri: string;
+    exists: boolean;
+
+    constructor(...uris: (string | Directory | File)[]) {
+      this.uri = joinUri(uris);
+      const entry = infoMap.get(this.uri);
+      this.exists = entry?.exists ?? false;
+    }
+
+    delete() {
+      infoMap.delete(this.uri);
+    }
+
+    static downloadFileAsync = jest.fn(
+      async (_url: string, to: File | Directory) => {
+        const targetUri = to.uri;
+        infoMap.set(targetUri, { exists: true, isDirectory: false });
+        return new File(targetUri);
+      }
+    );
+  }
+
+  const Paths = {
+    document: new Directory("file:///documents/"),
+    cache: new Directory("file:///cache/"),
+    info: (uri: string) =>
+      infoMap.get(uri) ?? { exists: false, isDirectory: false },
+  };
+
+  return { Directory, File, Paths, __mockState: { infoMap } };
+});
+
 describe("BlueskyAccountController", () => {
   beforeEach(() => {
-    if (jest.isMockFunction(getInfoAsync)) {
-      (getInfoAsync as jest.Mock).mockReset();
-    }
-    if (jest.isMockFunction(downloadAsync)) {
-      (downloadAsync as jest.Mock).mockReset();
-    }
+    const fsMock = require("expo-file-system") as {
+      __mockState: {
+        infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
+      };
+    };
+    fsMock.__mockState.infoMap.clear();
+    (File.downloadFileAsync as jest.Mock).mockClear();
   });
 
   afterEach(() => {
@@ -673,35 +742,57 @@ describe("BlueskyAccountController", () => {
     it("should skip download when file already exists", async () => {
       const controller = new BlueskyAccountController(1);
       (controller as unknown as { agent: Agent | null }).agent = {} as Agent;
-      (getInfoAsync as jest.Mock).mockResolvedValueOnce({
+      const uuid = controller.getAccountUUID();
+      const paths = buildAccountPaths("bluesky", uuid);
+      const fsMock = require("expo-file-system") as {
+        __mockState: {
+          infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
+        };
+      };
+      const infoMap = fsMock.__mockState.infoMap;
+      const safeDid = encodeURIComponent("did:plc:123");
+      const targetPath = `${paths.mediaDir}${safeDid}/blob-cid`;
+
+      infoMap.set(paths.accountsDir, { exists: true, isDirectory: true });
+      infoMap.set(paths.accountDir, { exists: true, isDirectory: true });
+      infoMap.set(`${paths.mediaDir}${safeDid}/`, {
         exists: true,
-        uri: "file:///existing",
+        isDirectory: true,
       });
+      infoMap.set(targetPath, { exists: true, isDirectory: false });
 
       const path = await controller.downloadMedia("blob-cid", "did:plc:123");
 
-      expect(getInfoAsync).toHaveBeenCalledTimes(1);
-      expect(downloadAsync).not.toHaveBeenCalled();
-      expect(path).toContain("media/did%3Aplc%3A123/");
-      expect(path.endsWith("blob-cid")).toBe(true);
+      expect(File.downloadFileAsync).not.toHaveBeenCalled();
+      expect(path).toBe(targetPath);
     });
 
     it("should download media when missing", async () => {
       const controller = new BlueskyAccountController(1);
       (controller as unknown as { agent: Agent | null }).agent = {} as Agent;
-      (getInfoAsync as jest.Mock).mockResolvedValueOnce({ exists: false });
-      (downloadAsync as jest.Mock).mockResolvedValueOnce({
-        uri: "file:///mock/downloaded",
-      });
+      const uuid = controller.getAccountUUID();
+      const paths = buildAccountPaths("bluesky", uuid);
+      const fsMock = require("expo-file-system") as {
+        __mockState: {
+          infoMap: Map<string, { exists: boolean; isDirectory: boolean }>;
+        };
+      };
+      const infoMap = fsMock.__mockState.infoMap;
+      const safeDid = encodeURIComponent("did:plc:123");
+      const safeName = encodeURIComponent("bafy/test");
+      const mediaDir = `${paths.mediaDir}${safeDid}`;
+      const targetPath = `${mediaDir}/${safeName}`;
+
+      infoMap.set(paths.accountsDir, { exists: true, isDirectory: true });
+      infoMap.set(paths.accountDir, { exists: true, isDirectory: true });
 
       const path = await controller.downloadMedia("bafy/test", "did:plc:123");
 
-      expect(downloadAsync).toHaveBeenCalledTimes(1);
-      const [url, dest] = (downloadAsync as jest.Mock).mock.calls[0];
+      expect(File.downloadFileAsync).toHaveBeenCalledTimes(1);
+      const [url, dest] = (File.downloadFileAsync as jest.Mock).mock.calls[0];
       expect(url).toBe("https://cdn.bsky.app/blob/did%3Aplc%3A123/bafy%2Ftest");
-      expect(dest).toBe(path);
-      expect(path).toContain("media/did%3Aplc%3A123/");
-      expect(path.endsWith("bafy%2Ftest")).toBe(true);
+      expect(dest).toBeInstanceOf(File);
+      expect(path).toBe(targetPath);
     });
   });
 

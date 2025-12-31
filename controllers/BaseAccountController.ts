@@ -1,9 +1,46 @@
 import * as Crypto from "expo-crypto";
 import { Directory, Paths } from "expo-file-system";
-import * as LegacyFileSystem from "expo-file-system/legacy";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
+
+function getDocumentsBasePath(): string {
+  const baseDir = Paths.document ?? Paths.cache;
+  if (!baseDir?.uri) {
+    throw new Error("Unable to resolve a writable document directory");
+  }
+  const uri = baseDir.uri;
+  return uri.endsWith("/") ? uri : `${uri}/`;
+}
+
+export function buildAccountPaths(accountType: string, accountUUID: string) {
+  const base = getDocumentsBasePath();
+  const accountsDir = `${base}accounts/`;
+  const accountDir = `${accountsDir}${accountType}-${accountUUID}/`;
+  return {
+    base,
+    accountsDir,
+    accountDir,
+    dbPath: `${accountDir}data.db`,
+    // Relative path so SQLite writes to Documents/accounts/... instead of Documents/SQLite/
+    dbPathForSQLite: `../accounts/${accountType}-${accountUUID}/data.db`,
+    mediaDir: `${accountDir}media/`,
+    mediaDirForDid: (did: string) =>
+      `${accountDir}media/${encodeURIComponent(did)}/`,
+  } as const;
+}
+
+async function ensureDirectoryExists(path: string): Promise<void> {
+  const info = Paths.info(path);
+  if (info.exists && info.isDirectory) {
+    return;
+  }
+  if (info.exists && !info.isDirectory) {
+    throw new Error(`Expected directory at ${path} but found a file`);
+  }
+  const dir = new Directory(path);
+  dir.create({ intermediates: true, idempotent: true });
+}
 
 /**
  * Abstract base class for account controllers.
@@ -109,50 +146,22 @@ export abstract class BaseAccountController<TProgress = unknown> {
     };
   }
 
-  /**
-   * Get the directory path for this account's data
-   */
-  protected getAccountDirectoryHandle(): Directory {
-    const type = this.getAccountType();
-    const baseDirectory =
-      Paths?.document ??
-      Paths?.cache ??
-      (LegacyFileSystem.documentDirectory
-        ? new Directory(LegacyFileSystem.documentDirectory)
-        : null) ??
-      (LegacyFileSystem.cacheDirectory
-        ? new Directory(LegacyFileSystem.cacheDirectory)
-        : null);
-
-    if (!baseDirectory) {
-      throw new Error("Unable to resolve a writable document directory");
-    }
-
-    return new Directory(baseDirectory, `${type}-accounts`, this.accountUUID);
-  }
-
   protected getAccountDirectory(): string {
-    const accountDir = this.getAccountDirectoryHandle();
-    const uri = accountDir.uri;
-    return uri.endsWith("/") ? uri : `${uri}/`;
+    return buildAccountPaths(this.getAccountType(), this.accountUUID)
+      .accountDir;
   }
 
-  /**
-   * Get the database file path for this account
-   */
-  protected getDatabasePath(): string {
-    return `${this.getAccountDirectory()}data.sqlite3`;
+  protected getAccountDatabasePathForSQLite(): string {
+    return buildAccountPaths(this.getAccountType(), this.accountUUID)
+      .dbPathForSQLite;
   }
 
   /**
    * Ensure the account directory exists
    */
   protected async ensureAccountDirectory(): Promise<void> {
-    const accountDir = this.getAccountDirectoryHandle();
-
-    if (!accountDir.exists) {
-      accountDir.create({ intermediates: true, idempotent: true });
-    }
+    const accountDir = this.getAccountDirectory();
+    await ensureDirectoryExists(accountDir);
   }
 
   /**
@@ -160,10 +169,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
    */
   protected async openAccountDatabase(): Promise<SQLiteDatabase> {
     await this.ensureAccountDirectory();
-    const dbPath = `${this.getAccountType()}-accounts/${
-      this.accountUUID
-    }/data.sqlite3`;
-    const db = await openDatabaseAsync(dbPath);
+    const db = await openDatabaseAsync(this.getAccountDatabasePathForSQLite());
     await db.execAsync("PRAGMA foreign_keys = ON;");
     return db;
   }
