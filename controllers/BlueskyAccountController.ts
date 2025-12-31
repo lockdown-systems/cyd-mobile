@@ -31,6 +31,7 @@ import type {
   DeleteRepostsOptions,
   RateLimitInfo,
 } from "./bluesky/types";
+import { createInitialProgress } from "./bluesky/types";
 
 type FetchRequestInfo = string | URL | Request;
 
@@ -107,36 +108,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   resetProgress(): BlueskyProgress {
-    return {
-      postsSaved: 0,
-      postsTotal: null,
-      previewPost: null,
-      likesSaved: 0,
-      likesTotal: null,
-      bookmarksSaved: 0,
-      bookmarksTotal: null,
-      followsSaved: 0,
-      followsTotal: null,
-      conversationsSaved: 0,
-      conversationsTotal: null,
-      messagesSaved: 0,
-      messagesTotal: null,
-      postsDeleted: 0,
-      postsToDelete: null,
-      repostsDeleted: 0,
-      repostsToDelete: null,
-      likesDeleted: 0,
-      likesToDelete: null,
-      bookmarksDeleted: 0,
-      bookmarksToDelete: null,
-      messagesDeleted: 0,
-      messagesToDelete: null,
-      unfollowed: 0,
-      toUnfollow: null,
-      currentAction: "",
-      isRunning: false,
-      error: null,
-    };
+    return createInitialProgress();
   }
 
   /**
@@ -501,6 +473,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         speechText: update.speechText,
         progressText: update.progressText,
         progressPercent: update.progressPercent,
+        unknownTotal: update.unknownTotal,
         previewPost: update.previewPost,
         detailText: update.detailText,
       });
@@ -531,6 +504,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           speechText: update.speechText,
           progressText: update.progressText,
           progressPercent: update.progressPercent,
+          unknownTotal: update.unknownTotal,
           previewPost: update.previewPost,
           detailText: update.detailText,
         });

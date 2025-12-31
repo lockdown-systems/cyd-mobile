@@ -1,15 +1,12 @@
 import type { BlueskyAccountController } from "../../BlueskyAccountController";
 import type { BlueskyJobRecord, JobEmit } from "../job-types";
-import type { BlueskyProgress } from "../types";
+import type { BlueskyProgress, JobProgressSegment } from "../types";
 
-function formatProgress(
-  bookmarksSaved: number,
-  bookmarksTotal: number | null
-): string {
-  if (bookmarksTotal === null || bookmarksTotal === 0) {
-    return `Saved ${bookmarksSaved} bookmarks`;
+function formatProgress(segment: JobProgressSegment): string {
+  if (segment.unknownTotal || segment.total === null) {
+    return `Saved ${segment.current} bookmarks`;
   }
-  return `Saved ${bookmarksSaved}/${bookmarksTotal} bookmarks`;
+  return `Saved ${segment.current}/${segment.total} bookmarks`;
 }
 
 export async function runSaveBookmarksJob(
@@ -20,22 +17,15 @@ export async function runSaveBookmarksJob(
   emit({
     speechText: "I'm saving all of your bookmarks",
     progressText: "Fetching bookmarks…",
+    unknownTotal: true,
   });
 
   controller.setProgressCallback((progress: BlueskyProgress) => {
-    const fraction =
-      progress.bookmarksTotal && progress.bookmarksTotal > 0
-        ? Math.max(
-            0,
-            Math.min(1, progress.bookmarksSaved / progress.bookmarksTotal)
-          )
-        : null;
+    const segment = progress.bookmarksProgress;
     emit({
-      progressText: formatProgress(
-        progress.bookmarksSaved,
-        progress.bookmarksTotal
-      ),
-      progressPercent: fraction ?? undefined,
+      progressText: formatProgress(segment),
+      progressPercent: undefined, // No percent for unknown total
+      unknownTotal: segment.unknownTotal,
       detailText: progress.currentAction || undefined,
       previewPost: progress.previewPost,
     });
@@ -49,5 +39,9 @@ export async function runSaveBookmarksJob(
   await controller.indexBookmarks();
   await controller.waitForPause();
 
-  emit({ progressText: "Saved bookmarks", progressPercent: 1 });
+  emit({
+    progressText: "Saved bookmarks",
+    progressPercent: 1,
+    unknownTotal: false,
+  });
 }

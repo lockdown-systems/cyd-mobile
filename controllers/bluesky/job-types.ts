@@ -27,6 +27,8 @@ export type BlueskyJobRunUpdate = {
   speechText?: string;
   progressText?: string;
   progressPercent?: number;
+  /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
+  unknownTotal?: boolean;
   detailText?: string;
   previewPost?: AutomationPostPreviewData | null;
 };
@@ -35,6 +37,8 @@ export type JobEmit = (update: {
   speechText?: string;
   progressText?: string;
   progressPercent?: number;
+  /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
+  unknownTotal?: boolean;
   detailText?: string;
   previewPost?: AutomationPostPreviewData | null;
 }) => void;

@@ -50,6 +50,7 @@ export function AutomationModal({
   const [paused, setPaused] = useState(false);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [activeJobProgress, setActiveJobProgress] = useState(0);
+  const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
   const [previewPost, setPreviewPost] =
     useState<AutomationPostPreviewData | null>(null);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
@@ -63,6 +64,7 @@ export function AutomationModal({
     setError(null);
     setJobs([]);
     setPreviewPost(null);
+    setActiveJobUnknownTotal(false);
     latestJobsRef.current = [];
   };
 
@@ -172,6 +174,9 @@ export function AutomationModal({
             }
             if (update.progressPercent !== undefined) {
               setActiveJobProgress(update.progressPercent);
+            }
+            if (update.unknownTotal !== undefined) {
+              setActiveJobUnknownTotal(update.unknownTotal);
             }
             if (update.previewPost !== undefined) {
               setPreviewPost(
@@ -349,6 +354,7 @@ export function AutomationModal({
           palette={palette}
           jobs={jobs}
           activeJobProgress={activeJobProgress}
+          activeJobUnknownTotal={activeJobUnknownTotal}
         />
 
         <View

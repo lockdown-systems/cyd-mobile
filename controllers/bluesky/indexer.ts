@@ -37,6 +37,8 @@ interface IndexerDeps {
   downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
 }
 
+const SLEEP_PER_LOOP_MS = 500;
+
 export class BlueskyIndexer {
   private readonly pageSize = 100;
 
@@ -47,20 +49,9 @@ export class BlueskyIndexer {
     const agent = this.requireAgent();
     const did = this.requireDid();
 
-    let postsTotal: number | null = null;
-    try {
-      const profile = await agent.getProfile({ actor: did });
-      const profilePosts = profile.data?.postsCount;
-      if (typeof profilePosts === "number" && profilePosts >= 0) {
-        postsTotal = profilePosts;
-      }
-    } catch (err) {
-      console.warn("[Indexer] Unable to fetch profile posts count", err);
-    }
-
+    // Posts have unknown total - we don't rely on profile.postsCount
     this.deps.updateProgress({
-      postsSaved: 0,
-      postsTotal,
+      postsProgress: { current: 0, total: null, unknownTotal: true },
       currentAction: "Indexing posts...",
       isRunning: true,
       error: null,
@@ -83,17 +74,15 @@ export class BlueskyIndexer {
         const nextCursor = response.cursor;
 
         if (feed.length > 0) {
-          const savedCount = await this.saveFeedPosts(
-            db,
-            feed,
-            totalSaved,
-            postsTotal
-          );
+          const savedCount = await this.saveFeedPosts(db, feed, totalSaved);
           totalSaved += savedCount;
 
           this.deps.updateProgress({
-            postsSaved: totalSaved,
-            postsTotal,
+            postsProgress: {
+              current: totalSaved,
+              total: null,
+              unknownTotal: true,
+            },
             currentAction: `Indexed ${totalSaved} posts`,
           });
         }
@@ -105,10 +94,13 @@ export class BlueskyIndexer {
         cursor = nextCursor;
       }
 
-      const finalTotal = Math.max(postsTotal ?? 0, totalSaved);
+      // Once complete, we know the total
       this.deps.updateProgress({
-        postsSaved: totalSaved,
-        postsTotal: finalTotal,
+        postsProgress: {
+          current: totalSaved,
+          total: totalSaved,
+          unknownTotal: false,
+        },
         currentAction: "Post indexing complete",
         isRunning: false,
       });
@@ -127,8 +119,7 @@ export class BlueskyIndexer {
     const did = this.requireDid();
 
     this.deps.updateProgress({
-      likesSaved: 0,
-      likesTotal: null,
+      likesProgress: { current: 0, total: null, unknownTotal: true },
       currentAction: "Indexing likes...",
       isRunning: true,
       error: null,
@@ -155,8 +146,11 @@ export class BlueskyIndexer {
           totalSaved += savedCount;
 
           this.deps.updateProgress({
-            likesSaved: totalSaved,
-            likesTotal: null,
+            likesProgress: {
+              current: totalSaved,
+              total: null,
+              unknownTotal: true,
+            },
             currentAction: `Indexed ${totalSaved} likes`,
           });
         }
@@ -168,9 +162,13 @@ export class BlueskyIndexer {
         cursor = nextCursor;
       }
 
+      // Once complete, we know the total
       this.deps.updateProgress({
-        likesSaved: totalSaved,
-        likesTotal: totalSaved,
+        likesProgress: {
+          current: totalSaved,
+          total: totalSaved,
+          unknownTotal: false,
+        },
         currentAction: "Like indexing complete",
         isRunning: false,
       });
@@ -188,8 +186,7 @@ export class BlueskyIndexer {
     const agent = this.requireAgent();
 
     this.deps.updateProgress({
-      bookmarksSaved: 0,
-      bookmarksTotal: null,
+      bookmarksProgress: { current: 0, total: null, unknownTotal: true },
       currentAction: "Indexing bookmarks...",
       isRunning: true,
       error: null,
@@ -215,8 +212,11 @@ export class BlueskyIndexer {
           totalSaved += savedCount;
 
           this.deps.updateProgress({
-            bookmarksSaved: totalSaved,
-            bookmarksTotal: null,
+            bookmarksProgress: {
+              current: totalSaved,
+              total: null,
+              unknownTotal: true,
+            },
             currentAction: `Indexed ${totalSaved} bookmarks`,
           });
         }
@@ -228,9 +228,13 @@ export class BlueskyIndexer {
         cursor = nextCursor;
       }
 
+      // Once complete, we know the total
       this.deps.updateProgress({
-        bookmarksSaved: totalSaved,
-        bookmarksTotal: totalSaved,
+        bookmarksProgress: {
+          current: totalSaved,
+          total: totalSaved,
+          unknownTotal: false,
+        },
         currentAction: "Bookmark indexing complete",
         isRunning: false,
       });
@@ -270,8 +274,7 @@ export class BlueskyIndexer {
   private async saveFeedPosts(
     db: SQLiteDatabase,
     feed: FeedViewPost[],
-    totalSavedSoFar: number,
-    postsTotal: number | null
+    totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
 
@@ -287,13 +290,16 @@ export class BlueskyIndexer {
 
         saved += 1;
         this.deps.updateProgress({
-          postsSaved: totalSavedSoFar + saved,
-          postsTotal: postsTotal ?? undefined,
+          postsProgress: {
+            current: totalSavedSoFar + saved,
+            total: null,
+            unknownTotal: true,
+          },
           currentAction: `Indexed ${totalSavedSoFar + saved} posts`,
           previewPost,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
       }
     });
 
@@ -369,13 +375,16 @@ export class BlueskyIndexer {
 
         saved += 1;
         this.deps.updateProgress({
-          likesSaved: totalSavedSoFar + saved,
-          likesTotal: null,
+          likesProgress: {
+            current: totalSavedSoFar + saved,
+            total: null,
+            unknownTotal: true,
+          },
           currentAction: `Indexed ${totalSavedSoFar + saved} likes`,
           previewPost,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
       }
     });
 
@@ -443,13 +452,16 @@ export class BlueskyIndexer {
 
         saved += 1;
         this.deps.updateProgress({
-          bookmarksSaved: totalSavedSoFar + saved,
-          bookmarksTotal: null,
+          bookmarksProgress: {
+            current: totalSavedSoFar + saved,
+            total: null,
+            unknownTotal: true,
+          },
           currentAction: `Indexed ${totalSavedSoFar + saved} bookmarks`,
           previewPost,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
       }
     });
 

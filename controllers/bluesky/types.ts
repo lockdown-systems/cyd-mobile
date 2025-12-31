@@ -1,42 +1,76 @@
 import type { HeadersMap } from "@atproto/xrpc";
 
 /**
+ * Progress state for a single job segment.
+ * When unknownTotal is true, the total is unknown and the UI should show an animated
+ * "indeterminate" state. When false, progress can be calculated as current/total.
+ */
+export interface JobProgressSegment {
+  current: number;
+  total: number | null;
+  unknownTotal: boolean;
+}
+
+/**
  * Progress state for Bluesky save/delete operations
  */
 export interface BlueskyProgress {
-  // Index (save) progress
-  postsSaved: number;
-  postsTotal: number | null;
-  previewPost?: AutomationPostPreviewData | null;
-  likesSaved: number;
-  likesTotal: number | null;
-  bookmarksSaved: number;
-  bookmarksTotal: number | null;
-  followsSaved: number;
-  followsTotal: number | null;
-  conversationsSaved: number;
-  conversationsTotal: number | null;
-  messagesSaved: number;
-  messagesTotal: number | null;
+  // Index (save) progress - now uses segments
+  postsProgress: JobProgressSegment;
+  likesProgress: JobProgressSegment;
+  bookmarksProgress: JobProgressSegment;
+  followsProgress: JobProgressSegment;
+  conversationsProgress: JobProgressSegment;
+  messagesProgress: JobProgressSegment;
 
-  // Delete progress
-  postsDeleted: number;
-  postsToDelete: number | null;
-  repostsDeleted: number;
-  repostsToDelete: number | null;
-  likesDeleted: number;
-  likesToDelete: number | null;
-  bookmarksDeleted: number;
-  bookmarksToDelete: number | null;
-  messagesDeleted: number;
-  messagesToDelete: number | null;
-  unfollowed: number;
-  toUnfollow: number | null;
+  // Delete progress - these have known totals
+  deletePostsProgress: JobProgressSegment;
+  deleteRepostsProgress: JobProgressSegment;
+  deleteLikesProgress: JobProgressSegment;
+  deleteBookmarksProgress: JobProgressSegment;
+  deleteMessagesProgress: JobProgressSegment;
+  unfollowProgress: JobProgressSegment;
+
+  // Preview post for display
+  previewPost?: AutomationPostPreviewData | null;
 
   // Status
   currentAction: string;
   isRunning: boolean;
   error: string | null;
+}
+
+/**
+ * Helper to create an initial progress segment
+ */
+export function createProgressSegment(
+  unknownTotal: boolean = false
+): JobProgressSegment {
+  return { current: 0, total: null, unknownTotal };
+}
+
+/**
+ * Helper to create initial BlueskyProgress state
+ */
+export function createInitialProgress(): BlueskyProgress {
+  return {
+    postsProgress: createProgressSegment(true), // Unknown total for indexing
+    likesProgress: createProgressSegment(true),
+    bookmarksProgress: createProgressSegment(true),
+    followsProgress: createProgressSegment(true),
+    conversationsProgress: createProgressSegment(true),
+    messagesProgress: createProgressSegment(true),
+    deletePostsProgress: createProgressSegment(false), // Known totals for deletion
+    deleteRepostsProgress: createProgressSegment(false),
+    deleteLikesProgress: createProgressSegment(false),
+    deleteBookmarksProgress: createProgressSegment(false),
+    deleteMessagesProgress: createProgressSegment(false),
+    unfollowProgress: createProgressSegment(false),
+    previewPost: null,
+    currentAction: "",
+    isRunning: false,
+    error: null,
+  };
 }
 
 /**

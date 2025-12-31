@@ -67,33 +67,36 @@ describe("BlueskyAccountController", () => {
       const controller = new BlueskyAccountController(1);
       const progress = controller.resetProgress();
 
-      // Save progress fields
-      expect(progress.postsSaved).toBe(0);
-      expect(progress.postsTotal).toBeNull();
-      expect(progress.likesSaved).toBe(0);
-      expect(progress.likesTotal).toBeNull();
-      expect(progress.bookmarksSaved).toBe(0);
-      expect(progress.bookmarksTotal).toBeNull();
-      expect(progress.followsSaved).toBe(0);
-      expect(progress.followsTotal).toBeNull();
-      expect(progress.conversationsSaved).toBe(0);
-      expect(progress.conversationsTotal).toBeNull();
-      expect(progress.messagesSaved).toBe(0);
-      expect(progress.messagesTotal).toBeNull();
+      // Save progress fields (now use segment format)
+      expect(progress.postsProgress.current).toBe(0);
+      expect(progress.postsProgress.total).toBeNull();
+      expect(progress.postsProgress.unknownTotal).toBe(true);
+      expect(progress.likesProgress.current).toBe(0);
+      expect(progress.likesProgress.total).toBeNull();
+      expect(progress.likesProgress.unknownTotal).toBe(true);
+      expect(progress.bookmarksProgress.current).toBe(0);
+      expect(progress.bookmarksProgress.total).toBeNull();
+      expect(progress.bookmarksProgress.unknownTotal).toBe(true);
+      expect(progress.followsProgress.current).toBe(0);
+      expect(progress.followsProgress.total).toBeNull();
+      expect(progress.conversationsProgress.current).toBe(0);
+      expect(progress.conversationsProgress.total).toBeNull();
+      expect(progress.messagesProgress.current).toBe(0);
+      expect(progress.messagesProgress.total).toBeNull();
 
-      // Delete progress fields
-      expect(progress.postsDeleted).toBe(0);
-      expect(progress.postsToDelete).toBeNull();
-      expect(progress.repostsDeleted).toBe(0);
-      expect(progress.repostsToDelete).toBeNull();
-      expect(progress.likesDeleted).toBe(0);
-      expect(progress.likesToDelete).toBeNull();
-      expect(progress.bookmarksDeleted).toBe(0);
-      expect(progress.bookmarksToDelete).toBeNull();
-      expect(progress.messagesDeleted).toBe(0);
-      expect(progress.messagesToDelete).toBeNull();
-      expect(progress.unfollowed).toBe(0);
-      expect(progress.toUnfollow).toBeNull();
+      // Delete progress fields (use segment format)
+      expect(progress.deletePostsProgress.current).toBe(0);
+      expect(progress.deletePostsProgress.total).toBeNull();
+      expect(progress.deleteRepostsProgress.current).toBe(0);
+      expect(progress.deleteRepostsProgress.total).toBeNull();
+      expect(progress.deleteLikesProgress.current).toBe(0);
+      expect(progress.deleteLikesProgress.total).toBeNull();
+      expect(progress.deleteBookmarksProgress.current).toBe(0);
+      expect(progress.deleteBookmarksProgress.total).toBeNull();
+      expect(progress.deleteMessagesProgress.current).toBe(0);
+      expect(progress.deleteMessagesProgress.total).toBeNull();
+      expect(progress.unfollowProgress.current).toBe(0);
+      expect(progress.unfollowProgress.total).toBeNull();
 
       // Status fields
       expect(progress.currentAction).toBe("");
@@ -254,7 +257,7 @@ describe("BlueskyAccountController", () => {
       const secondArgs = insertCalls[1]?.[1] as unknown[];
       expect(firstArgs?.slice(17, 21)).toEqual([11, 21, 31, 41]);
       expect(secondArgs?.slice(17, 21)).toEqual([12, 22, 32, 42]);
-      expect(controller.progress.postsSaved).toBe(2);
+      expect(controller.progress.postsProgress.current).toBe(2);
       expect(controller.progress.isRunning).toBe(false);
     });
 
@@ -485,7 +488,7 @@ describe("BlueskyAccountController", () => {
       const firstArgs = postInsertCalls[0]?.[1] as unknown[];
       expect(firstArgs?.[21]).toBe(1); // viewerLiked
 
-      expect(controller.progress.likesSaved).toBe(2);
+      expect(controller.progress.likesProgress.current).toBe(2);
       expect(controller.progress.isRunning).toBe(false);
     });
 
@@ -588,7 +591,7 @@ describe("BlueskyAccountController", () => {
       const firstArgs = postInsertCalls[0]?.[1] as unknown[];
       expect(firstArgs?.[23]).toBe(1); // viewerBookmarked
 
-      expect(controller.progress.bookmarksSaved).toBe(2);
+      expect(controller.progress.bookmarksProgress.current).toBe(2);
       expect(controller.progress.isRunning).toBe(false);
     });
 

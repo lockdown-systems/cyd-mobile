@@ -1,12 +1,12 @@
 import type { BlueskyAccountController } from "../../BlueskyAccountController";
 import type { BlueskyJobRecord, JobEmit } from "../job-types";
-import type { BlueskyProgress } from "../types";
+import type { BlueskyProgress, JobProgressSegment } from "../types";
 
-function formatProgress(likesSaved: number, likesTotal: number | null): string {
-  if (likesTotal === null || likesTotal === 0) {
-    return `Saved ${likesSaved} likes`;
+function formatProgress(segment: JobProgressSegment): string {
+  if (segment.unknownTotal || segment.total === null) {
+    return `Saved ${segment.current} likes`;
   }
-  return `Saved ${likesSaved}/${likesTotal} likes`;
+  return `Saved ${segment.current}/${segment.total} likes`;
 }
 
 export async function runSaveLikesJob(
@@ -17,16 +17,15 @@ export async function runSaveLikesJob(
   emit({
     speechText: "I'm saving all of your likes",
     progressText: "Fetching likes…",
+    unknownTotal: true,
   });
 
   controller.setProgressCallback((progress: BlueskyProgress) => {
-    const fraction =
-      progress.likesTotal && progress.likesTotal > 0
-        ? Math.max(0, Math.min(1, progress.likesSaved / progress.likesTotal))
-        : null;
+    const segment = progress.likesProgress;
     emit({
-      progressText: formatProgress(progress.likesSaved, progress.likesTotal),
-      progressPercent: fraction ?? undefined,
+      progressText: formatProgress(segment),
+      progressPercent: undefined, // No percent for unknown total
+      unknownTotal: segment.unknownTotal,
       detailText: progress.currentAction || undefined,
       previewPost: progress.previewPost,
     });
@@ -40,5 +39,9 @@ export async function runSaveLikesJob(
   await controller.indexLikes();
   await controller.waitForPause();
 
-  emit({ progressText: "Saved likes", progressPercent: 1 });
+  emit({
+    progressText: "Saved likes",
+    progressPercent: 1,
+    unknownTotal: false,
+  });
 }
