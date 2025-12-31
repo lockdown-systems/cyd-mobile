@@ -86,7 +86,8 @@ export class BlueskyIndexer {
           });
         }
 
-        if (!nextCursor) {
+        // Break if no more results OR no cursor (API returns empty feed with cursor when done)
+        if (feed.length === 0 || !nextCursor) {
           break;
         }
 
@@ -154,7 +155,8 @@ export class BlueskyIndexer {
           });
         }
 
-        if (!nextCursor) {
+        // Break if no more results OR no cursor (API returns empty feed with cursor when done)
+        if (feed.length === 0 || !nextCursor) {
           break;
         }
 
@@ -220,7 +222,8 @@ export class BlueskyIndexer {
           });
         }
 
-        if (!nextCursor) {
+        // Break if no more results OR no cursor (API returns empty feed with cursor when done)
+        if (feed.length === 0 || !nextCursor) {
           break;
         }
 
