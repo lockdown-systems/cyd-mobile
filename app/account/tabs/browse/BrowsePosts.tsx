@@ -290,7 +290,7 @@ export function BrowsePosts({ handle, palette, accountId }: Props) {
 
   const renderItem = useCallback(
     ({ item }: { item: AutomationPostPreviewData }) => (
-      <PostPreview post={item} palette={palette} />
+      <PostPreview post={item} palette={palette} browseMode />
     ),
     [palette]
   );
