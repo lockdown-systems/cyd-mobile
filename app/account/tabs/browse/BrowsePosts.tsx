@@ -10,7 +10,10 @@ import {
 
 import { PostPreview } from "@/components/PostPreview";
 import { buildAccountPaths } from "@/controllers/BaseAccountController";
-import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
+import type {
+  AutomationMediaAttachment,
+  AutomationPostPreviewData,
+} from "@/controllers/bluesky/types";
 import { getDatabase } from "@/database";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
@@ -44,6 +47,20 @@ type PostRow = {
   avatarDataURI: string | null;
 };
 
+type MediaRow = {
+  postUri: string;
+  position: number;
+  mediaType: "image" | "video";
+  alt: string | null;
+  width: number | null;
+  height: number | null;
+  thumbUrl: string | null;
+  fullsizeUrl: string | null;
+  localThumbPath: string | null;
+  localFullsizePath: string | null;
+  localVideoPath: string | null;
+};
+
 type Cursor = {
   createdAt: string;
   id: number;
@@ -74,7 +91,8 @@ async function fetchAccountMeta(
 
 function mapRowToPreview(
   row: PostRow,
-  fallbackHandle: string
+  fallbackHandle: string,
+  media?: AutomationMediaAttachment[]
 ): AutomationPostPreviewData {
   return {
     uri: row.uri,
@@ -93,7 +111,50 @@ function mapRowToPreview(
     replyCount: row.replyCount,
     quoteCount: row.quoteCount,
     isRepost: row.isRepost === 1,
+    media,
   };
+}
+
+function mapMediaRowToAttachment(row: MediaRow): AutomationMediaAttachment {
+  return {
+    type: row.mediaType,
+    alt: row.alt,
+    width: row.width,
+    height: row.height,
+    thumbUrl: row.thumbUrl,
+    fullsizeUrl: row.fullsizeUrl,
+    localThumbPath: row.localThumbPath,
+    localFullsizePath: row.localFullsizePath,
+    localVideoPath: row.localVideoPath,
+  };
+}
+
+async function fetchMediaForPosts(
+  db: SQLiteDatabase,
+  postUris: string[]
+): Promise<Map<string, AutomationMediaAttachment[]>> {
+  if (postUris.length === 0) {
+    return new Map();
+  }
+
+  const placeholders = postUris.map(() => "?").join(",");
+  const mediaRows = await db.getAllAsync<MediaRow>(
+    `SELECT postUri, position, mediaType, alt, width, height,
+            thumbUrl, fullsizeUrl, localThumbPath, localFullsizePath, localVideoPath
+     FROM post_media
+     WHERE postUri IN (${placeholders})
+     ORDER BY postUri, position;`,
+    postUris
+  );
+
+  const mediaMap = new Map<string, AutomationMediaAttachment[]>();
+  for (const row of mediaRows) {
+    const existing = mediaMap.get(row.postUri) ?? [];
+    existing.push(mapMediaRowToAttachment(row));
+    mediaMap.set(row.postUri, existing);
+  }
+
+  return mediaMap;
 }
 
 export function BrowsePosts({ handle, palette, accountId }: Props) {
@@ -153,8 +214,12 @@ export function BrowsePosts({ handle, palette, accountId }: Props) {
         [meta.did, PAGE_SIZE]
       );
 
+      // Fetch media for these posts
+      const postUris = rows.map((r) => r.uri);
+      const mediaMap = await fetchMediaForPosts(db, postUris);
+
       const mapped = rows.map((row) =>
-        mapRowToPreview(row, meta.handle ?? handle)
+        mapRowToPreview(row, meta.handle ?? handle, mediaMap.get(row.uri))
       );
       setPosts(mapped);
       setHasMore(rows.length === PAGE_SIZE);
@@ -198,8 +263,12 @@ export function BrowsePosts({ handle, palette, accountId }: Props) {
         [meta.did, cursor.createdAt, cursor.createdAt, cursor.id, PAGE_SIZE]
       );
 
+      // Fetch media for these posts
+      const postUris = rows.map((r) => r.uri);
+      const mediaMap = await fetchMediaForPosts(db, postUris);
+
       const mapped = rows.map((row) =>
-        mapRowToPreview(row, meta.handle ?? handle)
+        mapRowToPreview(row, meta.handle ?? handle, mediaMap.get(row.uri))
       );
       setPosts((prev) => [...prev, ...mapped]);
       setHasMore(rows.length === PAGE_SIZE);
