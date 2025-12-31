@@ -276,6 +276,7 @@ export class BlueskyIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
+    let lastPreviewPost: AutomationPostPreviewData | null = null;
 
     await db.withTransactionAsync(async () => {
       for (const item of feed) {
@@ -288,19 +289,24 @@ export class BlueskyIndexer {
         }
 
         saved += 1;
-        this.deps.updateProgress({
-          postsProgress: {
-            current: totalSavedSoFar + saved,
-            total: null,
-            unknownTotal: true,
-          },
-          currentAction: `Saved ${totalSavedSoFar + saved} posts`,
-          previewPost,
-        });
+        lastPreviewPost = previewPost;
 
         await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
       }
     });
+
+    // Update progress after transaction completes
+    if (saved > 0) {
+      this.deps.updateProgress({
+        postsProgress: {
+          current: totalSavedSoFar + saved,
+          total: null,
+          unknownTotal: true,
+        },
+        currentAction: `Saved ${totalSavedSoFar + saved} posts`,
+        previewPost: lastPreviewPost,
+      });
+    }
 
     return saved;
   }
@@ -311,6 +317,7 @@ export class BlueskyIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
+    let lastPreviewPost: AutomationPostPreviewData | null = null;
 
     await db.withTransactionAsync(async () => {
       for (const item of feed) {
@@ -329,19 +336,24 @@ export class BlueskyIndexer {
         }
 
         saved += 1;
-        this.deps.updateProgress({
-          likesProgress: {
-            current: totalSavedSoFar + saved,
-            total: null,
-            unknownTotal: true,
-          },
-          currentAction: `Saved ${totalSavedSoFar + saved} likes`,
-          previewPost,
-        });
+        lastPreviewPost = previewPost;
 
         await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
       }
     });
+
+    // Update progress after transaction completes
+    if (saved > 0) {
+      this.deps.updateProgress({
+        likesProgress: {
+          current: totalSavedSoFar + saved,
+          total: null,
+          unknownTotal: true,
+        },
+        currentAction: `Saved ${totalSavedSoFar + saved} likes`,
+        previewPost: lastPreviewPost,
+      });
+    }
 
     return saved;
   }
@@ -352,6 +364,7 @@ export class BlueskyIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
+    let lastPreviewPost: AutomationPostPreviewData | null = null;
 
     await db.withTransactionAsync(async () => {
       for (const item of feed) {
@@ -406,19 +419,24 @@ export class BlueskyIndexer {
         );
 
         saved += 1;
-        this.deps.updateProgress({
-          bookmarksProgress: {
-            current: totalSavedSoFar + saved,
-            total: null,
-            unknownTotal: true,
-          },
-          currentAction: `Saved ${totalSavedSoFar + saved} bookmarks`,
-          previewPost,
-        });
+        lastPreviewPost = previewPost;
 
         await new Promise((resolve) => setTimeout(resolve, SLEEP_PER_LOOP_MS));
       }
     });
+
+    // Update progress after transaction completes
+    if (saved > 0) {
+      this.deps.updateProgress({
+        bookmarksProgress: {
+          current: totalSavedSoFar + saved,
+          total: null,
+          unknownTotal: true,
+        },
+        currentAction: `Saved ${totalSavedSoFar + saved} bookmarks`,
+        previewPost: lastPreviewPost,
+      });
+    }
 
     return saved;
   }
