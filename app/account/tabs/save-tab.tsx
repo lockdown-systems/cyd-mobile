@@ -94,6 +94,7 @@ export function SaveTab({
   const [automationVisible, setAutomationVisible] = useState(false);
   const [automationOptions, setAutomationOptions] =
     useState<SaveOptionState | null>(null);
+  const [automationKey, setAutomationKey] = useState(0);
 
   const selectedOptions = useMemo(() => {
     if (!state) {
@@ -209,6 +210,7 @@ export function SaveTab({
     if (!state) return;
     console.log("[SaveTab] confirm automation", accountId);
     setAutomationOptions(state);
+    setAutomationKey((prev) => prev + 1); // Force new modal instance
     setAutomationVisible(true);
   }, [accountId, state]);
 
@@ -238,6 +240,7 @@ export function SaveTab({
         />
       )}
       <AutomationModal
+        key={automationKey}
         visible={automationVisible}
         accountId={accountId}
         palette={palette}
