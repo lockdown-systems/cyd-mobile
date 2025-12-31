@@ -42,13 +42,27 @@ async function ensureAuthorized(
   controller: BlueskyAccountController,
   emit: JobEmit
 ): Promise<AccountAuthStatusValue> {
+  console.log(
+    "[verify-auth] start ensureAuthorized",
+    controller.getAccountId()
+  );
   const account = await loadAccount(controller);
+  console.log("[verify-auth] account loaded", {
+    accountId: account.id,
+    handle: account.handle,
+    did: account.did,
+  });
   const initialStatus = await verifyBlueskyAccountAuthStatus(
     controller,
     account,
     { force: true }
   );
+  console.log("[verify-auth] initial status", {
+    accountId: account.id,
+    status: initialStatus,
+  });
   if (initialStatus === ACCOUNT_AUTH_STATUS.authenticated) {
+    console.log("[verify-auth] already authenticated");
     return initialStatus;
   }
 
@@ -57,11 +71,17 @@ async function ensureAuthorized(
       "Reauthentication required — Opening Bluesky to refresh your session…",
   });
 
+  console.log("[verify-auth] waiting before reauth");
   await controller.waitForPause();
 
   try {
+    console.log("[verify-auth] triggering authenticateBlueskyAccount", {
+      handle: account.handle,
+    });
     await authenticateBlueskyAccount(account.handle);
+    console.log("[verify-auth] authenticateBlueskyAccount returned");
   } catch (err) {
+    console.warn("[verify-auth] reauth failed", err);
     const message =
       err instanceof Error && err.message
         ? err.message
@@ -69,6 +89,7 @@ async function ensureAuthorized(
     throw new Error(message);
   }
 
+  console.log("[verify-auth] waiting after reauth");
   await controller.waitForPause();
 
   const finalStatus = await verifyBlueskyAccountAuthStatus(
@@ -78,6 +99,10 @@ async function ensureAuthorized(
       force: true,
     }
   );
+  console.log("[verify-auth] final status", {
+    accountId: account.id,
+    status: finalStatus,
+  });
   if (finalStatus !== ACCOUNT_AUTH_STATUS.authenticated) {
     throw new Error("Unable to verify authorization after reauthentication");
   }
@@ -89,6 +114,10 @@ export async function runVerifyAuthorizationJob(
   job: BlueskyJobRecord,
   emit: JobEmit
 ): Promise<void> {
+  console.log("[verify-auth] job start", {
+    jobId: job.id,
+    accountId: controller.getAccountId(),
+  });
   emit({
     speechText: "I'm making sure I still have access to your Bluesky account",
     progressMessage: "Verifying Bluesky session…",
@@ -97,7 +126,12 @@ export async function runVerifyAuthorizationJob(
   await controller.waitForPause();
   const status = await ensureAuthorized(controller, emit);
   if (status !== ACCOUNT_AUTH_STATUS.authenticated) {
+    console.warn("[verify-auth] status not authenticated", { status });
     throw new Error("Authorization failed");
   }
   emit({ progressMessage: "Bluesky session verified" });
+  console.log("[verify-auth] job complete", {
+    jobId: job.id,
+    accountId: controller.getAccountId(),
+  });
 }
