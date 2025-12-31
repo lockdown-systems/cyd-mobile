@@ -19,7 +19,8 @@
             "CFBundleURLSchemes": ["social.cyd.api", "social.cyd.dev-api"]
           }
         ]
-      }
+      },
+      "icon": "./assets/images/cyd.icon"
     },
     "android": {
       "adaptiveIcon": {
