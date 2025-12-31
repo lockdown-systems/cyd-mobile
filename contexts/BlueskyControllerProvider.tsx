@@ -13,6 +13,7 @@ import {
   type BlueskyProgress,
   type RateLimitInfo,
 } from "@/controllers";
+import { createInitialProgress } from "@/controllers/bluesky/types";
 
 /**
  * Context value for the Bluesky controller
@@ -38,6 +39,7 @@ const BlueskyControllerContext =
 
 interface BlueskyControllerProviderProps {
   accountId: number;
+  accountUUID: string;
   children: ReactNode;
 }
 
@@ -48,6 +50,7 @@ interface BlueskyControllerProviderProps {
  */
 export function BlueskyControllerProvider({
   accountId,
+  accountUUID,
   children,
 }: BlueskyControllerProviderProps) {
   const controllerRef = useRef<BlueskyAccountController | null>(null);
@@ -57,35 +60,9 @@ export function BlueskyControllerProvider({
   const [reauthenticationRequested, setReauthenticationRequested] =
     useState(false);
 
-  const [progress, setProgress] = useState<BlueskyProgress>({
-    postsSaved: 0,
-    postsTotal: null,
-    likesSaved: 0,
-    likesTotal: null,
-    bookmarksSaved: 0,
-    bookmarksTotal: null,
-    followsSaved: 0,
-    followsTotal: null,
-    conversationsSaved: 0,
-    conversationsTotal: null,
-    messagesSaved: 0,
-    messagesTotal: null,
-    postsDeleted: 0,
-    postsToDelete: null,
-    repostsDeleted: 0,
-    repostsToDelete: null,
-    likesDeleted: 0,
-    likesToDelete: null,
-    bookmarksDeleted: 0,
-    bookmarksToDelete: null,
-    messagesDeleted: 0,
-    messagesToDelete: null,
-    unfollowed: 0,
-    toUnfollow: null,
-    currentAction: "",
-    isRunning: false,
-    error: null,
-  });
+  const [progress, setProgress] = useState<BlueskyProgress>(
+    createInitialProgress()
+  );
 
   const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo | null>(
     null
@@ -95,7 +72,7 @@ export function BlueskyControllerProvider({
   const initController = useCallback(async () => {
     try {
       // Create controller
-      const controller = new BlueskyAccountController(accountId);
+      const controller = new BlueskyAccountController(accountId, accountUUID);
       controllerRef.current = controller;
 
       // Set up callbacks
@@ -121,7 +98,7 @@ export function BlueskyControllerProvider({
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [accountId]);
+  }, [accountId, accountUUID]);
 
   // Clean up the controller
   const cleanupController = useCallback(async () => {

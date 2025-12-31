@@ -454,6 +454,7 @@ export default function AccountPlaceholderScreen() {
             {account ? (
               <ActiveTabComponent
                 accountId={account.id}
+                accountUUID={account.uuid}
                 handle={canonicalHandle}
                 palette={palette}
                 onSelectTab={handleSelectTab}

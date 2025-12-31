@@ -27,7 +27,7 @@ describe("BlueskyControllerProvider", () => {
       // Validate it can create a React element
       const element = React.createElement(
         BlueskyControllerProvider,
-        { accountId: 1 },
+        { accountId: 1, accountUUID: "test-uuid-1" },
         React.createElement("div", null, "test")
       );
 
@@ -39,7 +39,7 @@ describe("BlueskyControllerProvider", () => {
     it("should accept required accountId prop", () => {
       const element = React.createElement(
         BlueskyControllerProvider,
-        { accountId: 42 },
+        { accountId: 42, accountUUID: "test-uuid-42" },
         null
       );
 
@@ -50,7 +50,7 @@ describe("BlueskyControllerProvider", () => {
       const childElement = React.createElement("span", null, "child");
       const element = React.createElement(
         BlueskyControllerProvider,
-        { accountId: 1 },
+        { accountId: 1, accountUUID: "test-uuid-child" },
         childElement
       );
 

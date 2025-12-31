@@ -81,6 +81,7 @@ function mapStateToJobOptions(state: SaveOptionState): SaveJobOptions {
 
 export function SaveTab({
   accountId,
+  accountUUID,
   handle,
   palette,
   onSelectTab,
@@ -243,6 +244,7 @@ export function SaveTab({
         key={automationKey}
         visible={automationVisible}
         accountId={accountId}
+        accountUUID={accountUUID}
         palette={palette}
         options={mapStateToJobOptions(
           automationOptions ?? state ?? DEFAULT_STATE

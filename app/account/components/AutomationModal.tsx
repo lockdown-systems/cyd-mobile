@@ -25,6 +25,7 @@ export type AutomationModalState = "idle" | "running" | "failed" | "completed";
 export type AutomationModalProps = {
   visible: boolean;
   accountId: number;
+  accountUUID: string;
   palette: AccountTabPalette;
   options: SaveJobOptions;
   onFinished: (result: "completed" | "failed") => void;
@@ -35,6 +36,7 @@ export type AutomationModalProps = {
 export function AutomationModal({
   visible,
   accountId,
+  accountUUID,
   palette,
   options,
   onFinished,
@@ -71,7 +73,7 @@ export function AutomationModal({
       return controllerRef.current;
     }
     console.log("[AutomationModal] ensureController -> create", accountId);
-    const controller = new BlueskyAccountController(accountId);
+    const controller = new BlueskyAccountController(accountId, accountUUID);
     controllerRef.current = controller;
     controller.setProgressCallback(() => {
       // progress is reported via job events
@@ -92,7 +94,7 @@ export function AutomationModal({
       }
     }
     return controller;
-  }, [accountId]);
+  }, [accountId, accountUUID]);
 
   const jobLabel = useMemo(
     () =>
