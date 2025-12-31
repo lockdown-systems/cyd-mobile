@@ -9,6 +9,7 @@ import React, {
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
+import { PostPreview } from "@/components/PostPreview";
 import { BlueskyAccountController } from "@/controllers";
 import type {
   BlueskyJobRecord,
@@ -17,7 +18,6 @@ import type {
 } from "@/controllers/bluesky/job-types";
 import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
-import { AutomationPostPreview } from "./AutomationPostPreview";
 import { AutomationProgressBar } from "./AutomationProgressBar";
 
 export type AutomationModalState = "idle" | "running" | "failed" | "completed";
@@ -361,7 +361,7 @@ export function AutomationModal({
         </View>
 
         {previewPost ? (
-          <AutomationPostPreview post={previewPost} palette={palette} />
+          <PostPreview post={previewPost} palette={palette} />
         ) : null}
 
         {state === "failed" && error ? (

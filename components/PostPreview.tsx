@@ -1,14 +1,15 @@
-import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
-import type { AccountTabPalette } from "@/types/account-tabs";
 import React, { type JSX } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
+
+import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
+import type { AccountTabPalette } from "@/types/account-tabs";
 
 function formatNumber(num: number | null | undefined): string {
   if (num == null) return "0";
   return num.toLocaleString();
 }
 
-type AutomationPostPreviewProps = {
+type PostPreviewProps = {
   post: AutomationPostPreviewData;
   palette: AccountTabPalette;
 };
@@ -20,10 +21,7 @@ function Avatar({ uri }: { uri?: string | null }) {
   return <Image source={{ uri }} style={styles.avatar} />;
 }
 
-export function AutomationPostPreview({
-  post,
-  palette,
-}: AutomationPostPreviewProps): JSX.Element {
+export function PostPreview({ post, palette }: PostPreviewProps): JSX.Element {
   return (
     <View
       style={[
@@ -92,8 +90,8 @@ export function AutomationPostPreview({
       ) : null}
       <View style={styles.metaRow}>
         <Text style={[styles.meta, { color: palette.icon }]} numberOfLines={1}>
-          ❤ {formatNumber(post.likeCount)} 🔁 {formatNumber(post.repostCount)}{" "}
-          💬 {formatNumber(post.replyCount)} ❝ {formatNumber(post.quoteCount)}
+          ❤ {formatNumber(post.likeCount)} 🔁 {formatNumber(post.repostCount)} ❝{" "}
+          {formatNumber(post.quoteCount)} 💬 {formatNumber(post.replyCount)}
         </Text>
       </View>
     </View>
@@ -171,4 +169,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AutomationPostPreview;
+export default PostPreview;
