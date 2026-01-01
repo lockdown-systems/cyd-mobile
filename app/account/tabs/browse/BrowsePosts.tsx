@@ -56,6 +56,7 @@ type MediaRow = {
   height: number | null;
   thumbUrl: string | null;
   fullsizeUrl: string | null;
+  playlistUrl: string | null;
   localThumbPath: string | null;
   localFullsizePath: string | null;
   localVideoPath: string | null;
@@ -123,6 +124,7 @@ function mapMediaRowToAttachment(row: MediaRow): AutomationMediaAttachment {
     height: row.height,
     thumbUrl: row.thumbUrl,
     fullsizeUrl: row.fullsizeUrl,
+    playlistUrl: row.playlistUrl,
     localThumbPath: row.localThumbPath,
     localFullsizePath: row.localFullsizePath,
     localVideoPath: row.localVideoPath,
@@ -140,7 +142,7 @@ async function fetchMediaForPosts(
   const placeholders = postUris.map(() => "?").join(",");
   const mediaRows = await db.getAllAsync<MediaRow>(
     `SELECT postUri, position, mediaType, alt, width, height,
-            thumbUrl, fullsizeUrl, localThumbPath, localFullsizePath, localVideoPath
+            thumbUrl, fullsizeUrl, playlistUrl, localThumbPath, localFullsizePath, localVideoPath
      FROM post_media
      WHERE postUri IN (${placeholders})
      ORDER BY postUri, position;`,

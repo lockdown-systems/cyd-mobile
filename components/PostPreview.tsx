@@ -1,4 +1,11 @@
-import React, { useCallback, useRef, useState, type JSX } from "react";
+import { useVideoPlayer, VideoView } from "expo-video";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type JSX,
+} from "react";
 import {
   Dimensions,
   FlatList,
@@ -13,7 +20,10 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 
-import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
+import type {
+  AutomationMediaAttachment,
+  AutomationPostPreviewData,
+} from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -133,6 +143,61 @@ function ImageGalleryModal({
   );
 }
 
+function VideoPlayerModal({
+  visible,
+  videoUri,
+  posterUri,
+  onClose,
+}: {
+  visible: boolean;
+  videoUri: string;
+  posterUri?: string;
+  onClose: () => void;
+}) {
+  const player = useVideoPlayer(videoUri, (p) => {
+    p.loop = false;
+  });
+
+  // Auto-play when modal becomes visible, pause when hidden
+  useEffect(() => {
+    if (visible) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [visible, player]);
+
+  const handleClose = useCallback(() => {
+    player.pause();
+    onClose();
+  }, [onClose, player]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+      statusBarTranslucent
+    >
+      <View style={styles.modalBackdrop}>
+        <Pressable style={styles.closeButton} onPress={handleClose}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </Pressable>
+
+        <View style={styles.videoContainer}>
+          <VideoView
+            player={player}
+            style={styles.videoPlayer}
+            nativeControls
+            contentFit="contain"
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export function PostPreview({
   post,
   palette,
@@ -140,6 +205,9 @@ export function PostPreview({
 }: PostPreviewProps): JSX.Element {
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [videoVisible, setVideoVisible] = useState(false);
+  const [currentVideo, setCurrentVideo] =
+    useState<AutomationMediaAttachment | null>(null);
 
   // Build gallery images list for browse mode
   const galleryImages: ImageItem[] = React.useMemo(() => {
@@ -167,6 +235,16 @@ export function PostPreview({
     setGalleryVisible(false);
   }, []);
 
+  const openVideo = useCallback((video: AutomationMediaAttachment) => {
+    setCurrentVideo(video);
+    setVideoVisible(true);
+  }, []);
+
+  const closeVideo = useCallback(() => {
+    setVideoVisible(false);
+    setCurrentVideo(null);
+  }, []);
+
   return (
     <View
       style={[
@@ -180,6 +258,17 @@ export function PostPreview({
           images={galleryImages}
           initialIndex={galleryIndex}
           onClose={closeGallery}
+        />
+      )}
+
+      {browseMode && currentVideo && currentVideo.playlistUrl && (
+        <VideoPlayerModal
+          visible={videoVisible}
+          videoUri={String(currentVideo.playlistUrl)}
+          posterUri={
+            currentVideo.localThumbPath ?? currentVideo.thumbUrl ?? undefined
+          }
+          onClose={closeVideo}
         />
       )}
 
@@ -209,28 +298,69 @@ export function PostPreview({
         <View style={styles.mediaGrid}>
           {post.media.map((item, index) => {
             const key = `${item.type}-${index}`;
-            const uri =
-              item.localThumbPath ??
-              item.thumbUrl ??
-              item.localFullsizePath ??
-              item.fullsizeUrl ??
-              undefined;
+            const thumbUri = item.localThumbPath ?? item.thumbUrl ?? undefined;
 
             if (item.type === "video") {
+              const hasPlaylistUrl = !!item.playlistUrl;
+
+              // In browse mode with a playlist URL, make it tappable to play
+              if (browseMode && hasPlaylistUrl) {
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => openVideo(item)}
+                    style={styles.videoWrapper}
+                  >
+                    {thumbUri ? (
+                      <Image
+                        source={{ uri: thumbUri }}
+                        style={styles.mediaImage}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.videoPlaceholder,
+                          { borderColor: palette.icon + "33" },
+                        ]}
+                      />
+                    )}
+                    <View style={styles.playButtonOverlay}>
+                      <View style={styles.playButton}>
+                        <Text style={styles.playButtonText}>▶</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              }
+
+              // Non-browse mode or no playlist URL - show thumbnail with video indicator
               return (
-                <View
-                  key={key}
-                  style={[
-                    styles.videoPlaceholder,
-                    { borderColor: palette.icon + "33" },
-                  ]}
-                >
-                  <Text style={[styles.videoLabel, { color: palette.text }]}>
-                    Video
-                  </Text>
+                <View key={key} style={styles.videoWrapper}>
+                  {thumbUri ? (
+                    <Image
+                      source={{ uri: thumbUri }}
+                      style={styles.mediaImage}
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.videoPlaceholder,
+                        { borderColor: palette.icon + "33" },
+                      ]}
+                    />
+                  )}
+                  <View style={styles.videoIndicator}>
+                    <Text style={styles.videoIndicatorText}>Video</Text>
+                  </View>
                 </View>
               );
             }
+
+            const uri =
+              thumbUri ??
+              item.localFullsizePath ??
+              item.fullsizeUrl ??
+              undefined;
 
             if (!uri) {
               return null;
@@ -342,6 +472,57 @@ const styles = StyleSheet.create({
   videoLabel: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  videoWrapper: {
+    position: "relative",
+    width: 120,
+    height: 120,
+  },
+  playButtonOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    marginLeft: 3,
+  },
+  videoIndicator: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 4,
+  },
+  videoIndicatorText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  videoContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoPlayer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.6,
   },
   // Modal styles
   modalBackdrop: {

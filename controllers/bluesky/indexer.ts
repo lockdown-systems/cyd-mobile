@@ -24,6 +24,7 @@ type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
 type ExtractedMedia = AutomationMediaAttachment & {
   blobCid: string;
   mimeType?: string | null;
+  playlistUrl?: string | null;
 };
 
 /**
@@ -618,8 +619,8 @@ export class BlueskyIndexer {
             `INSERT INTO post_media (
               postUri, position, mediaType, blobCid, mimeType, alt,
               width, height, aspectRatioWidth, aspectRatioHeight,
-              thumbUrl, fullsizeUrl, localThumbPath, localFullsizePath, downloadedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              thumbUrl, fullsizeUrl, playlistUrl, localThumbPath, localFullsizePath, downloadedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(postUri, position) DO UPDATE SET
               mediaType = excluded.mediaType,
               blobCid = excluded.blobCid,
@@ -631,6 +632,7 @@ export class BlueskyIndexer {
               aspectRatioHeight = excluded.aspectRatioHeight,
               thumbUrl = excluded.thumbUrl,
               fullsizeUrl = excluded.fullsizeUrl,
+              playlistUrl = excluded.playlistUrl,
               localThumbPath = COALESCE(excluded.localThumbPath, post_media.localThumbPath),
               localFullsizePath = COALESCE(excluded.localFullsizePath, post_media.localFullsizePath),
               downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt);`,
@@ -647,6 +649,7 @@ export class BlueskyIndexer {
               attachment.height ?? null, // aspectRatioHeight
               attachment.thumbUrl ?? null,
               attachment.fullsizeUrl ?? null,
+              null, // playlistUrl - images don't have this
               localThumbPath ?? null,
               localFullsizePath ?? null,
               downloadedAt,
@@ -657,6 +660,72 @@ export class BlueskyIndexer {
             ...attachment,
             localThumbPath,
             localFullsizePath,
+          } satisfies AutomationMediaAttachment & ExtractedMedia;
+        }
+
+        // Handle video attachments
+        if (attachment.type === "video") {
+          let localThumbPath: string | null | undefined = null;
+          try {
+            if (attachment.thumbUrl) {
+              localThumbPath = await this.deps.downloadMediaFromUrl(
+                attachment.thumbUrl,
+                did
+              );
+            }
+          } catch (err) {
+            console.warn(
+              "[persistPostView] Failed to download video thumbnail",
+              err
+            );
+          }
+
+          // Insert video into post_media table
+          const downloadedAt = localThumbPath ? Date.now() : null;
+          await db.runAsync(
+            `INSERT INTO post_media (
+              postUri, position, mediaType, blobCid, mimeType, alt,
+              width, height, aspectRatioWidth, aspectRatioHeight,
+              thumbUrl, fullsizeUrl, playlistUrl, localThumbPath, localFullsizePath, downloadedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(postUri, position) DO UPDATE SET
+              mediaType = excluded.mediaType,
+              blobCid = excluded.blobCid,
+              mimeType = excluded.mimeType,
+              alt = excluded.alt,
+              width = excluded.width,
+              height = excluded.height,
+              aspectRatioWidth = excluded.aspectRatioWidth,
+              aspectRatioHeight = excluded.aspectRatioHeight,
+              thumbUrl = excluded.thumbUrl,
+              fullsizeUrl = excluded.fullsizeUrl,
+              playlistUrl = excluded.playlistUrl,
+              localThumbPath = COALESCE(excluded.localThumbPath, post_media.localThumbPath),
+              localFullsizePath = COALESCE(excluded.localFullsizePath, post_media.localFullsizePath),
+              downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt);`,
+            [
+              postView.uri,
+              position,
+              attachment.type,
+              attachment.blobCid,
+              attachment.mimeType ?? null,
+              attachment.alt ?? null,
+              attachment.width ?? null,
+              attachment.height ?? null,
+              attachment.width ?? null, // aspectRatioWidth
+              attachment.height ?? null, // aspectRatioHeight
+              attachment.thumbUrl ?? null,
+              null, // fullsizeUrl - videos use playlistUrl instead
+              attachment.playlistUrl ?? null,
+              localThumbPath ?? null,
+              null, // localFullsizePath - not used for videos
+              downloadedAt,
+            ]
+          );
+
+          return {
+            ...attachment,
+            localThumbPath,
           } satisfies AutomationMediaAttachment & ExtractedMedia;
         }
 
@@ -850,12 +919,37 @@ export class BlueskyIndexer {
 
   private extractMedia(postView: FeedPostView): ExtractedMedia[] {
     const embed = (postView as { embed?: unknown }).embed as
-      | { images?: Record<string, unknown>[] }
+      | {
+          $type?: string;
+          images?: Record<string, unknown>[];
+          cid?: string;
+          playlist?: string;
+          thumbnail?: string;
+          aspectRatio?: { width?: number; height?: number };
+          alt?: string;
+        }
       | undefined;
 
-    const images = Array.isArray(embed?.images) ? embed.images : [];
-
     const attachments: ExtractedMedia[] = [];
+
+    // Handle video embeds (app.bsky.embed.video#view)
+    if (embed?.$type === "app.bsky.embed.video#view" && embed.cid) {
+      const aspect = embed.aspectRatio;
+      attachments.push({
+        type: "video",
+        blobCid: embed.cid,
+        mimeType: "video/mp4",
+        thumbUrl: embed.thumbnail ?? null,
+        fullsizeUrl: null,
+        playlistUrl: embed.playlist ?? null,
+        alt: embed.alt ?? null,
+        width: aspect?.width ?? null,
+        height: aspect?.height ?? null,
+      });
+    }
+
+    // Handle image embeds (app.bsky.embed.images#view)
+    const images = Array.isArray(embed?.images) ? embed.images : [];
 
     for (const image of images) {
       const thumb = (image as { thumb?: string }).thumb ?? null;
