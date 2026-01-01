@@ -1,6 +1,8 @@
 import type { BlueskyAccountController } from "../BlueskyAccountController";
 import type { BlueskyJobRecord, JobEmit } from "./job-types";
 import { runSaveBookmarksJob } from "./jobs/save-bookmarks";
+import { runSaveChatConvosJob } from "./jobs/save-chat-convos";
+import { runSaveChatMessagesJob } from "./jobs/save-chat-messages";
 import { runSaveLikesJob } from "./jobs/save-likes";
 import { runSavePostsJob } from "./jobs/save-posts";
 import { runVerifyAuthorizationJob } from "./jobs/verify-authorization";
@@ -17,6 +19,8 @@ export async function runJob(
     savePosts: () => runSavePostsJob(controller, job, emit),
     saveLikes: () => runSaveLikesJob(controller, job, emit),
     saveBookmarks: () => runSaveBookmarksJob(controller, job, emit),
+    saveChatConvos: () => runSaveChatConvosJob(controller, job, emit),
+    saveChatMessages: () => runSaveChatMessagesJob(controller, job, emit),
   };
 
   const handler = handlers[job.jobType];
@@ -26,7 +30,6 @@ export async function runJob(
   }
 
   switch (job.jobType) {
-    case "saveChats":
     case "saveFollowing": {
       // TODO: implement in later phases
       throw new Error(`${job.jobType} is not implemented yet`);

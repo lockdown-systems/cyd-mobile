@@ -427,7 +427,12 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       jobTypes.push("saveBookmarks");
     }
 
-    // TODO: add chats and following when implemented in later phases
+    if (options.chat) {
+      jobTypes.push("saveChatConvos");
+      jobTypes.push("saveChatMessages");
+    }
+
+    // TODO: add following when implemented in later phases
 
     const inserted: BlueskyJobRecord[] = [];
 
@@ -662,17 +667,15 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   /**
    * Index (save) the user's conversations
    */
-  async indexConversations(): Promise<void> {
-    // TODO: Implement in Phase 3
-    throw new Error("Not implemented yet");
+  async indexChatConvos(): Promise<void> {
+    await this.indexer.indexChatConvos();
   }
 
   /**
-   * Index (save) messages in a conversation
+   * Index (save) messages in all conversations
    */
-  async indexMessages(_convoId: string): Promise<void> {
-    // TODO: Implement in Phase 3
-    throw new Error("Not implemented yet");
+  async indexChatMessages(): Promise<void> {
+    await this.indexer.indexChatMessages();
   }
 
   // ==================== Delete Operations ====================

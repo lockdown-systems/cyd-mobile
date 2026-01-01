@@ -108,8 +108,10 @@ export function AutomationModal({
             return "Save likes";
           case "saveBookmarks":
             return "Save bookmarks";
-          case "saveChats":
-            return "Save chats";
+          case "saveChatConvos":
+            return "Save chat conversations";
+          case "saveChatMessages":
+            return "Save chat messages";
           case "saveFollowing":
             return "Save following";
           default:

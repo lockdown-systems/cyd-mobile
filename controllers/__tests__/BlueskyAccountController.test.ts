@@ -684,18 +684,24 @@ describe("BlueskyAccountController", () => {
       );
     });
 
-    it("indexConversations should throw not implemented", async () => {
+    it("indexChatConvos should call indexer method", async () => {
       const controller = new BlueskyAccountController(1);
-      await expect(controller.indexConversations()).rejects.toThrow(
-        "Not implemented yet"
-      );
+      const mockIndexer = {
+        indexChatConvos: jest.fn().mockResolvedValue(undefined),
+      };
+      (controller as unknown as { indexer: unknown }).indexer = mockIndexer;
+      await controller.indexChatConvos();
+      expect(mockIndexer.indexChatConvos).toHaveBeenCalled();
     });
 
-    it("indexMessages should throw not implemented", async () => {
+    it("indexChatMessages should call indexer method", async () => {
       const controller = new BlueskyAccountController(1);
-      await expect(controller.indexMessages("convo-123")).rejects.toThrow(
-        "Not implemented yet"
-      );
+      const mockIndexer = {
+        indexChatMessages: jest.fn().mockResolvedValue(undefined),
+      };
+      (controller as unknown as { indexer: unknown }).indexer = mockIndexer;
+      await controller.indexChatMessages();
+      expect(mockIndexer.indexChatMessages).toHaveBeenCalled();
     });
   });
 
