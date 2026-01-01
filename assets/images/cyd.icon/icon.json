@@ -1,50 +1,36 @@
 {
   "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+    "linear-gradient" : [
+      "display-p3:0.34510,0.52157,0.76863,1.00000",
+      "srgb:0.60784,0.71373,0.86275,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 0
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.7
+      }
+    }
   },
   "groups" : [
     {
+      "hidden" : false,
       "layers" : [
         {
-          "fill" : "none",
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "5-transparent.png",
-          "name" : "5-transparent",
+          "image-name" : "3.png",
+          "name" : "3",
           "position" : {
-            "scale" : 1.02,
+            "scale" : 0.55,
             "translation-in-points" : [
               0,
-              6
-            ]
-          }
-        },
-        {
-          "blend-mode" : "normal",
-          "fill" : {
-            "solid" : "display-p3:0.92920,0.43921,0.17651,1.00000"
-          },
-          "glass" : true,
-          "hidden" : false,
-          "image-name" : "5-background.png",
-          "name" : "5-background",
-          "opacity" : 0.8,
-          "position" : {
-            "scale" : 2,
-            "translation-in-points" : [
-              0,
-              6
+              0
             ]
           }
         }
       ],
-      "position" : {
-        "scale" : 1,
-        "translation-in-points" : [
-          0,
-          6
-        ]
-      },
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5
