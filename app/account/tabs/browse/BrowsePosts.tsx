@@ -1,10 +1,11 @@
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -163,6 +164,7 @@ export function BrowsePosts({ handle, palette, accountId }: Props) {
   const [posts, setPosts] = useState<AutomationPostPreviewData[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [filterText, setFilterText] = useState("");
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const cursorRef = useRef<Cursor | null>(null);
@@ -290,6 +292,20 @@ export function BrowsePosts({ handle, palette, accountId }: Props) {
     void loadFirstPage();
   }, [loadFirstPage]);
 
+  // Filter posts based on filter text (case insensitive)
+  const filteredPosts = useMemo(() => {
+    if (!filterText.trim()) {
+      return posts;
+    }
+    const searchTerm = filterText.toLowerCase();
+    return posts.filter(
+      (post) =>
+        post.text?.toLowerCase().includes(searchTerm) ||
+        post.author?.handle?.toLowerCase().includes(searchTerm) ||
+        post.author?.displayName?.toLowerCase().includes(searchTerm)
+    );
+  }, [posts, filterText]);
+
   const renderItem = useCallback(
     ({ item }: { item: AutomationPostPreviewData }) => (
       <PostPreview post={item} palette={palette} browseMode />
@@ -323,35 +339,65 @@ export function BrowsePosts({ handle, palette, accountId }: Props) {
   }
 
   return (
-    <FlatList
-      data={posts}
-      renderItem={renderItem}
-      keyExtractor={keyExtractor}
-      contentContainerStyle={[
-        styles.listContent,
-        { backgroundColor: palette.background },
-        posts.length === 0 && styles.listEmpty,
-      ]}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
-      ListEmptyComponent={() => (
-        <Text style={[styles.emptyText, { color: palette.icon }]}>
-          No posts saved yet.
-        </Text>
-      )}
-      onEndReachedThreshold={0.3}
-      onEndReached={handleEndReached}
-      ListFooterComponent={
-        loadingMore ? (
-          <View style={styles.footer}>
-            <ActivityIndicator color={palette.tint} />
-          </View>
-        ) : null
-      }
-    />
+    <View style={[styles.container, { backgroundColor: palette.background }]}>
+      <FlatList
+        data={filteredPosts}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={[
+          styles.listContent,
+          filteredPosts.length === 0 && styles.listEmpty,
+        ]}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={() => (
+          <Text style={[styles.emptyText, { color: palette.icon }]}>
+            {filterText.trim()
+              ? "No posts match your filter."
+              : "No posts saved yet."}
+          </Text>
+        )}
+        onEndReachedThreshold={0.3}
+        onEndReached={handleEndReached}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footer}>
+              <ActivityIndicator color={palette.tint} />
+            </View>
+          ) : null
+        }
+      />
+      <View
+        style={[
+          styles.filterBar,
+          { backgroundColor: palette.background, borderTopColor: palette.icon },
+        ]}
+      >
+        <TextInput
+          style={[
+            styles.filterInput,
+            {
+              backgroundColor: palette.background,
+              color: palette.text,
+              borderColor: palette.icon,
+            },
+          ]}
+          placeholder="Filter posts..."
+          placeholderTextColor={palette.icon}
+          value={filterText}
+          onChangeText={setFilterText}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   center: {
     flex: 1,
     alignItems: "center",
@@ -373,6 +419,17 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: "center",
+    fontSize: 15,
+  },
+  filterBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterInput: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
     fontSize: 15,
   },
 });
