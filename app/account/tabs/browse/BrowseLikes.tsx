@@ -1,18 +1,12 @@
-import type { AccountTabPalette } from "@/types/account-tabs";
+import { BrowseList, type BrowseProps } from "./shared";
 
-import { BrowsePlaceholderCard } from "./BrowsePlaceholderCard";
-
-type Props = {
-  handle: string;
-  palette: AccountTabPalette;
-};
-
-export function BrowseLikes({ handle, palette }: Props) {
+export function BrowseLikes({ handle, palette, accountId }: BrowseProps) {
   return (
-    <BrowsePlaceholderCard
+    <BrowseList
+      handle={handle}
       palette={palette}
-      title="Likes"
-      message={`Likes for ${handle} will show up here soon.`}
+      accountId={accountId}
+      type="likes"
     />
   );
 }
