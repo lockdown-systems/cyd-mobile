@@ -303,12 +303,41 @@ export class ChatIndexer {
         ]
       );
 
-      // Save sender profile if available
-      if (msg.sender) {
-        await this.postPersistence.upsertProfile(
-          db,
-          msg.sender as AppBskyActorDefs.ProfileViewBasic
-        );
+      // Save sender profile. If the sender object includes handle, save it directly.
+      // Otherwise, check if we have the profile in DB; if not, fetch from API.
+      const senderWithProfile = msg.sender as AppBskyActorDefs.ProfileViewBasic;
+      if (senderWithProfile?.did) {
+        if (senderWithProfile.handle) {
+          // Sender object includes profile info, save it directly
+          await this.postPersistence.upsertProfile(db, senderWithProfile);
+        } else {
+          // Sender only has DID. Check if we already have the profile.
+          const existingProfile = await db.getFirstAsync<{ did: string }>(
+            `SELECT did FROM profile WHERE did = ?`,
+            [senderWithProfile.did]
+          );
+
+          if (!existingProfile) {
+            // Fetch profile from API
+            try {
+              const agent = this.requireAgent();
+              const profileResponse = await this.deps.makeApiRequest(() =>
+                agent.getProfile({ actor: senderWithProfile.did })
+              );
+
+              await this.postPersistence.upsertProfile(
+                db,
+                profileResponse as AppBskyActorDefs.ProfileViewBasic
+              );
+            } catch (error) {
+              // Log but don't fail the whole job if profile fetch fails
+              console.warn(
+                `[ChatIndexer] Failed to fetch profile for ${senderWithProfile.did}`,
+                error
+              );
+            }
+          }
+        }
       }
 
       savedCount++;
