@@ -285,16 +285,6 @@ export class ChatIndexer {
       }
 
       savedCount++;
-
-      // DEBUG: Pause to see progress
-      console.log(
-        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Pausing after saving convo`,
-        convo.id
-      );
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      console.log(
-        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Resume after convo pause`
-      );
     }
 
     return savedCount;
@@ -391,16 +381,6 @@ export class ChatIndexer {
       if (onMessageSaved) {
         await onMessageSaved(message);
       }
-
-      // DEBUG: Pause to see progress
-      console.log(
-        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Pausing after saving message`,
-        msg.id
-      );
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      console.log(
-        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Resume after message pause`
-      );
     }
 
     return savedCount;
