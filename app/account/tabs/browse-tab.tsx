@@ -4,17 +4,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
 
 import { BrowseBookmarks } from "./browse/BrowseBookmarks";
-import { BrowseFollowing } from "./browse/BrowseFollowing";
 import { BrowseLikes } from "./browse/BrowseLikes";
 import { BrowseMessages } from "./browse/BrowseMessages";
 import { BrowsePosts } from "./browse/BrowsePosts";
 
-type BrowseCategory =
-  | "posts"
-  | "likes"
-  | "bookmarks"
-  | "following"
-  | "messages";
+type BrowseCategory = "posts" | "likes" | "bookmarks" | "messages";
 
 type CategoryComponentProps = {
   handle: string;
@@ -28,7 +22,6 @@ const CATEGORY_DEFINITIONS: { key: BrowseCategory; label: string }[] = [
   { key: "posts", label: "Posts" },
   { key: "likes", label: "Likes" },
   { key: "bookmarks", label: "Bookmarks" },
-  { key: "following", label: "Following" },
   { key: "messages", label: "Messages" },
 ];
 
@@ -36,7 +29,6 @@ const CATEGORY_COMPONENTS: Record<BrowseCategory, CategoryComponent> = {
   posts: BrowsePosts,
   likes: BrowseLikes,
   bookmarks: BrowseBookmarks,
-  following: BrowseFollowing,
   messages: BrowseMessages,
 };
 

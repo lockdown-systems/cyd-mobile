@@ -112,8 +112,6 @@ export function AutomationModal({
             return "Save chat conversations";
           case "saveChatMessages":
             return "Save chat messages";
-          case "saveFollowing":
-            return "Save following";
           default:
             return jobType;
         }

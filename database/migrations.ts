@@ -21,7 +21,6 @@ export const migrations: Migration[] = [
         settingSaveLikes INTEGER DEFAULT 1,
         settingSaveBookmarks INTEGER DEFAULT 1,
         settingSaveChats INTEGER DEFAULT 1,
-        settingSaveFollowing INTEGER DEFAULT 1,
         settingDeletePosts INTEGER DEFAULT 0,
         settingDeletePostsDaysOldEnabled INTEGER DEFAULT 0,
         settingDeletePostsDaysOld INTEGER DEFAULT 0,

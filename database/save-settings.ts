@@ -5,7 +5,6 @@ export type AccountSaveSettings = {
   likes: boolean;
   bookmarks: boolean;
   chat: boolean;
-  following: boolean;
 };
 
 const DEFAULT_SAVE_SETTINGS: AccountSaveSettings = {
@@ -13,7 +12,6 @@ const DEFAULT_SAVE_SETTINGS: AccountSaveSettings = {
   likes: true,
   bookmarks: true,
   chat: false,
-  following: true,
 };
 
 type SaveSettingsRow = {
@@ -21,7 +19,6 @@ type SaveSettingsRow = {
   settingSaveLikes: number | null;
   settingSaveBookmarks: number | null;
   settingSaveChats: number | null;
-  settingSaveFollowing: number | null;
 };
 
 function mapRowToSettings(row: SaveSettingsRow | null): AccountSaveSettings {
@@ -34,7 +31,6 @@ function mapRowToSettings(row: SaveSettingsRow | null): AccountSaveSettings {
     likes: Boolean(row.settingSaveLikes),
     bookmarks: Boolean(row.settingSaveBookmarks),
     chat: Boolean(row.settingSaveChats),
-    following: Boolean(row.settingSaveFollowing),
   };
 }
 
@@ -47,8 +43,7 @@ export async function getAccountSaveSettings(
        b.settingSavePosts,
        b.settingSaveLikes,
        b.settingSaveBookmarks,
-       b.settingSaveChats,
-       b.settingSaveFollowing
+       b.settingSaveChats
      FROM bsky_account b
      INNER JOIN account a ON a.bskyAccountID = b.id
      WHERE a.id = ?
@@ -83,7 +78,6 @@ export async function updateAccountSaveSettings(
          settingSaveLikes = ?,
          settingSaveBookmarks = ?,
          settingSaveChats = ?,
-         settingSaveFollowing = ?,
          updatedAt = ?
      WHERE id = ?;`,
     [
@@ -91,7 +85,6 @@ export async function updateAccountSaveSettings(
       settings.likes ? 1 : 0,
       settings.bookmarks ? 1 : 0,
       settings.chat ? 1 : 0,
-      settings.following ? 1 : 0,
       Date.now(),
       accountRow.bskyAccountID,
     ]

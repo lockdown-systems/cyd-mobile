@@ -6,8 +6,7 @@ export type BlueskyJobType =
   | "saveLikes"
   | "saveBookmarks"
   | "saveChatConvos"
-  | "saveChatMessages"
-  | "saveFollowing";
+  | "saveChatMessages";
 
 export type BlueskyJobStatus = "pending" | "running" | "completed" | "failed";
 
@@ -47,5 +46,4 @@ export type SaveJobOptions = {
   likes: boolean;
   bookmarks: boolean;
   chat: boolean;
-  following: boolean;
 };

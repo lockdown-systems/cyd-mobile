@@ -29,13 +29,5 @@ export async function runJob(
     return;
   }
 
-  switch (job.jobType) {
-    case "saveFollowing": {
-      // TODO: implement in later phases
-      throw new Error(`${job.jobType} is not implemented yet`);
-    }
-    default: {
-      throw new Error(`Unknown job type: ${String(job.jobType)}`);
-    }
-  }
+  throw new Error(`Unknown job type: ${String(job.jobType)}`);
 }

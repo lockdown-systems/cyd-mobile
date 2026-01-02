@@ -41,11 +41,6 @@ const SAVE_OPTION_DEFINITIONS = [
     label: "Save my chat messages",
     reviewLabel: "Save chat messages",
   },
-  {
-    key: "following",
-    label: "Save my following list",
-    reviewLabel: "Save following list",
-  },
 ] as const;
 
 type SaveOptionKey = (typeof SAVE_OPTION_DEFINITIONS)[number]["key"];
@@ -56,7 +51,6 @@ const DEFAULT_STATE: SaveOptionState = {
   likes: true,
   bookmarks: true,
   chat: false,
-  following: true,
 };
 
 function mapSettingsToState(settings: AccountSaveSettings): SaveOptionState {
@@ -65,7 +59,6 @@ function mapSettingsToState(settings: AccountSaveSettings): SaveOptionState {
     likes: settings.likes,
     bookmarks: settings.bookmarks,
     chat: settings.chat,
-    following: settings.following,
   };
 }
 
@@ -75,7 +68,6 @@ function mapStateToJobOptions(state: SaveOptionState): SaveJobOptions {
     likes: state.likes,
     bookmarks: state.bookmarks,
     chat: state.chat,
-    following: state.following,
   };
 }
 

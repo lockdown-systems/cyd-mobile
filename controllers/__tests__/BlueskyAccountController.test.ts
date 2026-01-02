@@ -677,13 +677,6 @@ describe("BlueskyAccountController", () => {
   });
 
   describe("unimplemented save operations", () => {
-    it("indexFollowing should throw not implemented", async () => {
-      const controller = new BlueskyAccountController(1);
-      await expect(controller.indexFollowing()).rejects.toThrow(
-        "Not implemented yet"
-      );
-    });
-
     it("indexChatConvos should call indexer method", async () => {
       const controller = new BlueskyAccountController(1);
       const mockIndexer = {

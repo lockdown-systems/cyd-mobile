@@ -35,7 +35,6 @@ describe("Account save settings helpers", () => {
       settingSaveLikes: 0,
       settingSaveBookmarks: 1,
       settingSaveChats: 0,
-      settingSaveFollowing: 1,
     });
 
     const settings = await getAccountSaveSettings(7);
@@ -45,7 +44,6 @@ describe("Account save settings helpers", () => {
       likes: false,
       bookmarks: true,
       chat: false,
-      following: true,
     });
     expect(mockDb.getFirstAsync).toHaveBeenCalledWith(expect.any(String), [7]);
   });
@@ -67,7 +65,6 @@ describe("Account save settings helpers", () => {
         likes: false,
         bookmarks: true,
         chat: false,
-        following: true,
       });
 
       expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
@@ -76,7 +73,7 @@ describe("Account save settings helpers", () => {
       );
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining("UPDATE bsky_account"),
-        [1, 0, 1, 0, 1, expect.any(Number), 42]
+        [1, 0, 1, 0, expect.any(Number), 42]
       );
     });
 
@@ -89,7 +86,6 @@ describe("Account save settings helpers", () => {
           likes: false,
           bookmarks: false,
           chat: false,
-          following: false,
         })
       ).rejects.toThrow("Unable to find Bluesky account");
       expect(mockDb.runAsync).not.toHaveBeenCalled();

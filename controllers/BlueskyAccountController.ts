@@ -409,7 +409,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       likes: options.likes,
       bookmarks: options.bookmarks,
       chat: options.chat,
-      following: options.following,
     });
     const db = this.requireDb();
     const scheduledAt = Date.now();
@@ -431,8 +430,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       jobTypes.push("saveChatConvos");
       jobTypes.push("saveChatMessages");
     }
-
-    // TODO: add following when implemented in later phases
 
     const inserted: BlueskyJobRecord[] = [];
 
@@ -654,14 +651,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    */
   async indexBookmarks(): Promise<void> {
     await this.indexer.indexBookmarks();
-  }
-
-  /**
-   * Index (save) the accounts the user follows
-   */
-  async indexFollowing(): Promise<void> {
-    // TODO: Implement in Phase 3
-    throw new Error("Not implemented yet");
   }
 
   /**

@@ -32,7 +32,6 @@ describe("BlueskyAccountController job pipeline", () => {
     likes: false,
     bookmarks: false,
     chat: false,
-    following: false,
   };
 
   const setupControllerWithDb = () => {
