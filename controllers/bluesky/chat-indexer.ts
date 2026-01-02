@@ -162,9 +162,13 @@ export class ChatIndexer {
           const nextCursor = response.cursor;
 
           if (messages.length > 0) {
-            await this.saveMessages(db, convoId, messages, (message) => {
+            await this.saveMessages(db, convoId, messages, async (message) => {
               totalSaved++;
-              const previewData = this.buildMessagePreview(convoId, message);
+              const previewData = await this.buildMessagePreview(
+                db,
+                convoId,
+                message
+              );
               this.deps.updateProgress({
                 currentAction: `Saved ${totalSaved} messages (${convoIndex}/${convos.length} conversations)`,
                 previewData: previewData
@@ -297,7 +301,7 @@ export class ChatIndexer {
     messages: ChatBskyConvoGetMessages.OutputSchema["messages"],
     onMessageSaved?: (
       message: ChatBskyConvoGetMessages.OutputSchema["messages"][0]
-    ) => void
+    ) => Promise<void>
   ): Promise<number> {
     let savedCount = 0;
     const now = Date.now();
@@ -380,7 +384,7 @@ export class ChatIndexer {
 
       // Notify caller that message was saved
       if (onMessageSaved) {
-        onMessageSaved(message);
+        await onMessageSaved(message);
       }
 
       // DEBUG: Pause to see progress
@@ -447,10 +451,11 @@ export class ChatIndexer {
   /**
    * Build a message preview from a message object
    */
-  private buildMessagePreview(
+  private async buildMessagePreview(
+    db: SQLiteDatabase,
     convoId: string,
     message: ChatBskyConvoGetMessages.OutputSchema["messages"][0]
-  ): AutomationMessagePreviewData | null {
+  ): Promise<AutomationMessagePreviewData | null> {
     const msg = message as
       | {
           id?: string;
@@ -458,20 +463,28 @@ export class ChatIndexer {
           sentAt?: string;
           sender?: {
             did?: string;
-            handle?: string;
-            displayName?: string;
-            avatar?: string;
           };
         }
       | undefined;
 
-    if (!msg?.text || !msg?.id) return null;
+    if (!msg?.text || !msg?.id || !msg.sender?.did) return null;
+
+    // Fetch the profile from the database
+    const profile = await db.getFirstAsync<{
+      did: string;
+      handle: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+    }>(
+      `SELECT did, handle, displayName, avatarUrl FROM profile WHERE did = ?`,
+      [msg.sender.did]
+    );
 
     const sender: AutomationProfileData = {
-      did: msg.sender?.did ?? "",
-      handle: msg.sender?.handle ?? "unknown",
-      displayName: msg.sender?.displayName ?? null,
-      avatarUrl: msg.sender?.avatar ?? null,
+      did: msg.sender.did,
+      handle: profile?.handle ?? "unknown",
+      displayName: profile?.displayName ?? null,
+      avatarUrl: profile?.avatarUrl ?? null,
     };
 
     return {
