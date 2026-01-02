@@ -75,18 +75,15 @@ export class ChatIndexer {
         const nextCursor = response.cursor;
 
         if (convos.length > 0) {
-          const savedCount = await this.saveConversations(db, convos);
-          totalSaved += savedCount;
-
-          // Emit preview for the last saved conversation
-          const lastConvo = convos[convos.length - 1];
-          const previewData = this.buildConversationPreview(lastConvo);
-
-          this.deps.updateProgress({
-            currentAction: `Saved ${totalSaved} conversations`,
-            previewData: previewData
-              ? { type: "conversation", data: previewData }
-              : undefined,
+          await this.saveConversations(db, convos, (convo) => {
+            totalSaved++;
+            const previewData = this.buildConversationPreview(convo);
+            this.deps.updateProgress({
+              currentAction: `Saved ${totalSaved} conversations`,
+              previewData: previewData
+                ? { type: "conversation", data: previewData }
+                : undefined,
+            });
           });
         }
 
@@ -202,7 +199,10 @@ export class ChatIndexer {
 
   private async saveConversations(
     db: SQLiteDatabase,
-    convos: ChatBskyConvoListConvos.OutputSchema["convos"]
+    convos: ChatBskyConvoListConvos.OutputSchema["convos"],
+    onConvoSaved?: (
+      convo: ChatBskyConvoListConvos.OutputSchema["convos"][0]
+    ) => void
   ): Promise<number> {
     let savedCount = 0;
     const now = Date.now();
@@ -277,6 +277,11 @@ export class ChatIndexer {
             }
           }
         }
+      }
+
+      // Notify caller that conversation was saved
+      if (onConvoSaved) {
+        onConvoSaved(convo);
       }
 
       savedCount++;
