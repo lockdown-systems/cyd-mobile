@@ -20,6 +20,7 @@ export async function runSaveChatConvosJob(
       progressMessage: message,
       progressPercent: undefined,
       unknownTotal: true,
+      previewData: progress.previewData,
     });
   });
 
@@ -37,5 +38,6 @@ export async function runSaveChatConvosJob(
     progressMessage: "Saved chat conversations",
     progressPercent: 1,
     unknownTotal: false,
+    previewData: null,
   });
 }

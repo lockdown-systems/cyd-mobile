@@ -8,7 +8,9 @@ import React, {
 } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
+import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import { BlueskyAccountController } from "@/controllers";
 import type {
@@ -16,7 +18,10 @@ import type {
   BlueskyJobRunUpdate,
   SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
-import type { AutomationPostPreviewData } from "@/controllers/bluesky/types";
+import type {
+  AutomationPostPreviewData,
+  AutomationPreviewData,
+} from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { AutomationProgressBar } from "./AutomationProgressBar";
 
@@ -54,6 +59,9 @@ export function AutomationModal({
   const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
   const [previewPost, setPreviewPost] =
     useState<AutomationPostPreviewData | null>(null);
+  const [previewData, setPreviewData] = useState<AutomationPreviewData | null>(
+    null
+  );
   const controllerRef = useRef<BlueskyAccountController | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
@@ -64,6 +72,7 @@ export function AutomationModal({
     setError(null);
     setJobs([]);
     setPreviewPost(null);
+    setPreviewData(null);
     setActiveJobUnknownTotal(false);
     latestJobsRef.current = [];
   };
@@ -185,6 +194,9 @@ export function AutomationModal({
                 isPreviewPost(update.previewPost) ? update.previewPost : null
               );
             }
+            if (update.previewData !== undefined) {
+              setPreviewData(update.previewData);
+            }
           },
         });
         if (cancelled) return;
@@ -234,6 +246,8 @@ export function AutomationModal({
 
   useEffect(() => {
     setActiveJobProgress(0);
+    setPreviewPost(null);
+    setPreviewData(null);
   }, [activeJobId]);
 
   useEffect(() => {
@@ -362,7 +376,17 @@ export function AutomationModal({
           </Text>
         </View>
 
-        {previewPost ? (
+        {/* Render appropriate preview based on previewData type, or fall back to legacy previewPost */}
+        {previewData?.type === "post" ? (
+          <PostPreview post={previewData.data} palette={palette} />
+        ) : previewData?.type === "conversation" ? (
+          <ConversationPreview
+            conversation={previewData.data}
+            palette={palette}
+          />
+        ) : previewData?.type === "message" ? (
+          <MessagePreview message={previewData.data} palette={palette} />
+        ) : previewPost ? (
           <PostPreview post={previewPost} palette={palette} />
         ) : null}
 

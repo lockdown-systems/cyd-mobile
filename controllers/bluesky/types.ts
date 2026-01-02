@@ -31,8 +31,11 @@ export interface BlueskyProgress {
   deleteMessagesProgress: JobProgressSegment;
   unfollowProgress: JobProgressSegment;
 
-  // Preview post for display
+  // Preview post for display (legacy, prefer previewData)
   previewPost?: AutomationPostPreviewData | null;
+
+  // Unified preview data for posts, conversations, or messages
+  previewData?: AutomationPreviewData | null;
 
   // Status
   currentAction: string;
@@ -67,6 +70,7 @@ export function createInitialProgress(): BlueskyProgress {
     deleteMessagesProgress: createProgressSegment(false),
     unfollowProgress: createProgressSegment(false),
     previewPost: null,
+    previewData: null,
     currentAction: "",
     isRunning: false,
     error: null,
@@ -116,6 +120,48 @@ export type AutomationPostPreviewData = {
   quotedPostUri?: string | null;
   media?: AutomationMediaAttachment[];
 };
+
+/**
+ * Author/participant info for preview components
+ */
+export type AutomationProfileData = {
+  did: string;
+  handle: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  avatarDataURI?: string | null;
+};
+
+/**
+ * Preview data for a chat conversation
+ */
+export type AutomationConversationPreviewData = {
+  convoId: string;
+  lastMessageText?: string | null;
+  lastMessageSentAt?: string | null;
+  unreadCount?: number;
+  muted?: boolean;
+  members: AutomationProfileData[];
+};
+
+/**
+ * Preview data for a chat message
+ */
+export type AutomationMessagePreviewData = {
+  messageId: string;
+  convoId: string;
+  text: string;
+  sentAt: string;
+  sender: AutomationProfileData;
+};
+
+/**
+ * Union type for all preview data types
+ */
+export type AutomationPreviewData =
+  | { type: "post"; data: AutomationPostPreviewData }
+  | { type: "conversation"; data: AutomationConversationPreviewData }
+  | { type: "message"; data: AutomationMessagePreviewData };
 
 /**
  * Database statistics for the account

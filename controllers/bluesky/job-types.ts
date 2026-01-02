@@ -1,4 +1,9 @@
-import type { AutomationPostPreviewData } from "./types";
+import type {
+  AutomationConversationPreviewData,
+  AutomationMessagePreviewData,
+  AutomationPostPreviewData,
+  AutomationPreviewData,
+} from "./types";
 
 export type BlueskyJobType =
   | "verifyAuthorization"
@@ -29,7 +34,10 @@ export type BlueskyJobRunUpdate = {
   progressPercent?: number;
   /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
   unknownTotal?: boolean;
+  /** @deprecated Use previewData instead */
   previewPost?: AutomationPostPreviewData | null;
+  /** Unified preview data for posts, conversations, or messages */
+  previewData?: AutomationPreviewData | null;
 };
 
 export type JobEmit = (update: {
@@ -38,8 +46,18 @@ export type JobEmit = (update: {
   progressPercent?: number;
   /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
   unknownTotal?: boolean;
+  /** @deprecated Use previewData instead */
   previewPost?: AutomationPostPreviewData | null;
+  /** Unified preview data for posts, conversations, or messages */
+  previewData?: AutomationPreviewData | null;
 }) => void;
+
+export type {
+  AutomationConversationPreviewData,
+  AutomationMessagePreviewData,
+  AutomationPostPreviewData,
+  AutomationPreviewData,
+};
 
 export type SaveJobOptions = {
   posts: boolean;

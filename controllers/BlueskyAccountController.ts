@@ -486,6 +486,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         progressPercent: update.progressPercent,
         unknownTotal: update.unknownTotal,
         previewPost: update.previewPost,
+        previewData: update.previewData,
       });
     };
 
@@ -516,6 +517,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           progressPercent: update.progressPercent,
           unknownTotal: update.unknownTotal,
           previewPost: update.previewPost,
+          previewData: update.previewData,
         });
       };
 

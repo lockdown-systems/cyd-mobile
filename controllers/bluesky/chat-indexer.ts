@@ -7,9 +7,21 @@ import {
 import type { SQLiteDatabase } from "expo-sqlite";
 import { PostPersistence } from "./post-persistence";
 import type { ApiRequestFn } from "./rate-limiter";
-import type { BlueskyProgress } from "./types";
+import type {
+  AutomationConversationPreviewData,
+  AutomationMessagePreviewData,
+  AutomationProfileData,
+  BlueskyProgress,
+} from "./types";
 
 type RequestExecutor = <T>(requestFn: ApiRequestFn<T>) => Promise<T>;
+
+/**
+ * Headers required for the Bluesky Chat DM service proxy
+ */
+const DM_SERVICE_HEADERS = {
+  "atproto-proxy": "did:web:api.bsky.chat#bsky_chat",
+};
 
 export interface ChatIndexerDeps {
   getDb: () => SQLiteDatabase | null;
@@ -50,10 +62,13 @@ export class ChatIndexer {
     try {
       while (true) {
         const response = await this.deps.makeApiRequest(() =>
-          agent.chat.bsky.convo.listConvos({
-            cursor,
-            limit: 50,
-          })
+          agent.chat.bsky.convo.listConvos(
+            {
+              cursor,
+              limit: 50,
+            },
+            { headers: DM_SERVICE_HEADERS }
+          )
         );
 
         const convos = response.convos ?? [];
@@ -63,8 +78,15 @@ export class ChatIndexer {
           const savedCount = await this.saveConversations(db, convos);
           totalSaved += savedCount;
 
+          // Emit preview for the last saved conversation
+          const lastConvo = convos[convos.length - 1];
+          const previewData = this.buildConversationPreview(lastConvo);
+
           this.deps.updateProgress({
             currentAction: `Saved ${totalSaved} conversations`,
+            previewData: previewData
+              ? { type: "conversation", data: previewData }
+              : undefined,
           });
         }
 
@@ -78,6 +100,7 @@ export class ChatIndexer {
       this.deps.updateProgress({
         currentAction: "Finished saving conversations",
         isRunning: false,
+        previewData: null,
       });
     } catch (error) {
       this.deps.updateProgress({
@@ -125,11 +148,14 @@ export class ChatIndexer {
 
         while (true) {
           const response = await this.deps.makeApiRequest(() =>
-            agent.chat.bsky.convo.getMessages({
-              convoId,
-              cursor,
-              limit: 100,
-            })
+            agent.chat.bsky.convo.getMessages(
+              {
+                convoId,
+                cursor,
+                limit: 100,
+              },
+              { headers: DM_SERVICE_HEADERS }
+            )
           );
 
           const messages = response.messages ?? [];
@@ -139,8 +165,15 @@ export class ChatIndexer {
             const savedCount = await this.saveMessages(db, convoId, messages);
             totalSaved += savedCount;
 
+            // Emit preview for the last saved message
+            const lastMessage = messages[messages.length - 1];
+            const previewData = this.buildMessagePreview(convoId, lastMessage);
+
             this.deps.updateProgress({
               currentAction: `Saved ${totalSaved} messages (${convoIndex}/${convos.length} conversations)`,
+              previewData: previewData
+                ? { type: "message", data: previewData }
+                : undefined,
             });
           }
 
@@ -155,6 +188,7 @@ export class ChatIndexer {
       this.deps.updateProgress({
         currentAction: `Finished saving ${totalSaved} messages`,
         isRunning: false,
+        previewData: null,
       });
     } catch (error) {
       this.deps.updateProgress({
@@ -297,5 +331,75 @@ export class ChatIndexer {
       throw new Error("Agent not initialized");
     }
     return agent;
+  }
+
+  /**
+   * Build a conversation preview from a convo object
+   */
+  private buildConversationPreview(
+    convo: ChatBskyConvoListConvos.OutputSchema["convos"][0]
+  ): AutomationConversationPreviewData | null {
+    if (!convo) return null;
+
+    const lastMsg = convo.lastMessage as
+      | { text?: string; sentAt?: string }
+      | undefined;
+
+    const members: AutomationProfileData[] = (convo.members ?? []).map(
+      (member) => ({
+        did: member.did,
+        handle: member.handle,
+        displayName: member.displayName ?? null,
+        avatarUrl: member.avatar ?? null,
+      })
+    );
+
+    return {
+      convoId: convo.id,
+      lastMessageText: lastMsg?.text ?? null,
+      lastMessageSentAt: lastMsg?.sentAt ?? null,
+      unreadCount: convo.unreadCount ?? 0,
+      muted: convo.muted ?? false,
+      members,
+    };
+  }
+
+  /**
+   * Build a message preview from a message object
+   */
+  private buildMessagePreview(
+    convoId: string,
+    message: ChatBskyConvoGetMessages.OutputSchema["messages"][0]
+  ): AutomationMessagePreviewData | null {
+    const msg = message as
+      | {
+          id?: string;
+          text?: string;
+          sentAt?: string;
+          sender?: {
+            did?: string;
+            handle?: string;
+            displayName?: string;
+            avatar?: string;
+          };
+        }
+      | undefined;
+
+    if (!msg?.text || !msg?.id) return null;
+
+    const sender: AutomationProfileData = {
+      did: msg.sender?.did ?? "",
+      handle: msg.sender?.handle ?? "unknown",
+      displayName: msg.sender?.displayName ?? null,
+      avatarUrl: msg.sender?.avatar ?? null,
+    };
+
+    return {
+      messageId: msg.id,
+      convoId,
+      text: msg.text,
+      sentAt: msg.sentAt ?? new Date().toISOString(),
+      sender,
+    };
   }
 }
