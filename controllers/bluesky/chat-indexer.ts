@@ -162,18 +162,15 @@ export class ChatIndexer {
           const nextCursor = response.cursor;
 
           if (messages.length > 0) {
-            const savedCount = await this.saveMessages(db, convoId, messages);
-            totalSaved += savedCount;
-
-            // Emit preview for the last saved message
-            const lastMessage = messages[messages.length - 1];
-            const previewData = this.buildMessagePreview(convoId, lastMessage);
-
-            this.deps.updateProgress({
-              currentAction: `Saved ${totalSaved} messages (${convoIndex}/${convos.length} conversations)`,
-              previewData: previewData
-                ? { type: "message", data: previewData }
-                : undefined,
+            await this.saveMessages(db, convoId, messages, (message) => {
+              totalSaved++;
+              const previewData = this.buildMessagePreview(convoId, message);
+              this.deps.updateProgress({
+                currentAction: `Saved ${totalSaved} messages (${convoIndex}/${convos.length} conversations)`,
+                previewData: previewData
+                  ? { type: "message", data: previewData }
+                  : undefined,
+              });
             });
           }
 
@@ -245,14 +242,50 @@ export class ChatIndexer {
 
       // Save profile information for each member
       for (const member of convo.members ?? []) {
-        // Cast chat profile to app profile for upsertProfile compatibility
-        await this.postPersistence.upsertProfile(
-          db,
-          member as unknown as AppBskyActorDefs.ProfileViewBasic
-        );
+        const memberProfile =
+          member as unknown as AppBskyActorDefs.ProfileViewBasic;
+        if (memberProfile.handle) {
+          // Member has full profile data
+          await this.postPersistence.upsertProfile(db, memberProfile);
+        } else if (memberProfile.did) {
+          // Member only has DID, check if we need to fetch profile
+          const existingProfile = await db.getFirstAsync<{ did: string }>(
+            `SELECT did FROM profile WHERE did = ?`,
+            [memberProfile.did]
+          );
+
+          if (!existingProfile) {
+            // Fetch profile from API
+            try {
+              const agent = this.requireAgent();
+              const profileResponse = await this.deps.makeApiRequest(() =>
+                agent.getProfile({ actor: memberProfile.did })
+              );
+              await this.postPersistence.upsertProfile(
+                db,
+                profileResponse as AppBskyActorDefs.ProfileViewBasic
+              );
+            } catch (error) {
+              console.warn(
+                `[ChatIndexer] Failed to fetch profile for member ${memberProfile.did}`,
+                error
+              );
+            }
+          }
+        }
       }
 
       savedCount++;
+
+      // DEBUG: Pause to see progress
+      console.log(
+        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Pausing after saving convo`,
+        convo.id
+      );
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      console.log(
+        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Resume after convo pause`
+      );
     }
 
     return savedCount;
@@ -261,7 +294,10 @@ export class ChatIndexer {
   private async saveMessages(
     db: SQLiteDatabase,
     convoId: string,
-    messages: ChatBskyConvoGetMessages.OutputSchema["messages"]
+    messages: ChatBskyConvoGetMessages.OutputSchema["messages"],
+    onMessageSaved?: (
+      message: ChatBskyConvoGetMessages.OutputSchema["messages"][0]
+    ) => void
   ): Promise<number> {
     let savedCount = 0;
     const now = Date.now();
@@ -341,6 +377,21 @@ export class ChatIndexer {
       }
 
       savedCount++;
+
+      // Notify caller that message was saved
+      if (onMessageSaved) {
+        onMessageSaved(message);
+      }
+
+      // DEBUG: Pause to see progress
+      console.log(
+        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Pausing after saving message`,
+        msg.id
+      );
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      console.log(
+        `[ChatIndexer] DEBUG [${new Date().toISOString()}]: Resume after message pause`
+      );
     }
 
     return savedCount;
