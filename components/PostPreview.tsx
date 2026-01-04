@@ -25,6 +25,7 @@ import type {
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
+import { EmbeddedPostSnippet } from "./EmbeddedPostSnippet";
 
 import { formatNumber, formatTimestampFull } from "@/utils/formatting";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -205,6 +206,7 @@ export function PostPreview({
   const [currentVideo, setCurrentVideo] = useState<MediaAttachment | null>(
     null
   );
+  const [quotedModalVisible, setQuotedModalVisible] = useState(false);
 
   // Build gallery images list for browse mode
   const galleryImages: ImageItem[] = React.useMemo(() => {
@@ -240,6 +242,16 @@ export function PostPreview({
   const closeVideo = useCallback(() => {
     setVideoVisible(false);
     setCurrentVideo(null);
+  }, []);
+
+  const handleOpenQuoted = useCallback(() => {
+    if (post.quotedPost) {
+      setQuotedModalVisible(true);
+    }
+  }, [post.quotedPost]);
+
+  const handleCloseQuoted = useCallback(() => {
+    setQuotedModalVisible(false);
   }, []);
 
   return (
@@ -295,6 +307,13 @@ export function PostPreview({
       <Text style={[styles.bodyText, { color: palette.text }]}>
         {post.text}
       </Text>
+      {post.quotedPost && (
+        <EmbeddedPostSnippet
+          post={post.quotedPost}
+          palette={palette}
+          onPress={handleOpenQuoted}
+        />
+      )}
       {post.media && post.media.length > 0 ? (
         <View style={styles.mediaGrid}>
           {post.media.map((item, index) => {
@@ -404,6 +423,30 @@ export function PostPreview({
       <Text style={[styles.timestampFull, { color: palette.icon }]}>
         Posted {formatTimestampFull(post.createdAt)}
       </Text>
+
+      {post.quotedPost && (
+        <Modal
+          visible={quotedModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={handleCloseQuoted}
+        >
+          <View style={styles.modalBackdropLight}>
+            <View style={[styles.modalCard, { backgroundColor: palette.card }]}>
+              <Pressable style={styles.modalClose} onPress={handleCloseQuoted}>
+                <Text style={[styles.modalCloseText, { color: palette.text }]}>
+                  ✕ Close
+                </Text>
+              </Pressable>
+              <PostPreview
+                post={post.quotedPost}
+                palette={palette}
+                browseMode
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -583,6 +626,26 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "500",
+  },
+  modalBackdropLight: {
+    flex: 1,
+    backgroundColor: "#0008",
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalCard: {
+    borderRadius: 12,
+    padding: 12,
+    maxHeight: "90%",
+  },
+  modalClose: {
+    alignSelf: "flex-end",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  modalCloseText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });
 

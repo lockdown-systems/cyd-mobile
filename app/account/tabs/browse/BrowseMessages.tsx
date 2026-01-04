@@ -18,6 +18,7 @@ import type {
   ProfileData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
+import { extractEmbeddedPostFromJson } from "@/utils/embeddedPost";
 
 import { BrowsePlaceholderCard } from "./BrowsePlaceholderCard";
 import { fetchAccountMeta, openAccountDb } from "./shared";
@@ -215,6 +216,8 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
           text: string;
           createdAt: string;
           authorDid: string;
+          embedJSON: string | null;
+          quotedPostUri: string | null;
           likeCount: number | null;
           repostCount: number | null;
           replyCount: number | null;
@@ -226,6 +229,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
         }>(
           `SELECT p.uri, p.cid, p.text, p.createdAt, p.authorDid,
                   p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
+                  p.embedJSON, p.quotedPostUri,
                   prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
            FROM post p
            LEFT JOIN profile prof ON prof.did = p.authorDid
@@ -286,6 +290,8 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
             repostCount: p.repostCount,
             replyCount: p.replyCount,
             quoteCount: p.quoteCount,
+            quotedPostUri: p.quotedPostUri,
+            quotedPost: extractEmbeddedPostFromJson(p.embedJSON, p.createdAt),
             media: mediaByPost.get(p.uri),
           });
         }

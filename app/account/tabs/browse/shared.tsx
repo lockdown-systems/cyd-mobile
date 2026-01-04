@@ -17,6 +17,7 @@ import type {
 } from "@/controllers/bluesky/types";
 import { getDatabase } from "@/database";
 import type { AccountTabPalette } from "@/types/account-tabs";
+import { extractEmbeddedPostFromJson } from "@/utils/embeddedPost";
 
 export type BrowseProps = {
   handle: string;
@@ -37,6 +38,8 @@ export type PostRow = {
   authorDid: string;
   text: string;
   createdAt: string;
+  embedJSON: string | null;
+  quotedPostUri: string | null;
   likeCount: number | null;
   repostCount: number | null;
   replyCount: number | null;
@@ -96,6 +99,8 @@ export function mapRowToPreview(
   fallbackHandle: string,
   media?: MediaAttachment[]
 ): PostPreviewData {
+  const quotedPost = extractEmbeddedPostFromJson(row.embedJSON, row.createdAt);
+
   return {
     uri: row.uri,
     cid: row.cid,
@@ -113,6 +118,8 @@ export function mapRowToPreview(
     replyCount: row.replyCount,
     quoteCount: row.quoteCount,
     isRepost: row.isRepost === 1,
+    quotedPostUri: row.quotedPostUri,
+    quotedPost,
     media,
   };
 }
@@ -177,6 +184,7 @@ export function buildFirstPageQuery(type: BrowseType): string {
   const baseSelect = `
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
+      p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
     FROM post p
@@ -205,6 +213,7 @@ export function buildLoadMoreQuery(type: BrowseType): string {
   const baseSelect = `
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
+      p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
     FROM post p

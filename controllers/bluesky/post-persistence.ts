@@ -1,3 +1,4 @@
+import { extractEmbeddedPost } from "@/utils/embeddedPost";
 import {
   AppBskyFeedPost,
   AppBskyFeedRepost,
@@ -96,6 +97,8 @@ export class PostPersistence {
       repostRecord?.createdAt ??
       (postView as { indexedAt?: string }).indexedAt ??
       new Date().toISOString();
+
+    const quotedPost = extractEmbeddedPost(postView.embed, createdAt);
 
     await db.runAsync(
       `INSERT INTO post (
@@ -208,6 +211,7 @@ export class PostPersistence {
       quoteCount,
       isRepost: recordInfo.kind === "repost",
       quotedPostUri,
+      quotedPost,
       media: downloadedMedia,
     } satisfies PostPreviewData;
 

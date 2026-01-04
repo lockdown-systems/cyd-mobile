@@ -16,6 +16,7 @@ import type {
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { formatTimestampFull } from "@/utils/formatting";
+import { EmbeddedPostSnippet } from "./EmbeddedPostSnippet";
 import { PostPreview } from "./PostPreview";
 
 type MessagePreviewProps = {
@@ -320,38 +321,11 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
 
             {/* Display embedded post if present */}
             {embeddedPost && (
-              <Pressable
+              <EmbeddedPostSnippet
+                post={embeddedPost}
+                palette={palette}
                 onPress={handleOpenPostModal}
-                style={[
-                  styles.embeddedPost,
-                  {
-                    backgroundColor: palette.background,
-                    borderColor: palette.icon,
-                  },
-                ]}
-              >
-                {embeddedPost.author && (
-                  <Text
-                    style={[styles.embeddedAuthor, { color: palette.text }]}
-                    numberOfLines={1}
-                  >
-                    {embeddedPost.author.displayName ||
-                      embeddedPost.author.handle ||
-                      "Unknown"}
-                  </Text>
-                )}
-                {embeddedPost.text && (
-                  <Text
-                    style={[styles.embeddedText, { color: palette.text }]}
-                    numberOfLines={3}
-                  >
-                    {embeddedPost.text}
-                  </Text>
-                )}
-                <Text style={[styles.embeddedHint, { color: palette.icon }]}>
-                  Tap to view full post
-                </Text>
-              </Pressable>
+              />
             )}
           </View>
 

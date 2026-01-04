@@ -118,6 +118,7 @@ export type PostPreviewData = {
   quoteCount?: number | null;
   isRepost?: boolean;
   quotedPostUri?: string | null;
+  quotedPost?: PostPreviewData | null;
   media?: MediaAttachment[];
 };
 
