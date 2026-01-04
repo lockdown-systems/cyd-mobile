@@ -3,6 +3,8 @@ import type {
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 
+const MAX_QUOTE_DEPTH = 5;
+
 function extractMediaFromEmbedValue(embed: unknown): MediaAttachment[] {
   if (!embed || typeof embed !== "object") return [];
 
@@ -80,19 +82,27 @@ function safeParseEmbed(embedJson?: string | null): unknown {
 function pickRecord(embed: unknown): Record<string, unknown> | null {
   if (!embed || typeof embed !== "object") return null;
   const embedObj = embed as { record?: unknown };
-  const record = embedObj.record ?? embed;
-  if (record && typeof record === "object") {
-    return record as Record<string, unknown>;
+  // Only return the record if it actually exists (don't fall back to embed itself)
+  if (embedObj.record && typeof embedObj.record === "object") {
+    return embedObj.record as Record<string, unknown>;
   }
   return null;
 }
 
 export function extractEmbeddedPost(
   embed: unknown,
-  fallbackCreatedAt: string
+  fallbackCreatedAt: string,
+  depth = 0
 ): PostPreviewData | null {
+  if (depth > MAX_QUOTE_DEPTH) return null;
+
   const record = pickRecord(embed);
   if (!record) return null;
+
+  // Only treat this as a quoted post if it looks like a record with a URI.
+  if (typeof (record as { uri?: unknown }).uri !== "string") {
+    return null;
+  }
 
   const value = record.value as Record<string, unknown> | undefined;
   const author = record.author as Record<string, unknown> | undefined;
@@ -104,9 +114,23 @@ export function extractEmbeddedPost(
   const createdAt =
     typeof value?.createdAt === "string" ? value.createdAt : fallbackCreatedAt;
 
-  const mediaSource =
-    (embed as { media?: unknown })?.media ?? (value ? value.embed : undefined);
-  const media = extractMediaFromEmbedValue(mediaSource);
+  // For quoted posts, only extract media from the record's own embed, not the parent
+  const mediaSource = value?.embed as Record<string, unknown> | undefined;
+  const media = mediaSource ? extractMediaFromEmbedValue(mediaSource) : [];
+
+  const nestedRecord =
+    (value?.embed as { record?: unknown })?.record ??
+    (mediaSource as { record?: unknown })?.record;
+
+  const nestedQuoted =
+    nestedRecord && depth < MAX_QUOTE_DEPTH
+      ? extractEmbeddedPost(nestedRecord, createdAt, depth + 1)
+      : null;
+
+  const nestedQuotedUri =
+    nestedRecord && typeof (nestedRecord as { uri?: unknown }).uri === "string"
+      ? (nestedRecord as { uri: string }).uri
+      : null;
 
   const quotedPost: PostPreviewData = {
     uri: uri ?? "",
@@ -126,12 +150,8 @@ export function extractEmbeddedPost(
           : null,
     },
     media: media.length > 0 ? media : undefined,
-    quotedPostUri:
-      typeof (value as { embed?: { record?: { uri?: string } } })?.embed?.record
-        ?.uri === "string"
-        ? ((value as { embed?: { record?: { uri?: string } } })?.embed?.record
-            ?.uri as string)
-        : null,
+    quotedPostUri: nestedQuotedUri,
+    quotedPost: nestedQuoted,
   };
 
   return quotedPost;
@@ -142,7 +162,7 @@ export function extractEmbeddedPostFromJson(
   fallbackCreatedAt: string
 ): PostPreviewData | null {
   const embed = safeParseEmbed(embedJson);
-  return extractEmbeddedPost(embed, fallbackCreatedAt);
+  return extractEmbeddedPost(embed, fallbackCreatedAt, 0);
 }
 
 export function extractMediaFromEmbeddedRecord(
