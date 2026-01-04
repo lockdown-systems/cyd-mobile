@@ -340,6 +340,11 @@ export class ChatIndexer {
         ]
       );
 
+      // If the message embeds a post, fetch the full post view (counts + media) and persist it
+      if (msg.embed) {
+        await this.persistEmbeddedRecord(db, msg.embed);
+      }
+
       // Save sender profile. If the sender object includes handle, save it directly.
       // Otherwise, check if we have the profile in DB; if not, fetch from API.
       const senderWithProfile = msg.sender as AppBskyActorDefs.ProfileViewBasic;
@@ -386,6 +391,37 @@ export class ChatIndexer {
     }
 
     return savedCount;
+  }
+
+  /**
+   * Persist an embedded record (post) found inside a chat message embed
+   */
+  private async persistEmbeddedRecord(
+    db: SQLiteDatabase,
+    embed: unknown
+  ): Promise<void> {
+    const embedObj = embed as { record?: unknown } | undefined;
+    const record = embedObj?.record as { uri?: unknown } | undefined;
+    const uri = record && typeof record.uri === "string" ? record.uri : null;
+
+    if (!uri) return;
+
+    try {
+      const agent = this.requireAgent();
+      const response = await this.deps.makeApiRequest(() =>
+        agent.app.bsky.feed.getPosts({ uris: [uri] })
+      );
+
+      const postView = response?.posts?.[0];
+      if (postView) {
+        await this.postPersistence.persistPostView(db, postView);
+      }
+    } catch (error) {
+      console.warn("[ChatIndexer] Failed to persist embedded post", {
+        uri,
+        error,
+      });
+    }
   }
 
   private requireDb(): SQLiteDatabase {
