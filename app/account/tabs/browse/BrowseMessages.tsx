@@ -59,6 +59,7 @@ type MessageRow = {
   avatarDataURI: string | null;
   embedJSON: string | null;
   reactionsJSON: string | null;
+  facetsJSON: string | null;
   embeddedPostUri: string | null;
 };
 
@@ -186,7 +187,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
       const db = await openAccountDb(uuid);
       const rows = await db.getAllAsync<MessageRow>(
         `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.senderDid,
-                m.embedJSON, m.reactionsJSON, m.embeddedPostUri,
+          m.embedJSON, m.reactionsJSON, m.facetsJSON, m.embeddedPostUri,
                 p.handle, p.displayName, p.avatarUrl, p.avatarDataURI
          FROM message m
          LEFT JOIN profile p ON p.did = m.senderDid
@@ -318,6 +319,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
         },
         embed: parseUnknown(row.embedJSON),
         reactions: parseUnknownArray(row.reactionsJSON),
+        facets: parseUnknown(row.facetsJSON) as unknown[] | null,
         embeddedPost:
           row.embeddedPostUri && postMap.has(row.embeddedPostUri)
             ? (postMap.get(row.embeddedPostUri) ?? null)

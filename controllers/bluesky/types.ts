@@ -155,6 +155,7 @@ export type MessagePreviewData = {
   sender: ProfileData;
   embed?: Record<string, unknown> | null;
   reactions?: unknown[] | null;
+  facets?: unknown[] | null;
   embeddedPost?: PostPreviewData | null;
 };
 

@@ -501,6 +501,7 @@ export class ChatIndexer {
             did?: string;
           };
           embed?: unknown;
+          facets?: unknown[];
           reactions?: unknown[];
         }
       | undefined;
@@ -532,6 +533,7 @@ export class ChatIndexer {
       sentAt: msg.sentAt ?? new Date().toISOString(),
       sender,
       embed: msg.embed ?? null,
+      facets: msg.facets ?? null,
       reactions: msg.reactions ?? null,
     };
   }

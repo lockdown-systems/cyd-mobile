@@ -1,5 +1,13 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import type {
   MediaAttachment,
@@ -198,6 +206,94 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
 
   const [postModalVisible, setPostModalVisible] = useState(false);
 
+  const handleLinkPress = useCallback(async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      }
+    } catch (err) {
+      console.warn("Failed to open URL", url, err);
+    }
+  }, []);
+
+  const messageNodes = useMemo(() => {
+    if (!message.text) return null;
+
+    type Facet = {
+      index?: { byteStart?: number; byteEnd?: number };
+      features?: { $type?: string; uri?: string }[];
+    };
+
+    const facets = Array.isArray(message.facets)
+      ? (message.facets as Facet[])
+      : [];
+
+    const linkSpans = facets
+      .map((facet) => {
+        const link = facet.features?.find(
+          (f) => f && typeof f === "object" && f.$type?.includes("#link")
+        );
+        const start = facet.index?.byteStart ?? null;
+        const end = facet.index?.byteEnd ?? null;
+        if (
+          !link ||
+          typeof link.uri !== "string" ||
+          start == null ||
+          end == null
+        ) {
+          return null;
+        }
+        return { start, end, uri: link.uri };
+      })
+      .filter((span): span is { start: number; end: number; uri: string } =>
+        Boolean(span)
+      )
+      .sort((a, b) => a.start - b.start);
+
+    const segments: { text: string; uri?: string }[] = [];
+    let cursor = 0;
+    for (const span of linkSpans) {
+      const safeStart = Math.max(0, Math.min(span.start, message.text.length));
+      const safeEnd = Math.max(
+        safeStart,
+        Math.min(span.end, message.text.length)
+      );
+      if (safeStart > cursor) {
+        segments.push({ text: message.text.slice(cursor, safeStart) });
+      }
+      segments.push({
+        text: message.text.slice(safeStart, safeEnd),
+        uri: span.uri,
+      });
+      cursor = safeEnd;
+    }
+    if (cursor < message.text.length) {
+      segments.push({ text: message.text.slice(cursor) });
+    }
+
+    return segments.map((segment, index) => {
+      if (segment.uri) {
+        return (
+          <Text
+            key={`link-${index}`}
+            style={[styles.linkText, { color: palette.background }]}
+            onPress={() => {
+              void handleLinkPress(segment.uri ?? segment.text);
+            }}
+          >
+            {segment.text}
+          </Text>
+        );
+      }
+      return (
+        <Text key={`text-${index}`} style={{ color: palette.background }}>
+          {segment.text}
+        </Text>
+      );
+    });
+  }, [handleLinkPress, message.facets, message.text, palette.background]);
+
   const handleOpenPostModal = useCallback(() => {
     if (embeddedPost) {
       setPostModalVisible(true);
@@ -234,7 +330,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
               style={[styles.messageText, { color: palette.background }]}
               numberOfLines={4}
             >
-              {message.text}
+              {messageNodes}
             </Text>
 
             {/* Display embedded post if present */}
@@ -389,6 +485,9 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 15,
     lineHeight: 20,
+  },
+  linkText: {
+    textDecorationLine: "underline",
   },
   embeddedPost: {
     marginTop: 8,
