@@ -189,6 +189,16 @@ export function extractEmbeddedPost(
     );
   }
 
+  // Extract engagement counts from the record (these come from the hydrated view)
+  const likeCount =
+    typeof record.likeCount === "number" ? record.likeCount : null;
+  const repostCount =
+    typeof record.repostCount === "number" ? record.repostCount : null;
+  const replyCount =
+    typeof record.replyCount === "number" ? record.replyCount : null;
+  const quoteCount =
+    typeof record.quoteCount === "number" ? record.quoteCount : null;
+
   const quotedPost: PostPreviewData = {
     uri: uri ?? "",
     cid: cid ?? "",
@@ -206,6 +216,10 @@ export function extractEmbeddedPost(
           ? ((author as { avatarDataURI?: string }).avatarDataURI as string)
           : null,
     },
+    likeCount,
+    repostCount,
+    replyCount,
+    quoteCount,
     media: media.length > 0 ? media : undefined,
     quotedPostUri: nestedQuotedUri,
     quotedPost: nestedQuoted,
