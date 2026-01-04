@@ -79,25 +79,107 @@ function extractExternalFromEmbed(embeds: unknown[]): ExternalEmbed | null {
         uri?: string;
         title?: string;
         description?: string;
-        thumb?: string;
+        thumb?: unknown; // Can be string URL or blob object
       };
+      // In hydrated views, external properties might be directly on the embed
+      uri?: string;
+      title?: string;
+      description?: string;
+      thumb?: unknown; // Can be string URL or blob object
       $type?: string;
     };
 
-    // Check for external embed (link preview)
+    // Check for external embed (link preview) - nested under .external
     if (
       embedObj.external &&
       typeof embedObj.external.uri === "string" &&
       typeof embedObj.external.title === "string"
     ) {
+      // thumb can be a string URL or a blob object - only use if it's a string
+      const thumbUrl =
+        typeof embedObj.external.thumb === "string"
+          ? embedObj.external.thumb
+          : null;
       return {
         uri: embedObj.external.uri,
         title: embedObj.external.title,
         description: embedObj.external.description ?? null,
-        thumbUrl: embedObj.external.thumb ?? null,
+        thumbUrl,
+      };
+    }
+
+    // Check for hydrated external view where properties are directly on the object
+    if (
+      embedObj.$type?.includes("external") &&
+      typeof embedObj.uri === "string" &&
+      typeof embedObj.title === "string"
+    ) {
+      // thumb can be a string URL or a blob object - only use if it's a string
+      const thumbUrl =
+        typeof embedObj.thumb === "string" ? embedObj.thumb : null;
+      return {
+        uri: embedObj.uri,
+        title: embedObj.title,
+        description: embedObj.description ?? null,
+        thumbUrl,
       };
     }
   }
+  return null;
+}
+
+function extractExternalFromSingleEmbed(embed: unknown): ExternalEmbed | null {
+  if (!embed || typeof embed !== "object") return null;
+  const embedObj = embed as {
+    external?: {
+      uri?: string;
+      title?: string;
+      description?: string;
+      thumb?: unknown; // Can be string URL or blob object
+    };
+    // In hydrated views, external properties might be directly on the embed
+    uri?: string;
+    title?: string;
+    description?: string;
+    thumb?: unknown; // Can be string URL or blob object
+    $type?: string;
+  };
+
+  // Check for external embed (link preview) - nested under .external
+  if (
+    embedObj.external &&
+    typeof embedObj.external.uri === "string" &&
+    typeof embedObj.external.title === "string"
+  ) {
+    // thumb can be a string URL or a blob object - only use if it's a string
+    const thumbUrl =
+      typeof embedObj.external.thumb === "string"
+        ? embedObj.external.thumb
+        : null;
+    return {
+      uri: embedObj.external.uri,
+      title: embedObj.external.title,
+      description: embedObj.external.description ?? null,
+      thumbUrl,
+    };
+  }
+
+  // Check for hydrated external view where properties are directly on the object
+  if (
+    embedObj.$type?.includes("external") &&
+    typeof embedObj.uri === "string" &&
+    typeof embedObj.title === "string"
+  ) {
+    // thumb can be a string URL or a blob object - only use if it's a string
+    const thumbUrl = typeof embedObj.thumb === "string" ? embedObj.thumb : null;
+    return {
+      uri: embedObj.uri,
+      title: embedObj.title,
+      description: embedObj.description ?? null,
+      thumbUrl,
+    };
+  }
+
   return null;
 }
 
@@ -206,6 +288,10 @@ export function extractEmbeddedPost(
   }
   if (media.length === 0 && value?.embed) {
     media = extractMediaFromEmbedValue(value.embed);
+  }
+  // Also try to extract external embed from value.embed if not found in embeds array
+  if (!externalEmbed && value?.embed) {
+    externalEmbed = extractExternalFromSingleEmbed(value.embed);
   }
 
   // Find nested quoted post using improved logic

@@ -144,7 +144,7 @@ export const blueskyAccountMigrations: AccountMigration[] = [
       );`,
       `CREATE INDEX IF NOT EXISTS idx_post_media_post ON post_media(postUri);`,
 
-      // External links embedded in posts
+      // External links embedded in posts (no FK constraint to allow quoted posts)
       `CREATE TABLE IF NOT EXISTS post_external (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         postUri TEXT NOT NULL UNIQUE,
@@ -152,9 +152,7 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         title TEXT NOT NULL,
         description TEXT,
         thumbUrl TEXT,
-        thumbLocalPath TEXT,
-
-        FOREIGN KEY (postUri) REFERENCES post(uri)
+        thumbLocalPath TEXT
       );`,
 
       // Bookmarks

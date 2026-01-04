@@ -119,10 +119,19 @@ export function mapRowToPreview(
   row: PostRow,
   fallbackHandle: string,
   media?: MediaAttachment[],
-  externalEmbed?: ExternalEmbed | null
+  externalEmbed?: ExternalEmbed | null,
+  quotedPostExternalEmbed?: ExternalEmbed | null
 ): PostPreviewData {
-  const quotedPost = extractEmbeddedPostFromJson(row.embedJSON, row.createdAt);
+  let quotedPost = extractEmbeddedPostFromJson(row.embedJSON, row.createdAt);
   const facets = parseFacets(row.facetsJSON);
+
+  // Apply saved external embed to quoted post if available
+  if (quotedPost && quotedPostExternalEmbed) {
+    quotedPost = {
+      ...quotedPost,
+      externalEmbed: quotedPostExternalEmbed,
+    };
+  }
 
   return {
     uri: row.uri,
@@ -388,11 +397,16 @@ export function BrowseList({
       const params = getFirstPageParams(type, meta.did);
       const rows = await db.getAllAsync<PostRow>(query, params);
 
-      // Fetch media and external embeds for these posts
+      // Fetch media and external embeds for these posts (including quoted posts)
       const postUris = rows.map((r) => r.uri);
+      const quotedPostUris = rows
+        .map((r) => r.quotedPostUri)
+        .filter((uri): uri is string => uri != null);
+      const allUrisForExternals = [...postUris, ...quotedPostUris];
+
       const [mediaMap, externalMap] = await Promise.all([
         fetchMediaForPosts(db, postUris),
-        fetchExternalEmbedsForPosts(db, postUris),
+        fetchExternalEmbedsForPosts(db, allUrisForExternals),
       ]);
 
       const mapped = rows.map((row) =>
@@ -400,7 +414,10 @@ export function BrowseList({
           row,
           meta.handle ?? handle,
           mediaMap.get(row.uri),
-          externalMap.get(row.uri) ?? null
+          externalMap.get(row.uri) ?? null,
+          row.quotedPostUri
+            ? (externalMap.get(row.quotedPostUri) ?? null)
+            : null
         )
       );
       setPosts(mapped);
@@ -436,11 +453,16 @@ export function BrowseList({
       const params = getLoadMoreParams(type, meta.did, cursor);
       const rows = await db.getAllAsync<PostRow>(query, params);
 
-      // Fetch media and external embeds for these posts
+      // Fetch media and external embeds for these posts (including quoted posts)
       const postUris = rows.map((r) => r.uri);
+      const quotedPostUris = rows
+        .map((r) => r.quotedPostUri)
+        .filter((uri): uri is string => uri != null);
+      const allUrisForExternals = [...postUris, ...quotedPostUris];
+
       const [mediaMap, externalMap] = await Promise.all([
         fetchMediaForPosts(db, postUris),
-        fetchExternalEmbedsForPosts(db, postUris),
+        fetchExternalEmbedsForPosts(db, allUrisForExternals),
       ]);
 
       const mapped = rows.map((row) =>
@@ -448,7 +470,10 @@ export function BrowseList({
           row,
           meta.handle ?? handle,
           mediaMap.get(row.uri),
-          externalMap.get(row.uri) ?? null
+          externalMap.get(row.uri) ?? null,
+          row.quotedPostUri
+            ? (externalMap.get(row.quotedPostUri) ?? null)
+            : null
         )
       );
       setPosts((prev) => [...prev, ...mapped]);

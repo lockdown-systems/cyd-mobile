@@ -29,6 +29,7 @@ export interface ChatIndexerDeps {
   getDid: () => string | null;
   updateProgress: (updates: Partial<BlueskyProgress>) => void;
   makeApiRequest: RequestExecutor;
+  downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
 }
 
 /**
@@ -39,9 +40,7 @@ export class ChatIndexer {
 
   constructor(private readonly deps: ChatIndexerDeps) {
     this.postPersistence = new PostPersistence({
-      downloadMediaFromUrl: async () => {
-        throw new Error("Media download not supported in chat context");
-      },
+      downloadMediaFromUrl: deps.downloadMediaFromUrl,
       getDid: deps.getDid,
     });
   }

@@ -178,6 +178,21 @@ export class PostPersistence {
     // Extract and save external link embeds
     const externalEmbed = await this.saveExternalEmbed(db, postView);
 
+    // Save external embed for quoted post if it has one
+    let quotedPostWithLocalEmbed = quotedPost;
+    if (quotedPost?.externalEmbed) {
+      const savedQuotedExternal = await this.saveQuotedPostExternalEmbed(
+        db,
+        quotedPost
+      );
+      if (savedQuotedExternal) {
+        quotedPostWithLocalEmbed = {
+          ...quotedPost,
+          externalEmbed: savedQuotedExternal,
+        };
+      }
+    }
+
     const author = postView.author;
     const likeCount =
       typeof postView.likeCount === "number" ? postView.likeCount : null;
@@ -211,7 +226,7 @@ export class PostPersistence {
       quoteCount,
       isRepost: recordInfo.kind === "repost",
       quotedPostUri,
-      quotedPost,
+      quotedPost: quotedPostWithLocalEmbed,
       media: downloadedMedia,
       facets: postRecord?.facets ?? null,
       externalEmbed,
@@ -414,6 +429,45 @@ export class PostPersistence {
       return null;
     }
 
+    return this.saveExternalEmbedData(db, postView.uri, {
+      uri: external.uri,
+      title: external.title,
+      description: external.description ?? undefined,
+      thumbUrl: external.thumbUrl ?? undefined,
+    });
+  }
+
+  /**
+   * Save external embed data for a quoted post.
+   * Downloads the thumbnail and stores it locally.
+   */
+  private async saveQuotedPostExternalEmbed(
+    db: SQLiteDatabase,
+    quotedPost: PostPreviewData
+  ): Promise<ExternalEmbed | null> {
+    if (!quotedPost.externalEmbed || !quotedPost.uri) {
+      return null;
+    }
+
+    const external = quotedPost.externalEmbed;
+    return this.saveExternalEmbedData(db, quotedPost.uri, {
+      uri: external.uri,
+      title: external.title,
+      description: external.description ?? undefined,
+      thumbUrl: external.thumbUrl ?? undefined,
+    });
+  }
+
+  private async saveExternalEmbedData(
+    db: SQLiteDatabase,
+    postUri: string,
+    external: {
+      uri: string;
+      title: string;
+      description?: string;
+      thumbUrl?: string;
+    }
+  ): Promise<ExternalEmbed | null> {
     const did = this.requireDid();
     let thumbLocalPath: string | null = null;
     if (external.thumbUrl) {
@@ -441,7 +495,7 @@ export class PostPersistence {
         thumbUrl = excluded.thumbUrl,
         thumbLocalPath = COALESCE(excluded.thumbLocalPath, post_external.thumbLocalPath);`,
       [
-        postView.uri,
+        postUri,
         external.uri,
         external.title,
         external.description ?? null,
@@ -453,8 +507,8 @@ export class PostPersistence {
     return {
       uri: external.uri,
       title: external.title,
-      description: external.description,
-      thumbUrl: external.thumbUrl,
+      description: external.description ?? null,
+      thumbUrl: external.thumbUrl ?? null,
       thumbLocalPath,
     };
   }

@@ -230,6 +230,14 @@ function ExternalEmbedCard({
 
   const thumbUri = embed.thumbLocalPath ?? embed.thumbUrl;
 
+  console.log("[ExternalEmbedCard] Rendering", {
+    uri: embed.uri,
+    title: embed.title,
+    thumbLocalPath: embed.thumbLocalPath,
+    thumbUrl: embed.thumbUrl,
+    thumbUri,
+  });
+
   return (
     <Pressable
       style={[
@@ -246,6 +254,13 @@ function ExternalEmbedCard({
           source={{ uri: thumbUri }}
           style={styles.externalThumb}
           resizeMode="cover"
+          onError={(e) =>
+            console.warn(
+              "[ExternalEmbedCard] Image load error",
+              thumbUri,
+              e.nativeEvent.error
+            )
+          }
         />
       )}
       <View style={styles.externalContent}>

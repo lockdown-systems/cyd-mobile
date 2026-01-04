@@ -39,6 +39,7 @@ export class BlueskyIndexer {
       getDid: deps.getDid,
       updateProgress: deps.updateProgress,
       makeApiRequest: deps.makeApiRequest,
+      downloadMediaFromUrl: deps.downloadMediaFromUrl,
     };
 
     this.postIndexer = new PostIndexer(postIndexerDeps);
