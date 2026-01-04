@@ -311,6 +311,16 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
         return Array.isArray(parsed) ? parsed : null;
       };
 
+      const parseEmbed = (
+        value?: string | null
+      ): Record<string, unknown> | null => {
+        const parsed = parseUnknown(value);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+        return null;
+      };
+
       const mapped: MessagePreviewData[] = rows.map((row) => ({
         messageId: row.messageId,
         convoId: row.convoId,
@@ -323,7 +333,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
           avatarUrl: row.avatarUrl ?? row.avatarDataURI ?? undefined,
           avatarDataURI: row.avatarDataURI ?? undefined,
         },
-        embed: parseUnknown(row.embedJSON),
+        embed: parseEmbed(row.embedJSON),
         reactions: parseUnknownArray(row.reactionsJSON),
         facets: parseUnknown(row.facetsJSON) as unknown[] | null,
         embeddedPost:

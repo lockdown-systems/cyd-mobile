@@ -298,6 +298,7 @@ export function PostPreview({
   }, []);
 
   // Parse facets to render links
+  // Note: Bluesky uses byte offsets, not character offsets
   const textNodes = useMemo(() => {
     if (!post.text) return null;
 
@@ -309,13 +310,13 @@ export function PostPreview({
     const facets = Array.isArray(post.facets) ? (post.facets as Facet[]) : [];
 
     type SpanItem = {
-      start: number;
-      end: number;
+      byteStart: number;
+      byteEnd: number;
       type: "link" | "mention";
       uri?: string;
     };
 
-    // Collect all link/mention spans
+    // Collect all link/mention spans (in byte offsets)
     const spans: SpanItem[] = facets
       .map((facet): SpanItem | null => {
         const link = facet.features?.find(
@@ -324,48 +325,59 @@ export function PostPreview({
         const mention = facet.features?.find(
           (f) => f && typeof f === "object" && f.$type?.includes("#mention")
         );
-        const start = facet.index?.byteStart ?? null;
-        const end = facet.index?.byteEnd ?? null;
+        const byteStart = facet.index?.byteStart ?? null;
+        const byteEnd = facet.index?.byteEnd ?? null;
 
-        if (start == null || end == null) return null;
+        if (byteStart == null || byteEnd == null) return null;
 
         if (link && typeof link.uri === "string") {
-          return { start, end, type: "link", uri: link.uri };
+          return { byteStart, byteEnd, type: "link", uri: link.uri };
         }
         if (mention && typeof mention.did === "string") {
-          return { start, end, type: "mention" };
+          return { byteStart, byteEnd, type: "mention" };
         }
         return null;
       })
       .filter((span): span is SpanItem => span !== null)
-      .sort((a, b) => a.start - b.start);
+      .sort((a, b) => a.byteStart - b.byteStart);
 
     if (spans.length === 0) {
       return <Text style={{ color: palette.text }}>{post.text}</Text>;
     }
+
+    // Convert text to bytes for accurate slicing with byte offsets
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const textBytes = encoder.encode(post.text);
 
     const segments: {
       text: string;
       type?: "link" | "mention";
       uri?: string;
     }[] = [];
-    let cursor = 0;
-    for (const span of spans) {
-      const safeStart = Math.max(0, Math.min(span.start, post.text.length));
-      const safeEnd = Math.max(safeStart, Math.min(span.end, post.text.length));
+    let byteCursor = 0;
 
-      if (safeStart > cursor) {
-        segments.push({ text: post.text.slice(cursor, safeStart) });
+    for (const span of spans) {
+      const safeStart = Math.max(0, Math.min(span.byteStart, textBytes.length));
+      const safeEnd = Math.max(
+        safeStart,
+        Math.min(span.byteEnd, textBytes.length)
+      );
+
+      if (safeStart > byteCursor) {
+        segments.push({
+          text: decoder.decode(textBytes.slice(byteCursor, safeStart)),
+        });
       }
       segments.push({
-        text: post.text.slice(safeStart, safeEnd),
+        text: decoder.decode(textBytes.slice(safeStart, safeEnd)),
         type: span.type,
         uri: span.type === "link" ? span.uri : undefined,
       });
-      cursor = safeEnd;
+      byteCursor = safeEnd;
     }
-    if (cursor < post.text.length) {
-      segments.push({ text: post.text.slice(cursor) });
+    if (byteCursor < textBytes.length) {
+      segments.push({ text: decoder.decode(textBytes.slice(byteCursor)) });
     }
 
     return segments.map((segment, index) => {

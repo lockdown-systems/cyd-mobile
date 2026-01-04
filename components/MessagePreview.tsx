@@ -220,42 +220,51 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
         const link = facet.features?.find(
           (f) => f && typeof f === "object" && f.$type?.includes("#link")
         );
-        const start = facet.index?.byteStart ?? null;
-        const end = facet.index?.byteEnd ?? null;
+        const byteStart = facet.index?.byteStart ?? null;
+        const byteEnd = facet.index?.byteEnd ?? null;
         if (
           !link ||
           typeof link.uri !== "string" ||
-          start == null ||
-          end == null
+          byteStart == null ||
+          byteEnd == null
         ) {
           return null;
         }
-        return { start, end, uri: link.uri };
+        return { byteStart, byteEnd, uri: link.uri };
       })
-      .filter((span): span is { start: number; end: number; uri: string } =>
-        Boolean(span)
+      .filter(
+        (span): span is { byteStart: number; byteEnd: number; uri: string } =>
+          Boolean(span)
       )
-      .sort((a, b) => a.start - b.start);
+      .sort((a, b) => a.byteStart - b.byteStart);
+
+    // Bluesky facets use byte offsets, not character offsets
+    // We need to convert text to bytes for accurate slicing
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const textBytes = encoder.encode(message.text);
 
     const segments: { text: string; uri?: string }[] = [];
-    let cursor = 0;
+    let byteCursor = 0;
     for (const span of linkSpans) {
-      const safeStart = Math.max(0, Math.min(span.start, message.text.length));
+      const safeStart = Math.max(0, Math.min(span.byteStart, textBytes.length));
       const safeEnd = Math.max(
         safeStart,
-        Math.min(span.end, message.text.length)
+        Math.min(span.byteEnd, textBytes.length)
       );
-      if (safeStart > cursor) {
-        segments.push({ text: message.text.slice(cursor, safeStart) });
+      if (safeStart > byteCursor) {
+        segments.push({
+          text: decoder.decode(textBytes.slice(byteCursor, safeStart)),
+        });
       }
       segments.push({
-        text: message.text.slice(safeStart, safeEnd),
+        text: decoder.decode(textBytes.slice(safeStart, safeEnd)),
         uri: span.uri,
       });
-      cursor = safeEnd;
+      byteCursor = safeEnd;
     }
-    if (cursor < message.text.length) {
-      segments.push({ text: message.text.slice(cursor) });
+    if (byteCursor < textBytes.length) {
+      segments.push({ text: decoder.decode(textBytes.slice(byteCursor)) });
     }
 
     return segments.map((segment, index) => {

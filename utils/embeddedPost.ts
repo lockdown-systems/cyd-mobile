@@ -235,6 +235,9 @@ export function extractEmbeddedPost(
   const quoteCount =
     typeof record.quoteCount === "number" ? record.quoteCount : null;
 
+  // Extract facets from the value (record data)
+  const facets = Array.isArray(value?.facets) ? value.facets : null;
+
   const quotedPost: PostPreviewData = {
     uri: uri ?? "",
     cid: cid ?? "",
@@ -258,6 +261,7 @@ export function extractEmbeddedPost(
     quoteCount,
     media: media.length > 0 ? media : undefined,
     externalEmbed,
+    facets,
     quotedPostUri: nestedQuotedUri,
     quotedPost: nestedQuoted,
   };

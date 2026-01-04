@@ -8,10 +8,10 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { PostPersistence } from "./post-persistence";
 import type { ApiRequestFn } from "./rate-limiter";
 import type {
-  AutomationConversationPreviewData,
-  AutomationMessagePreviewData,
-  AutomationProfileData,
   BlueskyProgress,
+  ConversationPreviewData,
+  MessagePreviewData,
+  ProfileData,
 } from "./types";
 
 type RequestExecutor = <T>(requestFn: ApiRequestFn<T>) => Promise<T>;
@@ -458,21 +458,19 @@ export class ChatIndexer {
    */
   private buildConversationPreview(
     convo: ChatBskyConvoListConvos.OutputSchema["convos"][0]
-  ): AutomationConversationPreviewData | null {
+  ): ConversationPreviewData | null {
     if (!convo) return null;
 
     const lastMsg = convo.lastMessage as
       | { text?: string; sentAt?: string }
       | undefined;
 
-    const members: AutomationProfileData[] = (convo.members ?? []).map(
-      (member) => ({
-        did: member.did,
-        handle: member.handle,
-        displayName: member.displayName ?? null,
-        avatarUrl: member.avatar ?? null,
-      })
-    );
+    const members: ProfileData[] = (convo.members ?? []).map((member) => ({
+      did: member.did,
+      handle: member.handle,
+      displayName: member.displayName ?? null,
+      avatarUrl: member.avatar ?? null,
+    }));
 
     return {
       convoId: convo.id,
@@ -491,7 +489,7 @@ export class ChatIndexer {
     db: SQLiteDatabase,
     convoId: string,
     message: ChatBskyConvoGetMessages.OutputSchema["messages"][0]
-  ): Promise<AutomationMessagePreviewData | null> {
+  ): Promise<MessagePreviewData | null> {
     const msg = message as
       | {
           id?: string;
@@ -519,7 +517,7 @@ export class ChatIndexer {
       [msg.sender.did]
     );
 
-    const sender: AutomationProfileData = {
+    const sender: ProfileData = {
       did: msg.sender.did,
       handle: profile?.handle ?? "unknown",
       displayName: profile?.displayName ?? null,
@@ -532,7 +530,7 @@ export class ChatIndexer {
       text: msg.text,
       sentAt: msg.sentAt ?? new Date().toISOString(),
       sender,
-      embed: msg.embed ?? null,
+      embed: (msg.embed as Record<string, unknown> | null) ?? null,
       facets: msg.facets ?? null,
       reactions: msg.reactions ?? null,
     };

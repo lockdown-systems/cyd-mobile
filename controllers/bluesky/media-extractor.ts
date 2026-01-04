@@ -1,5 +1,5 @@
 import type { AppBskyFeedGetAuthorFeed } from "@atproto/api";
-import type { AutomationMediaAttachment } from "./types";
+import type { MediaAttachment } from "./types";
 
 type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
 type FeedPostView = FeedViewPost["post"];
@@ -7,10 +7,9 @@ type FeedPostView = FeedViewPost["post"];
 /**
  * Internal type for extracted media with additional metadata for database storage
  */
-export type ExtractedMedia = AutomationMediaAttachment & {
+export type ExtractedMedia = MediaAttachment & {
   blobCid: string;
   mimeType?: string | null;
-  playlistUrl?: string | null;
 };
 
 /**
