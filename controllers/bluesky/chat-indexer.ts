@@ -321,10 +321,12 @@ export class ChatIndexer {
         continue;
       }
 
+      const embeddedInfo = this.extractEmbeddedRecordInfo(msg.embed);
+
       await db.runAsync(
         `INSERT OR REPLACE INTO message (
-          messageId, convoId, rev, senderDid, text, facetsJSON, embedJSON, reactionsJSON, sentAt, savedAt, deletedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          messageId, convoId, rev, senderDid, text, facetsJSON, embedJSON, reactionsJSON, embeddedPostUri, embeddedPostCid, sentAt, savedAt, deletedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           msg.id ?? null,
           convoId,
@@ -334,6 +336,8 @@ export class ChatIndexer {
           msg.facets ? JSON.stringify(msg.facets) : null,
           msg.embed ? JSON.stringify(msg.embed) : null,
           msg.reactions ? JSON.stringify(msg.reactions) : null,
+          embeddedInfo?.uri ?? null,
+          embeddedInfo?.cid ?? null,
           msg.sentAt ?? null,
           now,
           null,
@@ -341,8 +345,8 @@ export class ChatIndexer {
       );
 
       // If the message embeds a post, fetch the full post view (counts + media) and persist it
-      if (msg.embed) {
-        await this.persistEmbeddedRecord(db, msg.embed);
+      if (embeddedInfo?.uri) {
+        await this.persistEmbeddedRecord(db, embeddedInfo.uri);
       }
 
       // Save sender profile. If the sender object includes handle, save it directly.
@@ -396,16 +400,25 @@ export class ChatIndexer {
   /**
    * Persist an embedded record (post) found inside a chat message embed
    */
+  private extractEmbeddedRecordInfo(
+    embed: unknown
+  ): { uri?: string; cid?: string } | null {
+    if (!embed || typeof embed !== "object") return null;
+    const embedObj = embed as Record<string, unknown>;
+    const record = embedObj.record as Record<string, unknown> | undefined;
+    if (record && typeof record.uri === "string") {
+      return {
+        uri: record.uri,
+        cid: typeof record.cid === "string" ? record.cid : undefined,
+      };
+    }
+    return null;
+  }
+
   private async persistEmbeddedRecord(
     db: SQLiteDatabase,
-    embed: unknown
+    uri: string
   ): Promise<void> {
-    const embedObj = embed as { record?: unknown } | undefined;
-    const record = embedObj?.record as { uri?: unknown } | undefined;
-    const uri = record && typeof record.uri === "string" ? record.uri : null;
-
-    if (!uri) return;
-
     try {
       const agent = this.requireAgent();
       const response = await this.deps.makeApiRequest(() =>

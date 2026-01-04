@@ -22,7 +22,7 @@ import {
 
 import type {
   AutomationMediaAttachment,
-  AutomationPostPreviewData,
+  PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
@@ -51,7 +51,7 @@ function formatTimestamp(isoString: string): string {
 }
 
 type PostPreviewProps = {
-  post: AutomationPostPreviewData;
+  post: PostPreviewData;
   palette: AccountTabPalette;
   browseMode?: boolean;
 };

@@ -4,7 +4,7 @@ import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import type {
   AutomationMediaAttachment,
   AutomationMessagePreviewData,
-  AutomationPostPreviewData,
+  PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { PostPreview } from "./PostPreview";
@@ -29,6 +29,19 @@ type MessagePreviewProps = {
   message: AutomationMessagePreviewData;
   palette: AccountTabPalette;
 };
+
+function isPostPreviewData(value: unknown): value is PostPreviewData {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.uri === "string" &&
+    typeof v.cid === "string" &&
+    typeof v.text === "string" &&
+    typeof v.createdAt === "string" &&
+    v.author != null &&
+    typeof (v.author as { did?: unknown }).did === "string"
+  );
+}
 
 function Avatar({ uri, size = 40 }: { uri?: string | null; size?: number }) {
   if (!uri) {
@@ -128,12 +141,15 @@ function extractMediaFromEmbed(
 }
 
 export function MessagePreview({ message, palette }: MessagePreviewProps) {
-  const { sender, reactions, embed } = message;
+  const { sender, reactions, embed, embeddedPost: persistedPost } = message;
   const displayName = sender?.displayName || sender?.handle || "Unknown";
   const handle = sender?.handle || "";
   const avatarUrl = sender?.avatarUrl || sender?.avatarDataURI;
 
-  const embeddedPost = useMemo<AutomationPostPreviewData | null>(() => {
+  const embeddedPost = useMemo<PostPreviewData | null>(() => {
+    if (isPostPreviewData(persistedPost)) {
+      return persistedPost;
+    }
     if (!embed || typeof embed !== "object") return null;
     const embedObj = embed as Record<string, unknown>;
     const record = embedObj.record as Record<string, unknown> | undefined;
@@ -149,7 +165,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
     const value = record.value as Record<string, unknown> | undefined;
     const media = value ? extractMediaFromEmbed(value) : [];
 
-    const post: AutomationPostPreviewData = {
+    const post: PostPreviewData = {
       uri: typeof record.uri === "string" ? record.uri : "",
       cid: typeof record.cid === "string" ? record.cid : "",
       text: value && typeof value.text === "string" ? value.text : "",
@@ -178,7 +194,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
     };
 
     return post;
-  }, [embed, message.sentAt]);
+  }, [embed, message.sentAt, persistedPost]);
 
   const [postModalVisible, setPostModalVisible] = useState(false);
 

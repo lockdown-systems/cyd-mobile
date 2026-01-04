@@ -6,7 +6,7 @@ import {
 } from "@atproto/api";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { MediaExtractor, type ExtractedMedia } from "./media-extractor";
-import type { AutomationPostPreviewData } from "./types";
+import type { PostPreviewData } from "./types";
 
 type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
 type FeedPostView = FeedViewPost["post"];
@@ -41,7 +41,7 @@ export class PostPersistence {
     db: SQLiteDatabase,
     postView: FeedPostView,
     options?: PostPersistenceOptions
-  ): Promise<AutomationPostPreviewData | null> {
+  ): Promise<PostPreviewData | null> {
     const recordInfo = this.getRecordInfo(postView.record);
     if (!recordInfo) {
       console.warn(
@@ -185,7 +185,7 @@ export class PostPersistence {
     const quoteCount =
       typeof postView.quoteCount === "number" ? postView.quoteCount : null;
 
-    const previewPost: AutomationPostPreviewData = {
+    const previewPost: PostPreviewData = {
       uri: String(postView.uri ?? ""),
       cid: String(postView.cid ?? ""),
       text: String(text ?? ""),
@@ -209,7 +209,7 @@ export class PostPersistence {
       isRepost: recordInfo.kind === "repost",
       quotedPostUri,
       media: downloadedMedia,
-    } satisfies AutomationPostPreviewData;
+    } satisfies PostPreviewData;
 
     return previewPost;
   }

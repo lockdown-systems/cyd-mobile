@@ -239,6 +239,10 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         embedJSON TEXT,
         reactionsJSON TEXT,
 
+        -- Embedded post (record) denormalized keys for easy lookup
+        embeddedPostUri TEXT,
+        embeddedPostCid TEXT,
+
         sentAt TEXT NOT NULL,
         savedAt INTEGER NOT NULL,
         deletedAt INTEGER,

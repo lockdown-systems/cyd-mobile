@@ -19,8 +19,8 @@ import type {
   SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
 import type {
-  AutomationPostPreviewData,
   AutomationPreviewData,
+  PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { AutomationProgressBar } from "./AutomationProgressBar";
@@ -57,8 +57,7 @@ export function AutomationModal({
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [activeJobProgress, setActiveJobProgress] = useState(0);
   const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
-  const [previewPost, setPreviewPost] =
-    useState<AutomationPostPreviewData | null>(null);
+  const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
   const [previewData, setPreviewData] = useState<AutomationPreviewData | null>(
     null
   );
@@ -128,11 +127,9 @@ export function AutomationModal({
     []
   );
 
-  const isPreviewPost = (
-    value: unknown
-  ): value is AutomationPostPreviewData => {
+  const isPreviewPost = (value: unknown): value is PostPreviewData => {
     if (!value || typeof value !== "object") return false;
-    const candidate = value as Partial<AutomationPostPreviewData>;
+    const candidate = value as Partial<PostPreviewData>;
     return (
       typeof candidate.uri === "string" &&
       typeof candidate.cid === "string" &&

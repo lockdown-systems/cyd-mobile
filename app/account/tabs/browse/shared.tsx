@@ -13,7 +13,7 @@ import { PostPreview } from "@/components/PostPreview";
 import { buildAccountPaths } from "@/controllers/BaseAccountController";
 import type {
   AutomationMediaAttachment,
-  AutomationPostPreviewData,
+  PostPreviewData,
 } from "@/controllers/bluesky/types";
 import { getDatabase } from "@/database";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -95,7 +95,7 @@ export function mapRowToPreview(
   row: PostRow,
   fallbackHandle: string,
   media?: AutomationMediaAttachment[]
-): AutomationPostPreviewData {
+): PostPreviewData {
   return {
     uri: row.uri,
     cid: row.cid,
@@ -279,7 +279,7 @@ export function BrowseList({
   accountId,
   type,
 }: BrowseProps & { type: BrowseType }) {
-  const [posts, setPosts] = useState<AutomationPostPreviewData[]>([]);
+  const [posts, setPosts] = useState<PostPreviewData[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -404,16 +404,13 @@ export function BrowseList({
   }, [posts, filterText]);
 
   const renderItem = useCallback(
-    ({ item }: { item: AutomationPostPreviewData }) => (
+    ({ item }: { item: PostPreviewData }) => (
       <PostPreview post={item} palette={palette} browseMode />
     ),
     [palette]
   );
 
-  const keyExtractor = useCallback(
-    (item: AutomationPostPreviewData) => item.uri,
-    []
-  );
+  const keyExtractor = useCallback((item: PostPreviewData) => item.uri, []);
 
   const handleEndReached = useCallback(() => {
     void loadMore();

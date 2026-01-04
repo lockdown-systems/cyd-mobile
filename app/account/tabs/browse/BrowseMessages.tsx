@@ -14,6 +14,7 @@ import type {
   AutomationConversationPreviewData,
   AutomationMessagePreviewData,
   AutomationProfileData,
+  PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
@@ -57,6 +58,7 @@ type MessageRow = {
   avatarDataURI: string | null;
   embedJSON: string | null;
   reactionsJSON: string | null;
+  embeddedPostUri: string | null;
 };
 
 export function BrowseMessages({ handle, palette, accountId }: Props) {
@@ -185,7 +187,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
       const db = await openAccountDb(uuid);
       const rows = await db.getAllAsync<MessageRow>(
         `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.senderDid,
-                m.embedJSON, m.reactionsJSON,
+                m.embedJSON, m.reactionsJSON, m.embeddedPostUri,
                 p.handle, p.displayName, p.avatarUrl, p.avatarDataURI
          FROM message m
          LEFT JOIN profile p ON p.did = m.senderDid
@@ -193,6 +195,115 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
          ORDER BY m.sentAt ASC, m.id ASC;`,
         [convoId]
       );
+
+      const embeddedUris = Array.from(
+        new Set(
+          rows
+            .map((r) => r.embeddedPostUri)
+            .filter((uri): uri is string => typeof uri === "string")
+        )
+      );
+
+      const postMap = new Map<string, PostPreviewData>();
+
+      if (embeddedUris.length > 0) {
+        const placeholders = embeddedUris.map(() => "?").join(",");
+
+        const postRows = await db.getAllAsync<{
+          uri: string;
+          cid: string;
+          text: string;
+          createdAt: string;
+          authorDid: string;
+          likeCount: number | null;
+          repostCount: number | null;
+          replyCount: number | null;
+          quoteCount: number | null;
+          handle: string | null;
+          displayName: string | null;
+          avatarUrl: string | null;
+          avatarDataURI: string | null;
+        }>(
+          `SELECT p.uri, p.cid, p.text, p.createdAt, p.authorDid,
+                  p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
+                  prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
+           FROM post p
+           LEFT JOIN profile prof ON prof.did = p.authorDid
+           WHERE p.uri IN (${placeholders});`,
+          embeddedUris
+        );
+
+        const mediaRows = await db.getAllAsync<{
+          postUri: string;
+          position: number;
+          mediaType: string;
+          thumbUrl: string | null;
+          fullsizeUrl: string | null;
+          playlistUrl: string | null;
+          localThumbPath: string | null;
+          localFullsizePath: string | null;
+          alt: string | null;
+          width: number | null;
+          height: number | null;
+        }>(
+          `SELECT postUri, position, mediaType, thumbUrl, fullsizeUrl, playlistUrl,
+                  localThumbPath, localFullsizePath, alt, width, height
+           FROM post_media
+           WHERE postUri IN (${placeholders})
+           ORDER BY postUri, position ASC;`,
+          embeddedUris
+        );
+
+        const mediaByPost = new Map<string, AutomationMediaAttachment[]>();
+        for (const m of mediaRows) {
+          const arr = mediaByPost.get(m.postUri) ?? [];
+          arr.push({
+            type: m.mediaType === "video" ? "video" : "image",
+            thumbUrl: m.localThumbPath ?? m.thumbUrl ?? undefined,
+            fullsizeUrl: m.localFullsizePath ?? m.fullsizeUrl ?? undefined,
+            playlistUrl: m.playlistUrl ?? undefined,
+            alt: m.alt ?? undefined,
+            width: m.width ?? undefined,
+            height: m.height ?? undefined,
+          });
+          mediaByPost.set(m.postUri, arr);
+        }
+
+        for (const p of postRows) {
+          postMap.set(p.uri, {
+            uri: p.uri,
+            cid: p.cid,
+            text: p.text,
+            createdAt: p.createdAt,
+            author: {
+              did: p.authorDid,
+              handle: p.handle ?? "unknown",
+              displayName: p.displayName,
+              avatarUrl: p.avatarUrl ?? undefined,
+              avatarDataURI: p.avatarDataURI ?? undefined,
+            },
+            likeCount: p.likeCount,
+            repostCount: p.repostCount,
+            replyCount: p.replyCount,
+            quoteCount: p.quoteCount,
+            media: mediaByPost.get(p.uri),
+          });
+        }
+      }
+
+      const parseUnknown = (value?: string | null): unknown => {
+        if (!value) return null;
+        try {
+          return JSON.parse(value) as unknown;
+        } catch {
+          return null;
+        }
+      };
+
+      const parseUnknownArray = (value?: string | null): unknown[] | null => {
+        const parsed = parseUnknown(value);
+        return Array.isArray(parsed) ? parsed : null;
+      };
 
       const mapped: AutomationMessagePreviewData[] = rows.map((row) => ({
         messageId: row.messageId,
@@ -206,8 +317,12 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
           avatarUrl: row.avatarUrl ?? row.avatarDataURI ?? undefined,
           avatarDataURI: row.avatarDataURI ?? undefined,
         },
-        embed: row.embedJSON ? JSON.parse(row.embedJSON) : null,
-        reactions: row.reactionsJSON ? JSON.parse(row.reactionsJSON) : null,
+        embed: parseUnknown(row.embedJSON),
+        reactions: parseUnknownArray(row.reactionsJSON),
+        embeddedPost:
+          row.embeddedPostUri && postMap.has(row.embeddedPostUri)
+            ? (postMap.get(row.embeddedPostUri) ?? null)
+            : null,
       }));
 
       setMessages(mapped);
@@ -228,28 +343,32 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
     }
   }, [messages, loadingMessages, selectedConvo]);
 
-  const renderConversation = useMemo(
-    () =>
-      ({ item }: { item: AutomationConversationPreviewData }) => (
-        <Pressable
-          onPress={() => {
-            setSelectedConvo(item);
-            void loadMessages(item.convoId);
-          }}
-        >
-          <ConversationPreview conversation={item} palette={palette} />
-        </Pressable>
-      ),
-    [palette]
-  );
+  const renderConversation = useMemo(() => {
+    const ConversationItem = ({
+      item,
+    }: {
+      item: AutomationConversationPreviewData;
+    }) => (
+      <Pressable
+        onPress={() => {
+          setSelectedConvo(item);
+          void loadMessages(item.convoId);
+        }}
+      >
+        <ConversationPreview conversation={item} palette={palette} />
+      </Pressable>
+    );
+    ConversationItem.displayName = "BrowseMessagesConversationItem";
+    return ConversationItem;
+  }, [palette]);
 
-  const renderMessage = useMemo(
-    () =>
-      ({ item }: { item: AutomationMessagePreviewData }) => (
-        <MessagePreview message={item} palette={palette} />
-      ),
-    [palette]
-  );
+  const renderMessage = useMemo(() => {
+    const MessageItem = ({ item }: { item: AutomationMessagePreviewData }) => (
+      <MessagePreview message={item} palette={palette} />
+    );
+    MessageItem.displayName = "BrowseMessagesMessageItem";
+    return MessageItem;
+  }, [palette]);
 
   if (loadingConvos) {
     return (

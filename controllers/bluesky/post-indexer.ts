@@ -10,7 +10,7 @@ import {
   type PostPersistenceOptions,
 } from "./post-persistence";
 import type { ApiRequestFn } from "./rate-limiter";
-import type { AutomationPostPreviewData, BlueskyProgress } from "./types";
+import type { BlueskyProgress, PostPreviewData } from "./types";
 
 type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
 type FeedPostView = FeedViewPost["post"];
@@ -255,7 +255,7 @@ export class PostIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
-    let lastPreviewPost: AutomationPostPreviewData | null = null;
+    let lastPreviewPost: PostPreviewData | null = null;
 
     for (const item of feed) {
       await this.deps.waitForPause();
@@ -297,7 +297,7 @@ export class PostIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
-    let lastPreviewPost: AutomationPostPreviewData | null = null;
+    let lastPreviewPost: PostPreviewData | null = null;
 
     for (const item of feed) {
       await this.deps.waitForPause();
@@ -346,7 +346,7 @@ export class PostIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
-    let lastPreviewPost: AutomationPostPreviewData | null = null;
+    let lastPreviewPost: PostPreviewData | null = null;
 
     for (const item of feed) {
       await this.deps.waitForPause();

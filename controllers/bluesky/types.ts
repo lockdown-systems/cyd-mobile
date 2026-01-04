@@ -32,7 +32,7 @@ export interface BlueskyProgress {
   unfollowProgress: JobProgressSegment;
 
   // Preview post for display (legacy, prefer previewData)
-  previewPost?: AutomationPostPreviewData | null;
+  previewPost?: PostPreviewData | null;
 
   // Unified preview data for posts, conversations, or messages
   previewData?: AutomationPreviewData | null;
@@ -100,7 +100,7 @@ export type AutomationMediaAttachment = {
   height?: number | null;
 };
 
-export type AutomationPostPreviewData = {
+export type PostPreviewData = {
   uri: string;
   cid: string;
   text: string;
@@ -155,13 +155,14 @@ export type AutomationMessagePreviewData = {
   sender: AutomationProfileData;
   embed?: unknown | null;
   reactions?: unknown[] | null;
+  embeddedPost?: PostPreviewData | null;
 };
 
 /**
  * Union type for all preview data types
  */
 export type AutomationPreviewData =
-  | { type: "post"; data: AutomationPostPreviewData }
+  | { type: "post"; data: PostPreviewData }
   | { type: "conversation"; data: AutomationConversationPreviewData }
   | { type: "message"; data: AutomationMessagePreviewData };
 

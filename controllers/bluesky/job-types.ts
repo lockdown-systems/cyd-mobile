@@ -1,8 +1,8 @@
 import type {
   AutomationConversationPreviewData,
   AutomationMessagePreviewData,
-  AutomationPostPreviewData,
   AutomationPreviewData,
+  PostPreviewData,
 } from "./types";
 
 export type BlueskyJobType =
@@ -35,7 +35,7 @@ export type BlueskyJobRunUpdate = {
   /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
   unknownTotal?: boolean;
   /** @deprecated Use previewData instead */
-  previewPost?: AutomationPostPreviewData | null;
+  previewPost?: PostPreviewData | null;
   /** Unified preview data for posts, conversations, or messages */
   previewData?: AutomationPreviewData | null;
 };
@@ -47,7 +47,7 @@ export type JobEmit = (update: {
   /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
   unknownTotal?: boolean;
   /** @deprecated Use previewData instead */
-  previewPost?: AutomationPostPreviewData | null;
+  previewPost?: PostPreviewData | null;
   /** Unified preview data for posts, conversations, or messages */
   previewData?: AutomationPreviewData | null;
 }) => void;
@@ -55,8 +55,8 @@ export type JobEmit = (update: {
 export type {
   AutomationConversationPreviewData,
   AutomationMessagePreviewData,
-  AutomationPostPreviewData,
   AutomationPreviewData,
+  PostPreviewData,
 };
 
 export type SaveJobOptions = {
