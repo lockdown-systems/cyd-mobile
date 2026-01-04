@@ -237,6 +237,7 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         text TEXT NOT NULL,
         facetsJSON TEXT,
         embedJSON TEXT,
+        reactionsJSON TEXT,
 
         sentAt TEXT NOT NULL,
         savedAt INTEGER NOT NULL,

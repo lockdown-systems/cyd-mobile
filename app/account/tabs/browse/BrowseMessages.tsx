@@ -55,6 +55,8 @@ type MessageRow = {
   displayName: string | null;
   avatarUrl: string | null;
   avatarDataURI: string | null;
+  embedJSON: string | null;
+  reactionsJSON: string | null;
 };
 
 export function BrowseMessages({ handle, palette, accountId }: Props) {
@@ -183,6 +185,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
       const db = await openAccountDb(uuid);
       const rows = await db.getAllAsync<MessageRow>(
         `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.senderDid,
+                m.embedJSON, m.reactionsJSON,
                 p.handle, p.displayName, p.avatarUrl, p.avatarDataURI
          FROM message m
          LEFT JOIN profile p ON p.did = m.senderDid
@@ -203,6 +206,8 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
           avatarUrl: row.avatarUrl ?? row.avatarDataURI ?? undefined,
           avatarDataURI: row.avatarDataURI ?? undefined,
         },
+        embed: row.embedJSON ? JSON.parse(row.embedJSON) : null,
+        reactions: row.reactionsJSON ? JSON.parse(row.reactionsJSON) : null,
       }));
 
       setMessages(mapped);

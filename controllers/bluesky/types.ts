@@ -153,6 +153,8 @@ export type AutomationMessagePreviewData = {
   text: string;
   sentAt: string;
   sender: AutomationProfileData;
+  embed?: unknown | null;
+  reactions?: unknown[] | null;
 };
 
 /**

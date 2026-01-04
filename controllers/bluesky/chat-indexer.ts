@@ -312,6 +312,7 @@ export class ChatIndexer {
             sender?: { did?: string };
             facets?: unknown[];
             embed?: unknown;
+            reactions?: unknown[];
           }
         | undefined;
 
@@ -322,8 +323,8 @@ export class ChatIndexer {
 
       await db.runAsync(
         `INSERT OR REPLACE INTO message (
-          messageId, convoId, rev, senderDid, text, facetsJSON, embedJSON, sentAt, savedAt, deletedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          messageId, convoId, rev, senderDid, text, facetsJSON, embedJSON, reactionsJSON, sentAt, savedAt, deletedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           msg.id ?? null,
           convoId,
@@ -332,6 +333,7 @@ export class ChatIndexer {
           msg.text,
           msg.facets ? JSON.stringify(msg.facets) : null,
           msg.embed ? JSON.stringify(msg.embed) : null,
+          msg.reactions ? JSON.stringify(msg.reactions) : null,
           msg.sentAt ?? null,
           now,
           null,
@@ -449,6 +451,8 @@ export class ChatIndexer {
           sender?: {
             did?: string;
           };
+          embed?: unknown;
+          reactions?: unknown[];
         }
       | undefined;
 
@@ -478,6 +482,8 @@ export class ChatIndexer {
       text: msg.text,
       sentAt: msg.sentAt ?? new Date().toISOString(),
       sender,
+      embed: msg.embed ?? null,
+      reactions: msg.reactions ?? null,
     };
   }
 }
