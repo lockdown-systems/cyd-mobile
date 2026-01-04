@@ -18,10 +18,7 @@ import type {
   BlueskyJobRunUpdate,
   SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
-import type {
-  AutomationPreviewData,
-  PostPreviewData,
-} from "@/controllers/bluesky/types";
+import type { PostPreviewData, PreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { AutomationProgressBar } from "./AutomationProgressBar";
 
@@ -58,9 +55,7 @@ export function AutomationModal({
   const [activeJobProgress, setActiveJobProgress] = useState(0);
   const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
   const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
-  const [previewData, setPreviewData] = useState<AutomationPreviewData | null>(
-    null
-  );
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);

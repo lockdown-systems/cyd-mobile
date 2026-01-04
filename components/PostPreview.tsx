@@ -21,7 +21,7 @@ import {
 } from "react-native";
 
 import type {
-  AutomationMediaAttachment,
+  MediaAttachment,
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -223,8 +223,9 @@ export function PostPreview({
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [videoVisible, setVideoVisible] = useState(false);
-  const [currentVideo, setCurrentVideo] =
-    useState<AutomationMediaAttachment | null>(null);
+  const [currentVideo, setCurrentVideo] = useState<MediaAttachment | null>(
+    null
+  );
 
   // Build gallery images list for browse mode
   const galleryImages: ImageItem[] = React.useMemo(() => {
@@ -252,7 +253,7 @@ export function PostPreview({
     setGalleryVisible(false);
   }, []);
 
-  const openVideo = useCallback((video: AutomationMediaAttachment) => {
+  const openVideo = useCallback((video: MediaAttachment) => {
     setCurrentVideo(video);
     setVideoVisible(true);
   }, []);

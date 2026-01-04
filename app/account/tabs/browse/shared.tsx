@@ -12,7 +12,7 @@ import {
 import { PostPreview } from "@/components/PostPreview";
 import { buildAccountPaths } from "@/controllers/BaseAccountController";
 import type {
-  AutomationMediaAttachment,
+  MediaAttachment,
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import { getDatabase } from "@/database";
@@ -94,7 +94,7 @@ export async function fetchAccountMeta(
 export function mapRowToPreview(
   row: PostRow,
   fallbackHandle: string,
-  media?: AutomationMediaAttachment[]
+  media?: MediaAttachment[]
 ): PostPreviewData {
   return {
     uri: row.uri,
@@ -117,7 +117,7 @@ export function mapRowToPreview(
   };
 }
 
-function mapMediaRowToAttachment(row: MediaRow): AutomationMediaAttachment {
+function mapMediaRowToAttachment(row: MediaRow): MediaAttachment {
   return {
     type: row.mediaType,
     alt: row.alt,
@@ -135,7 +135,7 @@ function mapMediaRowToAttachment(row: MediaRow): AutomationMediaAttachment {
 export async function fetchMediaForPosts(
   db: SQLiteDatabase,
   postUris: string[]
-): Promise<Map<string, AutomationMediaAttachment[]>> {
+): Promise<Map<string, MediaAttachment[]>> {
   if (postUris.length === 0) {
     return new Map();
   }
@@ -150,7 +150,7 @@ export async function fetchMediaForPosts(
     postUris
   );
 
-  const mediaMap = new Map<string, AutomationMediaAttachment[]>();
+  const mediaMap = new Map<string, MediaAttachment[]>();
   for (const row of mediaRows) {
     const existing = mediaMap.get(row.postUri) ?? [];
     existing.push(mapMediaRowToAttachment(row));

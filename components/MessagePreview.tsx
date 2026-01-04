@@ -2,8 +2,8 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type {
-  AutomationMediaAttachment,
-  AutomationMessagePreviewData,
+  MediaAttachment,
+  MessagePreviewData,
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -26,7 +26,7 @@ function formatTimestampFull(isoString?: string | null): string {
 }
 
 type MessagePreviewProps = {
-  message: AutomationMessagePreviewData;
+  message: MessagePreviewData;
   palette: AccountTabPalette;
 };
 
@@ -68,8 +68,8 @@ function Avatar({ uri, size = 40 }: { uri?: string | null; size?: number }) {
 
 function extractMediaFromEmbed(
   value: Record<string, unknown>
-): AutomationMediaAttachment[] {
-  const media: AutomationMediaAttachment[] = [];
+): MediaAttachment[] {
+  const media: MediaAttachment[] = [];
 
   const embedVal = value.embed as
     | (Record<string, unknown> & {
@@ -151,7 +151,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
       return persistedPost;
     }
     if (!embed || typeof embed !== "object") return null;
-    const embedObj = embed as Record<string, unknown>;
+    const embedObj = embed;
     const record = embedObj.record as Record<string, unknown> | undefined;
     if (
       !record ||

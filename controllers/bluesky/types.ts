@@ -35,7 +35,7 @@ export interface BlueskyProgress {
   previewPost?: PostPreviewData | null;
 
   // Unified preview data for posts, conversations, or messages
-  previewData?: AutomationPreviewData | null;
+  previewData?: PreviewData | null;
 
   // Status
   currentAction: string;
@@ -87,7 +87,7 @@ export interface RateLimitInfo {
   isLimited: boolean;
 }
 
-export type AutomationMediaAttachment = {
+export type MediaAttachment = {
   type: "image" | "video";
   thumbUrl?: string | null;
   fullsizeUrl?: string | null;
@@ -118,13 +118,13 @@ export type PostPreviewData = {
   quoteCount?: number | null;
   isRepost?: boolean;
   quotedPostUri?: string | null;
-  media?: AutomationMediaAttachment[];
+  media?: MediaAttachment[];
 };
 
 /**
  * Author/participant info for preview components
  */
-export type AutomationProfileData = {
+export type ProfileData = {
   did: string;
   handle: string;
   displayName?: string | null;
@@ -135,25 +135,25 @@ export type AutomationProfileData = {
 /**
  * Preview data for a chat conversation
  */
-export type AutomationConversationPreviewData = {
+export type ConversationPreviewData = {
   convoId: string;
   lastMessageText?: string | null;
   lastMessageSentAt?: string | null;
   unreadCount?: number;
   muted?: boolean;
-  members: AutomationProfileData[];
+  members: ProfileData[];
 };
 
 /**
  * Preview data for a chat message
  */
-export type AutomationMessagePreviewData = {
+export type MessagePreviewData = {
   messageId: string;
   convoId: string;
   text: string;
   sentAt: string;
-  sender: AutomationProfileData;
-  embed?: unknown | null;
+  sender: ProfileData;
+  embed?: Record<string, unknown> | null;
   reactions?: unknown[] | null;
   embeddedPost?: PostPreviewData | null;
 };
@@ -161,10 +161,10 @@ export type AutomationMessagePreviewData = {
 /**
  * Union type for all preview data types
  */
-export type AutomationPreviewData =
+export type PreviewData =
   | { type: "post"; data: PostPreviewData }
-  | { type: "conversation"; data: AutomationConversationPreviewData }
-  | { type: "message"; data: AutomationMessagePreviewData };
+  | { type: "conversation"; data: ConversationPreviewData }
+  | { type: "message"; data: MessagePreviewData };
 
 /**
  * Database statistics for the account

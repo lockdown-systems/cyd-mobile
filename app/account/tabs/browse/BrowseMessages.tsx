@@ -11,10 +11,11 @@ import {
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { MessagePreview } from "@/components/MessagePreview";
 import type {
-  AutomationConversationPreviewData,
-  AutomationMessagePreviewData,
-  AutomationProfileData,
+  ConversationPreviewData,
+  MediaAttachment,
+  MessagePreviewData,
   PostPreviewData,
+  ProfileData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
@@ -62,19 +63,17 @@ type MessageRow = {
 };
 
 export function BrowseMessages({ handle, palette, accountId }: Props) {
-  const [conversations, setConversations] = useState<
-    AutomationConversationPreviewData[]
-  >([]);
-  const [messages, setMessages] = useState<AutomationMessagePreviewData[]>([]);
+  const [conversations, setConversations] = useState<ConversationPreviewData[]>(
+    []
+  );
+  const [messages, setMessages] = useState<MessagePreviewData[]>([]);
   const [loadingConvos, setLoadingConvos] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedConvo, setSelectedConvo] =
-    useState<AutomationConversationPreviewData | null>(null);
+    useState<ConversationPreviewData | null>(null);
   const accountUuidRef = useRef<string | null>(null);
-  const messagesListRef = useRef<FlatList<AutomationMessagePreviewData> | null>(
-    null
-  );
+  const messagesListRef = useRef<FlatList<MessagePreviewData> | null>(null);
 
   useEffect(() => {
     void loadConversations();
@@ -149,7 +148,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
           }
         })();
 
-        const members: AutomationProfileData[] = memberDids.map((did) => {
+        const members: ProfileData[] = memberDids.map((did) => {
           const prof = profilesByDid.get(did);
           return {
             did,
@@ -167,7 +166,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
           unreadCount: row.unreadCount,
           muted: row.muted === 1,
           members,
-        } satisfies AutomationConversationPreviewData;
+        } satisfies ConversationPreviewData;
       });
 
       setConversations(mapped);
@@ -254,7 +253,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
           embeddedUris
         );
 
-        const mediaByPost = new Map<string, AutomationMediaAttachment[]>();
+        const mediaByPost = new Map<string, MediaAttachment[]>();
         for (const m of mediaRows) {
           const arr = mediaByPost.get(m.postUri) ?? [];
           arr.push({
@@ -305,7 +304,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
         return Array.isArray(parsed) ? parsed : null;
       };
 
-      const mapped: AutomationMessagePreviewData[] = rows.map((row) => ({
+      const mapped: MessagePreviewData[] = rows.map((row) => ({
         messageId: row.messageId,
         convoId: row.convoId,
         text: row.text,
@@ -344,11 +343,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
   }, [messages, loadingMessages, selectedConvo]);
 
   const renderConversation = useMemo(() => {
-    const ConversationItem = ({
-      item,
-    }: {
-      item: AutomationConversationPreviewData;
-    }) => (
+    const ConversationItem = ({ item }: { item: ConversationPreviewData }) => (
       <Pressable
         onPress={() => {
           setSelectedConvo(item);
@@ -363,7 +358,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
   }, [palette]);
 
   const renderMessage = useMemo(() => {
-    const MessageItem = ({ item }: { item: AutomationMessagePreviewData }) => (
+    const MessageItem = ({ item }: { item: MessagePreviewData }) => (
       <MessagePreview message={item} palette={palette} />
     );
     MessageItem.displayName = "BrowseMessagesMessageItem";

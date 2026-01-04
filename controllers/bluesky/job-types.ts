@@ -1,8 +1,8 @@
 import type {
-  AutomationConversationPreviewData,
-  AutomationMessagePreviewData,
-  AutomationPreviewData,
+  ConversationPreviewData,
+  MessagePreviewData,
   PostPreviewData,
+  PreviewData,
 } from "./types";
 
 export type BlueskyJobType =
@@ -37,7 +37,7 @@ export type BlueskyJobRunUpdate = {
   /** @deprecated Use previewData instead */
   previewPost?: PostPreviewData | null;
   /** Unified preview data for posts, conversations, or messages */
-  previewData?: AutomationPreviewData | null;
+  previewData?: PreviewData | null;
 };
 
 export type JobEmit = (update: {
@@ -49,14 +49,14 @@ export type JobEmit = (update: {
   /** @deprecated Use previewData instead */
   previewPost?: PostPreviewData | null;
   /** Unified preview data for posts, conversations, or messages */
-  previewData?: AutomationPreviewData | null;
+  previewData?: PreviewData | null;
 }) => void;
 
 export type {
-  AutomationConversationPreviewData,
-  AutomationMessagePreviewData,
-  AutomationPreviewData,
+  ConversationPreviewData,
+  MessagePreviewData,
   PostPreviewData,
+  PreviewData,
 };
 
 export type SaveJobOptions = {
