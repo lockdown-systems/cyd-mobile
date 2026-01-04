@@ -3,7 +3,7 @@ import type {
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 
-const MAX_QUOTE_DEPTH = 5;
+const MAX_QUOTE_DEPTH = 20;
 
 function extractMediaFromEmbedValue(embed: unknown): MediaAttachment[] {
   if (!embed || typeof embed !== "object") return [];
@@ -89,6 +89,47 @@ function pickRecord(embed: unknown): Record<string, unknown> | null {
   return null;
 }
 
+/**
+ * Find a nested record embed from various possible locations in the Bluesky embed structure.
+ * The API can place nested record embeds in:
+ * - record.embeds[n] (hydrated view of what the quoted post embeds)
+ * - record.value.embed.record (raw record data)
+ * - embed.media.record (for recordWithMedia embeds)
+ */
+function findNestedRecordEmbed(
+  record: Record<string, unknown>
+): Record<string, unknown> | null {
+  // Check record.embeds array first (hydrated embed views)
+  const embeds = record.embeds as unknown[] | undefined;
+  if (Array.isArray(embeds)) {
+    for (const e of embeds) {
+      if (!e || typeof e !== "object") continue;
+      const embedObj = e as { record?: unknown; $type?: string };
+      // Look for record embeds
+      if (
+        embedObj.record &&
+        typeof embedObj.record === "object" &&
+        typeof (embedObj.record as { uri?: unknown }).uri === "string"
+      ) {
+        return embedObj.record as Record<string, unknown>;
+      }
+    }
+  }
+
+  // Check value.embed.record (raw record structure)
+  const value = record.value as Record<string, unknown> | undefined;
+  const valueEmbed = value?.embed as { record?: unknown } | undefined;
+  if (
+    valueEmbed?.record &&
+    typeof valueEmbed.record === "object" &&
+    typeof (valueEmbed.record as { uri?: unknown }).uri === "string"
+  ) {
+    return valueEmbed.record as Record<string, unknown>;
+  }
+
+  return null;
+}
+
 export function extractEmbeddedPost(
   embed: unknown,
   fallbackCreatedAt: string,
@@ -114,23 +155,39 @@ export function extractEmbeddedPost(
   const createdAt =
     typeof value?.createdAt === "string" ? value.createdAt : fallbackCreatedAt;
 
-  // For quoted posts, only extract media from the record's own embed, not the parent
-  const mediaSource = value?.embed as Record<string, unknown> | undefined;
-  const media = mediaSource ? extractMediaFromEmbedValue(mediaSource) : [];
+  // For media, check both record.embeds (hydrated) and value.embed (raw)
+  const embeds = record.embeds as unknown[] | undefined;
+  let media: MediaAttachment[] = [];
+  if (Array.isArray(embeds)) {
+    for (const e of embeds) {
+      if (!e || typeof e !== "object") continue;
+      const extracted = extractMediaFromEmbedValue(e);
+      if (extracted.length > 0) {
+        media = extracted;
+        break;
+      }
+    }
+  }
+  if (media.length === 0 && value?.embed) {
+    media = extractMediaFromEmbedValue(value.embed);
+  }
 
-  const nestedRecord =
-    (value?.embed as { record?: unknown })?.record ??
-    (mediaSource as { record?: unknown })?.record;
+  // Find nested quoted post using improved logic
+  const nestedRecord = findNestedRecordEmbed(record);
 
-  const nestedQuoted =
-    nestedRecord && depth < MAX_QUOTE_DEPTH
-      ? extractEmbeddedPost(nestedRecord, createdAt, depth + 1)
-      : null;
+  let nestedQuoted: PostPreviewData | null = null;
+  let nestedQuotedUri: string | null = null;
 
-  const nestedQuotedUri =
-    nestedRecord && typeof (nestedRecord as { uri?: unknown }).uri === "string"
-      ? (nestedRecord as { uri: string }).uri
-      : null;
+  if (nestedRecord && depth < MAX_QUOTE_DEPTH) {
+    nestedQuotedUri =
+      typeof nestedRecord.uri === "string" ? nestedRecord.uri : null;
+    // Wrap the nested record in a structure that extractEmbeddedPost expects
+    nestedQuoted = extractEmbeddedPost(
+      { record: nestedRecord },
+      createdAt,
+      depth + 1
+    );
+  }
 
   const quotedPost: PostPreviewData = {
     uri: uri ?? "",
