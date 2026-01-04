@@ -7,7 +7,7 @@ import {
 } from "@atproto/api";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { MediaExtractor, type ExtractedMedia } from "./media-extractor";
-import type { PostPreviewData } from "./types";
+import type { ExternalEmbed, PostPreviewData } from "./types";
 
 type FeedViewPost = AppBskyFeedGetAuthorFeed.OutputSchema["feed"][number];
 type FeedPostView = FeedViewPost["post"];
@@ -176,7 +176,7 @@ export class PostPersistence {
     );
 
     // Extract and save external link embeds
-    await this.saveExternalEmbed(db, postView);
+    const externalEmbed = await this.saveExternalEmbed(db, postView);
 
     const author = postView.author;
     const likeCount =
@@ -213,6 +213,8 @@ export class PostPersistence {
       quotedPostUri,
       quotedPost,
       media: downloadedMedia,
+      facets: postRecord?.facets ?? null,
+      externalEmbed,
     } satisfies PostPreviewData;
 
     return previewPost;
@@ -406,10 +408,10 @@ export class PostPersistence {
   private async saveExternalEmbed(
     db: SQLiteDatabase,
     postView: FeedPostView
-  ): Promise<void> {
+  ): Promise<ExternalEmbed | null> {
     const external = this.mediaExtractor.extractExternal(postView);
     if (!external) {
-      return;
+      return null;
     }
 
     const did = this.requireDid();
@@ -447,6 +449,14 @@ export class PostPersistence {
         thumbLocalPath,
       ]
     );
+
+    return {
+      uri: external.uri,
+      title: external.title,
+      description: external.description,
+      thumbUrl: external.thumbUrl,
+      thumbLocalPath,
+    };
   }
 
   private isPostRecord(

@@ -12,6 +12,7 @@ import {
 import { PostPreview } from "@/components/PostPreview";
 import { buildAccountPaths } from "@/controllers/BaseAccountController";
 import type {
+  ExternalEmbed,
   MediaAttachment,
   PostPreviewData,
 } from "@/controllers/bluesky/types";
@@ -38,6 +39,7 @@ export type PostRow = {
   authorDid: string;
   text: string;
   createdAt: string;
+  facetsJSON: string | null;
   embedJSON: string | null;
   quotedPostUri: string | null;
   likeCount: number | null;
@@ -64,6 +66,15 @@ export type MediaRow = {
   localThumbPath: string | null;
   localFullsizePath: string | null;
   localVideoPath: string | null;
+};
+
+export type ExternalRow = {
+  postUri: string;
+  uri: string;
+  title: string;
+  description: string | null;
+  thumbUrl: string | null;
+  thumbLocalPath: string | null;
 };
 
 export type Cursor = {
@@ -94,12 +105,24 @@ export async function fetchAccountMeta(
   };
 }
 
+function parseFacets(facetsJSON: string | null): unknown[] | null {
+  if (!facetsJSON) return null;
+  try {
+    const parsed: unknown = JSON.parse(facetsJSON);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function mapRowToPreview(
   row: PostRow,
   fallbackHandle: string,
-  media?: MediaAttachment[]
+  media?: MediaAttachment[],
+  externalEmbed?: ExternalEmbed | null
 ): PostPreviewData {
   const quotedPost = extractEmbeddedPostFromJson(row.embedJSON, row.createdAt);
+  const facets = parseFacets(row.facetsJSON);
 
   return {
     uri: row.uri,
@@ -121,6 +144,8 @@ export function mapRowToPreview(
     quotedPostUri: row.quotedPostUri,
     quotedPost,
     media,
+    facets,
+    externalEmbed,
   };
 }
 
@@ -167,6 +192,36 @@ export async function fetchMediaForPosts(
   return mediaMap;
 }
 
+export async function fetchExternalEmbedsForPosts(
+  db: SQLiteDatabase,
+  postUris: string[]
+): Promise<Map<string, ExternalEmbed>> {
+  if (postUris.length === 0) {
+    return new Map();
+  }
+
+  const placeholders = postUris.map(() => "?").join(",");
+  const externalRows = await db.getAllAsync<ExternalRow>(
+    `SELECT postUri, uri, title, description, thumbUrl, thumbLocalPath
+     FROM post_external
+     WHERE postUri IN (${placeholders});`,
+    postUris
+  );
+
+  const externalMap = new Map<string, ExternalEmbed>();
+  for (const row of externalRows) {
+    externalMap.set(row.postUri, {
+      uri: row.uri,
+      title: row.title,
+      description: row.description,
+      thumbUrl: row.thumbUrl,
+      thumbLocalPath: row.thumbLocalPath,
+    });
+  }
+
+  return externalMap;
+}
+
 export async function openAccountDb(uuid: string): Promise<SQLiteDatabase> {
   const db = await openDatabaseAsync(
     buildAccountPaths("bluesky", uuid).dbPathForSQLite
@@ -184,7 +239,7 @@ export function buildFirstPageQuery(type: BrowseType): string {
   const baseSelect = `
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
-      p.embedJSON, p.quotedPostUri,
+      p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
     FROM post p
@@ -213,7 +268,7 @@ export function buildLoadMoreQuery(type: BrowseType): string {
   const baseSelect = `
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
-      p.embedJSON, p.quotedPostUri,
+      p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
     FROM post p
@@ -333,12 +388,20 @@ export function BrowseList({
       const params = getFirstPageParams(type, meta.did);
       const rows = await db.getAllAsync<PostRow>(query, params);
 
-      // Fetch media for these posts
+      // Fetch media and external embeds for these posts
       const postUris = rows.map((r) => r.uri);
-      const mediaMap = await fetchMediaForPosts(db, postUris);
+      const [mediaMap, externalMap] = await Promise.all([
+        fetchMediaForPosts(db, postUris),
+        fetchExternalEmbedsForPosts(db, postUris),
+      ]);
 
       const mapped = rows.map((row) =>
-        mapRowToPreview(row, meta.handle ?? handle, mediaMap.get(row.uri))
+        mapRowToPreview(
+          row,
+          meta.handle ?? handle,
+          mediaMap.get(row.uri),
+          externalMap.get(row.uri) ?? null
+        )
       );
       setPosts(mapped);
       setHasMore(rows.length === PAGE_SIZE);
@@ -373,12 +436,20 @@ export function BrowseList({
       const params = getLoadMoreParams(type, meta.did, cursor);
       const rows = await db.getAllAsync<PostRow>(query, params);
 
-      // Fetch media for these posts
+      // Fetch media and external embeds for these posts
       const postUris = rows.map((r) => r.uri);
-      const mediaMap = await fetchMediaForPosts(db, postUris);
+      const [mediaMap, externalMap] = await Promise.all([
+        fetchMediaForPosts(db, postUris),
+        fetchExternalEmbedsForPosts(db, postUris),
+      ]);
 
       const mapped = rows.map((row) =>
-        mapRowToPreview(row, meta.handle ?? handle, mediaMap.get(row.uri))
+        mapRowToPreview(
+          row,
+          meta.handle ?? handle,
+          mediaMap.get(row.uri),
+          externalMap.get(row.uri) ?? null
+        )
       );
       setPosts((prev) => [...prev, ...mapped]);
       setHasMore(rows.length === PAGE_SIZE);

@@ -1,4 +1,5 @@
 import type {
+  ExternalEmbed,
   MediaAttachment,
   PostPreviewData,
 } from "@/controllers/bluesky/types";
@@ -68,6 +69,36 @@ function extractMediaFromEmbedValue(embed: unknown): MediaAttachment[] {
   }
 
   return media;
+}
+
+function extractExternalFromEmbed(embeds: unknown[]): ExternalEmbed | null {
+  for (const embed of embeds) {
+    if (!embed || typeof embed !== "object") continue;
+    const embedObj = embed as {
+      external?: {
+        uri?: string;
+        title?: string;
+        description?: string;
+        thumb?: string;
+      };
+      $type?: string;
+    };
+
+    // Check for external embed (link preview)
+    if (
+      embedObj.external &&
+      typeof embedObj.external.uri === "string" &&
+      typeof embedObj.external.title === "string"
+    ) {
+      return {
+        uri: embedObj.external.uri,
+        title: embedObj.external.title,
+        description: embedObj.external.description ?? null,
+        thumbUrl: embedObj.external.thumb ?? null,
+      };
+    }
+  }
+  return null;
 }
 
 function safeParseEmbed(embedJson?: string | null): unknown {
@@ -155,10 +186,13 @@ export function extractEmbeddedPost(
   const createdAt =
     typeof value?.createdAt === "string" ? value.createdAt : fallbackCreatedAt;
 
-  // For media, check both record.embeds (hydrated) and value.embed (raw)
+  // For media and external embeds, check both record.embeds (hydrated) and value.embed (raw)
   const embeds = record.embeds as unknown[] | undefined;
   let media: MediaAttachment[] = [];
+  let externalEmbed: ExternalEmbed | null = null;
+
   if (Array.isArray(embeds)) {
+    // Extract media
     for (const e of embeds) {
       if (!e || typeof e !== "object") continue;
       const extracted = extractMediaFromEmbedValue(e);
@@ -167,6 +201,8 @@ export function extractEmbeddedPost(
         break;
       }
     }
+    // Extract external embed
+    externalEmbed = extractExternalFromEmbed(embeds);
   }
   if (media.length === 0 && value?.embed) {
     media = extractMediaFromEmbedValue(value.embed);
@@ -221,6 +257,7 @@ export function extractEmbeddedPost(
     replyCount,
     quoteCount,
     media: media.length > 0 ? media : undefined,
+    externalEmbed,
     quotedPostUri: nestedQuotedUri,
     quotedPost: nestedQuoted,
   };

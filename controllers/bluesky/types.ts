@@ -100,6 +100,14 @@ export type MediaAttachment = {
   height?: number | null;
 };
 
+export type ExternalEmbed = {
+  uri: string;
+  title: string;
+  description?: string | null;
+  thumbUrl?: string | null;
+  thumbLocalPath?: string | null;
+};
+
 export type PostPreviewData = {
   uri: string;
   cid: string;
@@ -120,6 +128,8 @@ export type PostPreviewData = {
   quotedPostUri?: string | null;
   quotedPost?: PostPreviewData | null;
   media?: MediaAttachment[];
+  facets?: unknown[] | null;
+  externalEmbed?: ExternalEmbed | null;
 };
 
 /**

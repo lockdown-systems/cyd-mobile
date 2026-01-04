@@ -2,6 +2,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type JSX,
@@ -10,6 +11,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Linking,
   Modal,
   Pressable,
   StyleSheet,
@@ -21,6 +23,7 @@ import {
 } from "react-native";
 
 import type {
+  ExternalEmbed,
   MediaAttachment,
   PostPreviewData,
 } from "@/controllers/bluesky/types";
@@ -195,6 +198,81 @@ function VideoPlayerModal({
   );
 }
 
+function toNiceDomain(url: string): string {
+  try {
+    const host = new URL(url).host;
+    // Strip www. prefix if present
+    return host.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function ExternalEmbedCard({
+  embed,
+  palette,
+}: {
+  embed: ExternalEmbed;
+  palette: AccountTabPalette;
+}) {
+  const handlePress = useCallback(() => {
+    void (async () => {
+      try {
+        const supported = await Linking.canOpenURL(embed.uri);
+        if (supported) {
+          await Linking.openURL(embed.uri);
+        }
+      } catch (err) {
+        console.warn("Failed to open URL", embed.uri, err);
+      }
+    })();
+  }, [embed.uri]);
+
+  const thumbUri = embed.thumbLocalPath ?? embed.thumbUrl;
+
+  return (
+    <Pressable
+      style={[
+        styles.externalCard,
+        {
+          borderColor: palette.icon + "44",
+          backgroundColor: palette.background,
+        },
+      ]}
+      onPress={handlePress}
+    >
+      {thumbUri && (
+        <Image
+          source={{ uri: thumbUri }}
+          style={styles.externalThumb}
+          resizeMode="cover"
+        />
+      )}
+      <View style={styles.externalContent}>
+        <Text
+          style={[styles.externalDomain, { color: palette.icon }]}
+          numberOfLines={1}
+        >
+          🔗 {toNiceDomain(embed.uri)}
+        </Text>
+        <Text
+          style={[styles.externalTitle, { color: palette.text }]}
+          numberOfLines={2}
+        >
+          {embed.title}
+        </Text>
+        {embed.description ? (
+          <Text
+            style={[styles.externalDescription, { color: palette.icon }]}
+            numberOfLines={2}
+          >
+            {embed.description}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
 export function PostPreview({
   post,
   palette,
@@ -207,6 +285,120 @@ export function PostPreview({
     null
   );
   const [quotedModalVisible, setQuotedModalVisible] = useState(false);
+
+  const handleLinkPress = useCallback(async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      }
+    } catch (err) {
+      console.warn("Failed to open URL", url, err);
+    }
+  }, []);
+
+  // Parse facets to render links
+  const textNodes = useMemo(() => {
+    if (!post.text) return null;
+
+    type Facet = {
+      index?: { byteStart?: number; byteEnd?: number };
+      features?: { $type?: string; uri?: string; did?: string }[];
+    };
+
+    const facets = Array.isArray(post.facets) ? (post.facets as Facet[]) : [];
+
+    type SpanItem = {
+      start: number;
+      end: number;
+      type: "link" | "mention";
+      uri?: string;
+    };
+
+    // Collect all link/mention spans
+    const spans: SpanItem[] = facets
+      .map((facet): SpanItem | null => {
+        const link = facet.features?.find(
+          (f) => f && typeof f === "object" && f.$type?.includes("#link")
+        );
+        const mention = facet.features?.find(
+          (f) => f && typeof f === "object" && f.$type?.includes("#mention")
+        );
+        const start = facet.index?.byteStart ?? null;
+        const end = facet.index?.byteEnd ?? null;
+
+        if (start == null || end == null) return null;
+
+        if (link && typeof link.uri === "string") {
+          return { start, end, type: "link", uri: link.uri };
+        }
+        if (mention && typeof mention.did === "string") {
+          return { start, end, type: "mention" };
+        }
+        return null;
+      })
+      .filter((span): span is SpanItem => span !== null)
+      .sort((a, b) => a.start - b.start);
+
+    if (spans.length === 0) {
+      return <Text style={{ color: palette.text }}>{post.text}</Text>;
+    }
+
+    const segments: {
+      text: string;
+      type?: "link" | "mention";
+      uri?: string;
+    }[] = [];
+    let cursor = 0;
+    for (const span of spans) {
+      const safeStart = Math.max(0, Math.min(span.start, post.text.length));
+      const safeEnd = Math.max(safeStart, Math.min(span.end, post.text.length));
+
+      if (safeStart > cursor) {
+        segments.push({ text: post.text.slice(cursor, safeStart) });
+      }
+      segments.push({
+        text: post.text.slice(safeStart, safeEnd),
+        type: span.type,
+        uri: span.type === "link" ? span.uri : undefined,
+      });
+      cursor = safeEnd;
+    }
+    if (cursor < post.text.length) {
+      segments.push({ text: post.text.slice(cursor) });
+    }
+
+    return segments.map((segment, index) => {
+      if (segment.type === "link" && segment.uri) {
+        return (
+          <Text
+            key={`link-${index}`}
+            style={[styles.linkText, { color: palette.tint }]}
+            onPress={() => {
+              void handleLinkPress(segment.uri ?? segment.text);
+            }}
+          >
+            {segment.text}
+          </Text>
+        );
+      }
+      if (segment.type === "mention") {
+        return (
+          <Text
+            key={`mention-${index}`}
+            style={[styles.linkText, { color: palette.tint }]}
+          >
+            {segment.text}
+          </Text>
+        );
+      }
+      return (
+        <Text key={`text-${index}`} style={{ color: palette.text }}>
+          {segment.text}
+        </Text>
+      );
+    });
+  }, [handleLinkPress, post.facets, post.text, palette.text, palette.tint]);
 
   // Build gallery images list for browse mode
   const galleryImages: ImageItem[] = React.useMemo(() => {
@@ -305,8 +497,14 @@ export function PostPreview({
         </View>
       </View>
       <Text style={[styles.bodyText, { color: palette.text }]}>
-        {post.text}
+        {textNodes}
       </Text>
+
+      {/* External embed (link preview) */}
+      {post.externalEmbed && (
+        <ExternalEmbedCard embed={post.externalEmbed} palette={palette} />
+      )}
+
       {post.quotedPost && (
         <EmbeddedPostSnippet
           post={post.quotedPost}
@@ -646,6 +844,38 @@ const styles = StyleSheet.create({
   modalCloseText: {
     fontSize: 15,
     fontWeight: "600",
+  },
+  // External embed (link preview) styles
+  externalCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginTop: 8,
+  },
+  externalThumb: {
+    width: "100%",
+    aspectRatio: 1200 / 630,
+    backgroundColor: "#0001",
+  },
+  externalContent: {
+    padding: 12,
+    gap: 4,
+  },
+  externalDomain: {
+    fontSize: 13,
+  },
+  externalTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  externalDescription: {
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  // Facet link styles
+  linkText: {
+    textDecorationLine: "underline",
   },
 });
 
