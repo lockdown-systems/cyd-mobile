@@ -26,29 +26,8 @@ import type {
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
+import { formatNumber, formatTimestampFull } from "@/utils/formatting";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-function formatNumber(num: number | null | undefined): string {
-  if (num == null) return "0";
-  return num.toLocaleString();
-}
-
-function formatTimestamp(isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "now";
-  if (diffMins < 60) return `${diffMins}m`;
-  if (diffHours < 24) return `${diffHours}h`;
-  if (diffDays < 7) return `${diffDays}d`;
-
-  // For older posts, show date
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 type PostPreviewProps = {
   post: PostPreviewData;
@@ -298,6 +277,7 @@ export function PostPreview({
           <Text
             style={[styles.displayName, { color: palette.text }]}
             numberOfLines={1}
+            ellipsizeMode="tail"
           >
             {post.author.displayName || post.author.handle}
           </Text>
@@ -305,12 +285,9 @@ export function PostPreview({
             <Text
               style={[styles.handle, { color: palette.icon }]}
               numberOfLines={1}
+              ellipsizeMode="tail"
             >
               @{post.author.handle}
-            </Text>
-            <Text style={[styles.timestamp, { color: palette.icon }]}>•</Text>
-            <Text style={[styles.timestamp, { color: palette.icon }]}>
-              {formatTimestamp(post.createdAt)}
             </Text>
           </View>
         </View>
@@ -424,6 +401,9 @@ export function PostPreview({
           {formatNumber(post.quoteCount)} 💬 {formatNumber(post.replyCount)}
         </Text>
       </View>
+      <Text style={[styles.timestampFull, { color: palette.icon }]}>
+        Posted {formatTimestampFull(post.createdAt)}
+      </Text>
     </View>
   );
 }
@@ -455,9 +435,6 @@ const styles = StyleSheet.create({
   handle: {
     fontSize: 15,
   },
-  timestamp: {
-    fontSize: 15,
-  },
   avatar: {
     width: 44,
     height: 44,
@@ -479,6 +456,9 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontSize: 14,
+  },
+  timestampFull: {
+    fontSize: 13,
   },
   mediaGrid: {
     flexDirection: "row",

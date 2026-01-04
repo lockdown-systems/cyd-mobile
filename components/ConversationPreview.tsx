@@ -1,28 +1,12 @@
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
-import type { AutomationConversationPreviewData } from "@/controllers/bluesky/types";
+import type { ConversationPreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
-
-function formatTimestamp(isoString?: string | null): string {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "now";
-  if (diffMins < 60) return `${diffMins}m`;
-  if (diffHours < 24) return `${diffHours}h`;
-  if (diffDays < 7) return `${diffDays}d`;
-
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+import { formatTimestampFull } from "@/utils/formatting";
 
 type ConversationPreviewProps = {
-  conversation: AutomationConversationPreviewData;
+  conversation: ConversationPreviewData;
   palette: AccountTabPalette;
 };
 
@@ -74,11 +58,6 @@ export function ConversationPreview({
             >
               {displayName}
             </Text>
-            {conversation.lastMessageSentAt && (
-              <Text style={[styles.timestamp, { color: palette.icon }]}>
-                · {formatTimestamp(conversation.lastMessageSentAt)}
-              </Text>
-            )}
           </View>
           <Text
             style={[styles.handle, { color: palette.icon }]}
@@ -99,6 +78,13 @@ export function ConversationPreview({
       {conversation.muted && (
         <View style={[styles.mutedBadge, { backgroundColor: palette.icon }]}>
           <Text style={styles.mutedText}>Muted</Text>
+        </View>
+      )}
+      {conversation.lastMessageSentAt && (
+        <View style={[styles.metdataContainer]}>
+          <Text style={[styles.timestamp, { color: palette.icon }]}>
+            Sent {formatTimestampFull(conversation.lastMessageSentAt)}
+          </Text>
         </View>
       )}
     </View>
@@ -159,6 +145,9 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "500",
+  },
+  metdataContainer: {
+    marginTop: 10,
   },
 });
 

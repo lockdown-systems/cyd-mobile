@@ -15,23 +15,8 @@ import type {
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
+import { formatTimestampFull } from "@/utils/formatting";
 import { PostPreview } from "./PostPreview";
-
-function formatTimestampFull(isoString?: string | null): string {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-
-  // Format: "Jan 4, 2026, 5:19:23 PM"
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-}
 
 type MessagePreviewProps = {
   message: MessagePreviewData;
