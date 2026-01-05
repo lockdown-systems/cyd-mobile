@@ -28,6 +28,13 @@ type Props = {
   palette: AccountTabPalette;
   accountId?: number;
   onCountChange?: (count: number, label: string) => void;
+  onHeaderChange?: (
+    header: {
+      visible: boolean;
+      title: string;
+      onBack: () => void;
+    } | null
+  ) => void;
 };
 
 type ConversationRow = {
@@ -70,6 +77,7 @@ export function BrowseMessages({
   palette,
   accountId,
   onCountChange,
+  onHeaderChange,
 }: Props) {
   const [conversations, setConversations] = useState<ConversationPreviewData[]>(
     []
@@ -362,6 +370,8 @@ export function BrowseMessages({
         conversations.length,
         `Showing ${conversations.length.toLocaleString()} chat conversation${conversations.length === 1 ? "" : "s"}`
       );
+      // Clear header when not viewing a conversation
+      onHeaderChange?.(null);
     }
   }, [
     conversations.length,
@@ -369,6 +379,7 @@ export function BrowseMessages({
     loadingConvos,
     error,
     onCountChange,
+    onHeaderChange,
   ]);
 
   // Report message count when viewing a specific conversation
@@ -382,8 +393,26 @@ export function BrowseMessages({
         messages.length,
         `Showing ${messages.length.toLocaleString()} message${messages.length === 1 ? "" : "s"} with ${memberName}`
       );
+      // Report header info
+      onHeaderChange?.({
+        visible: true,
+        title:
+          selectedConvo.members[0]?.displayName ||
+          selectedConvo.members[0]?.handle ||
+          "Conversation",
+        onBack: () => {
+          setSelectedConvo(null);
+          setMessages([]);
+        },
+      });
     }
-  }, [messages.length, selectedConvo, loadingMessages, onCountChange]);
+  }, [
+    messages.length,
+    selectedConvo,
+    loadingMessages,
+    onCountChange,
+    onHeaderChange,
+  ]);
 
   const renderConversation = useMemo(() => {
     const ConversationItem = ({ item }: { item: ConversationPreviewData }) => (
@@ -442,24 +471,6 @@ export function BrowseMessages({
   if (selectedConvo) {
     return (
       <View style={styles.flex}>
-        <View style={styles.headerRow}>
-          <Pressable
-            onPress={() => {
-              setSelectedConvo(null);
-              setMessages([]);
-            }}
-          >
-            <Text style={[styles.backText, { color: palette.tint }]}>
-              ◀ Back
-            </Text>
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: palette.text }]}>
-            {selectedConvo.members[0]?.displayName ||
-              selectedConvo.members[0]?.handle ||
-              "Conversation"}
-          </Text>
-        </View>
-
         {loadingMessages ? (
           <View style={styles.centered}>
             <ActivityIndicator color={palette.tint} />

@@ -21,6 +21,13 @@ type CategoryComponentProps = {
   palette: AccountTabPalette;
   accountId?: number;
   onCountChange?: (count: number, label: string) => void;
+  onHeaderChange?: (
+    header: {
+      visible: boolean;
+      title: string;
+      onBack: () => void;
+    } | null
+  ) => void;
 };
 
 type CategoryComponent = ComponentType<CategoryComponentProps>;
@@ -42,14 +49,29 @@ const CATEGORY_COMPONENTS: Record<BrowseCategory, CategoryComponent> = {
 export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
   const [category, setCategory] = useState<BrowseCategory>("posts");
   const [countLabel, setCountLabel] = useState<string>("");
+  const [conversationHeader, setConversationHeader] = useState<{
+    visible: boolean;
+    title: string;
+    onBack: () => void;
+  } | null>(null);
 
   const handleCountChange = useCallback((newCount: number, label: string) => {
     setCountLabel(label);
   }, []);
 
-  // Reset count label when switching tabs
+  const handleHeaderChange = useCallback(
+    (
+      header: { visible: boolean; title: string; onBack: () => void } | null
+    ) => {
+      setConversationHeader(header);
+    },
+    []
+  );
+
+  // Reset count label and header when switching tabs
   useEffect(() => {
     setCountLabel("");
+    setConversationHeader(null);
   }, [category]);
 
   const ActiveCategory = useMemo(
@@ -99,6 +121,27 @@ export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
         </ScrollView>
       </View>
 
+      {conversationHeader && (
+        <View
+          style={[
+            styles.conversationHeader,
+            {
+              backgroundColor: palette.background,
+              borderBottomColor: palette.icon,
+            },
+          ]}
+        >
+          <Pressable onPress={conversationHeader.onBack}>
+            <Text style={[styles.backText, { color: palette.tint }]}>
+              ◀ Back
+            </Text>
+          </Pressable>
+          <Text style={[styles.conversationTitle, { color: palette.text }]}>
+            {conversationHeader.title}
+          </Text>
+        </View>
+      )}
+
       {countLabel && (
         <View style={[styles.countBar]}>
           <Text style={[styles.countText, { color: palette.icon }]}>
@@ -112,6 +155,7 @@ export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
         palette={palette}
         accountId={accountId}
         onCountChange={handleCountChange}
+        onHeaderChange={handleHeaderChange}
       />
     </View>
   );
@@ -133,6 +177,23 @@ const styles = StyleSheet.create({
   tabsContainer: {
     marginBottom: 0,
     paddingBottom: 12,
+  },
+  conversationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  conversationTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    flexShrink: 1,
   },
   tabsContent: {
     flexDirection: "row",
