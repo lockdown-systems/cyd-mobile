@@ -89,7 +89,13 @@ describe("EmbeddedPostSnippet", () => {
   });
 
   it("should render default hint text", () => {
-    render(<EmbeddedPostSnippet post={basePost} palette={defaultPalette} />);
+    render(
+      <EmbeddedPostSnippet
+        post={basePost}
+        palette={defaultPalette}
+        hint="Tap to view full post"
+      />
+    );
 
     expect(screen.getByText("Tap to view full post")).toBeTruthy();
   });

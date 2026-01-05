@@ -20,6 +20,7 @@ module.exports = {
     "\\.(svg)$": "<rootDir>/__mocks__/svgMock.js",
     "react-native-markdown-display":
       "<rootDir>/__mocks__/react-native-markdown-display.js",
+    "expo-clipboard": "<rootDir>/__mocks__/expo-clipboard.js",
     "^@/(.*)$": "<rootDir>/$1",
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json"],
