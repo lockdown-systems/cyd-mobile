@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import { useVideoPlayer, VideoView } from "expo-video";
 import React, {
   useCallback,
@@ -8,6 +9,7 @@ import React, {
   type JSX,
 } from "react";
 import {
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -205,6 +207,20 @@ function toNiceDomain(url: string): string {
     return host.replace(/^www\./, "");
   } catch {
     return url;
+  }
+}
+
+function atUriToWebUrl(uri: string, handle: string): string {
+  try {
+    // AT URI format: at://did:plc:xxx/app.bsky.feed.post/xxx
+    const parts = uri.split("/");
+    if (parts.length >= 5 && parts[0] === "at:") {
+      const postId = parts[parts.length - 1];
+      return `https://bsky.app/profile/${handle}/post/${postId}`;
+    }
+    return uri;
+  } catch {
+    return uri;
   }
 }
 
@@ -465,6 +481,12 @@ export function PostPreview({
     setQuotedModalVisible(false);
   }, []);
 
+  const handleCopyLink = useCallback(async () => {
+    const webUrl = atUriToWebUrl(post.uri, post.author.handle);
+    await Clipboard.setStringAsync(webUrl);
+    Alert.alert("Link Copied", "Post link copied to clipboard");
+  }, [post.uri, post.author.handle]);
+
   return (
     <View
       style={[
@@ -537,7 +559,8 @@ export function PostPreview({
         <EmbeddedPostSnippet
           post={post.quotedPost}
           palette={palette}
-          onPress={handleOpenQuoted}
+          onPress={browseMode ? handleOpenQuoted : undefined}
+          hint={browseMode ? "Tap to view full post" : undefined}
         />
       )}
       {post.media && post.media.length > 0 ? (
@@ -649,6 +672,18 @@ export function PostPreview({
       <Text style={[styles.timestampFull, { color: palette.icon }]}>
         Posted {formatTimestampFull(post.createdAt)}
       </Text>
+      {browseMode && (
+        <Pressable
+          onPress={() => {
+            void handleCopyLink();
+          }}
+          style={styles.copyLinkButton}
+        >
+          <Text style={[styles.copyLinkText, { color: palette.icon }]}>
+            📋 Copy Link
+          </Text>
+        </Pressable>
+      )}
 
       {post.quotedPost && (
         <Modal
@@ -920,6 +955,17 @@ const styles = StyleSheet.create({
   // Facet link styles
   linkText: {
     textDecorationLine: "underline",
+  },
+  copyLinkButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+    marginTop: 4,
+  },
+  copyLinkText: {
+    fontSize: 13,
+    fontWeight: "400",
+    opacity: 0.9,
   },
 });
 

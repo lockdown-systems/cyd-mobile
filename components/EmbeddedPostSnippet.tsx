@@ -77,9 +77,9 @@ export function EmbeddedPostSnippet({ post, palette, onPress, hint }: Props) {
           </Text>
         </Pressable>
       )}
-      <Text style={[styles.hint, { color: palette.icon }]}>
-        {hint ?? "Tap to view full post"}
-      </Text>
+      {hint && (
+        <Text style={[styles.hint, { color: palette.icon }]}>{hint}</Text>
+      )}
     </Wrapper>
   );
 }
