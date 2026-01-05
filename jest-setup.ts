@@ -4,7 +4,7 @@
 import React, { type ReactNode } from "react";
 
 // Expo/React Native global flag
-// eslint-disable-next-line no-underscore-dangle
+
 (global as unknown as { __DEV__: boolean }).__DEV__ = false;
 
 type MockProps = Record<string, unknown> & { children?: ReactNode };
@@ -13,7 +13,7 @@ type PlatformSelectOptions<T> = Partial<Record<string, T>> & { default?: T };
 const createMockComponent = (name: string) => {
   const Component = React.forwardRef<unknown, MockProps>(
     ({ children, ...props }, ref) =>
-      React.createElement(name, { ...props, ref }, children)
+      React.createElement(name, { ...props, ref }, children as ReactNode)
   );
   Component.displayName = name;
   return Component;
@@ -24,10 +24,38 @@ jest.mock("react-native", () => {
   return {
     StyleSheet: {
       create: <T extends Record<string, unknown>>(styles: T): T => styles,
+      flatten: (
+        style:
+          | Record<string, unknown>
+          | Record<string, unknown>[]
+          | null
+          | undefined
+      ): Record<string, unknown> => {
+        if (!style) return {};
+        if (Array.isArray(style)) {
+          return style.reduce<Record<string, unknown>>(
+            (acc, s) => ({ ...acc, ...(s || {}) }),
+            {}
+          );
+        }
+        return style;
+      },
       hairlineWidth: 1,
     },
     View: createMockComponent("View"),
     Text: createMockComponent("Text"),
+    Image: createMockComponent("Image"),
+    Pressable: createMockComponent("Pressable"),
+    TouchableOpacity: createMockComponent("TouchableOpacity"),
+    FlatList: createMockComponent("FlatList"),
+    Modal: createMockComponent("Modal"),
+    TextInput: createMockComponent("TextInput"),
+    ActivityIndicator: createMockComponent("ActivityIndicator"),
+    ScrollView: createMockComponent("ScrollView"),
+    Linking: {
+      openURL: jest.fn().mockResolvedValue(true),
+      canOpenURL: jest.fn().mockResolvedValue(true),
+    },
     Dimensions: {
       get: jest.fn(() => ({ height: 800, width: 400 })),
       addEventListener: jest.fn(),
@@ -83,7 +111,7 @@ jest.mock("expo-sqlite", () => ({
       ),
       closeAsync: jest.fn(() => Promise.resolve()),
       withTransactionAsync: jest.fn(
-        async (callback: () => Promise<unknown> | unknown) => await callback()
+        async (callback: () => Promise<void>) => await callback()
       ),
     })
   ),
@@ -105,7 +133,7 @@ jest.mock("expo-file-system", () => {
     uri: string;
 
     constructor(base?: { uri?: string } | string, ...paths: string[]) {
-      const baseUri = typeof base === "string" ? base : (base?.uri ?? "");
+      const baseUri = typeof base === "string" ? base : base?.uri ?? "";
       const joined = [baseUri, ...paths].filter(Boolean).join("/");
       this.uri = joined.endsWith("/") ? joined : `${joined}/`;
     }

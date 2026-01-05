@@ -14,6 +14,7 @@
     "services/**/*.ts",
     "testUtils/**/*.ts",
     "testUtils/**/*.tsx",
+    "utils/**/*.ts",
     "__mocks__/**/*.ts",
     "__mocks__/**/*.tsx",
     "*.ts",
