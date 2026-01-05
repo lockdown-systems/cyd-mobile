@@ -435,6 +435,20 @@ export function AutomationModal({
           </View>
         ) : null}
 
+        <View
+          style={[styles.infoBar, { backgroundColor: palette.icon + "11" }]}
+        >
+          <MaterialIcons
+            name="info-outline"
+            size={16}
+            color={palette.icon}
+            style={{ opacity: 0.7 }}
+          />
+          <Text style={[styles.infoText, { color: palette.text }]}>
+            Keep your phone unlocked and don&apos;t switch apps
+          </Text>
+        </View>
+
         <View style={styles.buttonRow}>
           {state === "running" ? (
             <SecondaryButton
@@ -589,6 +603,18 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
     padding: 12,
+  },
+  infoBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  infoText: {
+    fontSize: 13,
+    opacity: 0.8,
   },
   buttonRow: {
     marginTop: "auto",
