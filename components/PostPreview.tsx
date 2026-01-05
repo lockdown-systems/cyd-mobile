@@ -230,14 +230,6 @@ function ExternalEmbedCard({
 
   const thumbUri = embed.thumbLocalPath ?? embed.thumbUrl;
 
-  console.log("[ExternalEmbedCard] Rendering", {
-    uri: embed.uri,
-    title: embed.title,
-    thumbLocalPath: embed.thumbLocalPath,
-    thumbUrl: embed.thumbUrl,
-    thumbUri,
-  });
-
   return (
     <Pressable
       style={[
