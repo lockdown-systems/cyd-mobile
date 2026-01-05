@@ -1,4 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import { useKeepAwake } from "expo-keep-awake";
 import React, {
   useCallback,
   useEffect,
@@ -52,6 +53,9 @@ export function AutomationModal({
   onClose,
   onRestart,
 }: AutomationModalProps) {
+  // Keep the screen awake while automation is running
+  useKeepAwake();
+
   const [jobs, setJobs] = useState<BlueskyJobRecord[]>([]);
   const [speech, setSpeech] = useState<string | null>(null);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
