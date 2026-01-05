@@ -255,37 +255,30 @@ export class PostIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
-    let lastPreviewPost: PostPreviewData | null = null;
 
     for (const item of feed) {
       await this.deps.waitForPause();
       const postView = item.post;
 
+      let previewPost: PostPreviewData | null = null;
       await db.withTransactionAsync(async () => {
-        const previewPost = await this.postPersistence.persistPostView(
-          db,
-          postView
-        );
-        if (!previewPost) {
-          return;
-        }
+        previewPost = await this.postPersistence.persistPostView(db, postView);
+      });
 
+      if (previewPost) {
         saved += 1;
-        lastPreviewPost = previewPost;
-      });
-    }
-
-    // Update progress after transaction completes
-    if (saved > 0) {
-      this.deps.updateProgress({
-        postsProgress: {
-          current: totalSavedSoFar + saved,
-          total: null,
-          unknownTotal: true,
-        },
-        currentAction: `Saved ${totalSavedSoFar + saved} posts`,
-        previewPost: lastPreviewPost,
-      });
+        const currentTotal = totalSavedSoFar + saved;
+        // Update progress after each post for smooth UI updates
+        this.deps.updateProgress({
+          postsProgress: {
+            current: currentTotal,
+            total: null,
+            unknownTotal: true,
+          },
+          currentAction: `Saved ${currentTotal} ${currentTotal === 1 ? "post" : "posts"}`,
+          previewPost,
+        });
+      }
     }
 
     return saved;
@@ -297,7 +290,6 @@ export class PostIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
-    let lastPreviewPost: PostPreviewData | null = null;
 
     for (const item of feed) {
       await this.deps.waitForPause();
@@ -306,35 +298,28 @@ export class PostIndexer {
         continue;
       }
 
+      let previewPost: PostPreviewData | null = null;
       await db.withTransactionAsync(async () => {
-        const previewPost = await this.postPersistence.persistPostView(
-          db,
-          postView,
-          {
-            viewerLiked: 1,
-            savedAt: Date.now(),
-          } satisfies PostPersistenceOptions
-        );
-        if (!previewPost) {
-          return;
-        }
+        previewPost = await this.postPersistence.persistPostView(db, postView, {
+          viewerLiked: 1,
+          savedAt: Date.now(),
+        } satisfies PostPersistenceOptions);
+      });
 
+      if (previewPost) {
         saved += 1;
-        lastPreviewPost = previewPost;
-      });
-    }
-
-    // Update progress after transaction completes
-    if (saved > 0) {
-      this.deps.updateProgress({
-        likesProgress: {
-          current: totalSavedSoFar + saved,
-          total: null,
-          unknownTotal: true,
-        },
-        currentAction: `Saved ${totalSavedSoFar + saved} likes`,
-        previewPost: lastPreviewPost,
-      });
+        const currentTotal = totalSavedSoFar + saved;
+        // Update progress after each like for smooth UI updates
+        this.deps.updateProgress({
+          likesProgress: {
+            current: currentTotal,
+            total: null,
+            unknownTotal: true,
+          },
+          currentAction: `Saved ${currentTotal} ${currentTotal === 1 ? "like" : "likes"}`,
+          previewPost,
+        });
+      }
     }
 
     return saved;
@@ -346,7 +331,6 @@ export class PostIndexer {
     totalSavedSoFar: number
   ): Promise<number> {
     let saved = 0;
-    let lastPreviewPost: PostPreviewData | null = null;
 
     for (const item of feed) {
       await this.deps.waitForPause();
@@ -356,9 +340,10 @@ export class PostIndexer {
       }
 
       const savedAt = Date.now();
+      let previewPost: PostPreviewData | null = null;
 
       await db.withTransactionAsync(async () => {
-        const previewPost = await this.postPersistence.persistPostView(
+        const persistedPost = await this.postPersistence.persistPostView(
           db,
           postView,
           {
@@ -366,7 +351,7 @@ export class PostIndexer {
             savedAt,
           } satisfies PostPersistenceOptions
         );
-        if (!previewPost) {
+        if (!persistedPost) {
           return;
         }
 
@@ -378,7 +363,7 @@ export class PostIndexer {
         const authorHandle = postView.author.handle ?? null;
         const postCreatedAt =
           (postView as { indexedAt?: string }).indexedAt ??
-          previewPost.createdAt;
+          persistedPost.createdAt;
 
         await db.runAsync(
           `INSERT INTO bookmark (
@@ -399,28 +384,29 @@ export class PostIndexer {
             subjectCid,
             authorDid,
             authorHandle,
-            previewPost.text,
+            persistedPost.text,
             postCreatedAt,
             savedAt,
           ]
         );
 
-        saved += 1;
-        lastPreviewPost = previewPost;
+        previewPost = persistedPost;
       });
-    }
 
-    // Update progress after transaction completes
-    if (saved > 0) {
-      this.deps.updateProgress({
-        bookmarksProgress: {
-          current: totalSavedSoFar + saved,
-          total: null,
-          unknownTotal: true,
-        },
-        currentAction: `Saved ${totalSavedSoFar + saved} bookmarks`,
-        previewPost: lastPreviewPost,
-      });
+      if (previewPost) {
+        saved += 1;
+        const currentTotal = totalSavedSoFar + saved;
+        // Update progress after each bookmark for smooth UI updates
+        this.deps.updateProgress({
+          bookmarksProgress: {
+            current: currentTotal,
+            total: null,
+            unknownTotal: true,
+          },
+          currentAction: `Saved ${currentTotal} ${currentTotal === 1 ? "bookmark" : "bookmarks"}`,
+          previewPost,
+        });
+      }
     }
 
     return saved;

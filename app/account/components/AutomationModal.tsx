@@ -6,7 +6,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
@@ -368,19 +375,27 @@ export function AutomationModal({
           </Text>
         </View>
 
-        {/* Render appropriate preview based on previewData type, or fall back to legacy previewPost */}
-        {previewData?.type === "post" ? (
-          <PostPreview post={previewData.data} palette={palette} />
-        ) : previewData?.type === "conversation" ? (
-          <ConversationPreview
-            conversation={previewData.data}
-            palette={palette}
-          />
-        ) : previewData?.type === "message" ? (
-          <MessagePreview message={previewData.data} palette={palette} />
-        ) : previewPost ? (
-          <PostPreview post={previewPost} palette={palette} />
-        ) : null}
+        {/* Scrollable preview area */}
+        <ScrollView
+          style={styles.previewScrollView}
+          contentContainerStyle={styles.previewScrollContent}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+        >
+          {/* Render appropriate preview based on previewData type, or fall back to legacy previewPost */}
+          {previewData?.type === "post" ? (
+            <PostPreview post={previewData.data} palette={palette} />
+          ) : previewData?.type === "conversation" ? (
+            <ConversationPreview
+              conversation={previewData.data}
+              palette={palette}
+            />
+          ) : previewData?.type === "message" ? (
+            <MessagePreview message={previewData.data} palette={palette} />
+          ) : previewPost ? (
+            <PostPreview post={previewPost} palette={palette} />
+          ) : null}
+        </ScrollView>
 
         {state === "failed" && error ? (
           <View
@@ -545,6 +560,14 @@ const styles = StyleSheet.create({
   progressCard: {
     alignItems: "center",
     paddingVertical: 8,
+  },
+  previewScrollView: {
+    flex: 1,
+    minHeight: 0,
+  },
+  previewScrollContent: {
+    flexGrow: 0,
+    paddingBottom: 8,
   },
   progressMessage: {
     fontSize: 16,
