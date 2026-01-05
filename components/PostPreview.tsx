@@ -492,6 +492,15 @@ export function PostPreview({
         />
       )}
 
+      {post.isReply && (
+        <View style={styles.replyIndicator}>
+          <View style={[styles.replyLine, { backgroundColor: palette.icon }]} />
+          <Text style={[styles.replyLabel, { color: palette.icon }]}>
+            Reply
+          </Text>
+        </View>
+      )}
+
       <View style={styles.headerRow}>
         <Avatar
           uri={post.author.avatarDataURI ?? post.author.avatarUrl ?? undefined}
@@ -674,6 +683,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     gap: 8,
+  },
+  replyIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  replyLine: {
+    width: 2,
+    height: 16,
+    borderRadius: 1,
+    marginLeft: 20,
+  },
+  replyLabel: {
+    fontSize: 13,
+    fontWeight: "500",
   },
   headerRow: {
     flexDirection: "row",

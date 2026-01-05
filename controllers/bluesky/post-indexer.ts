@@ -82,7 +82,7 @@ export class PostIndexer {
               total: null,
               unknownTotal: true,
             },
-            currentAction: `Saved ${totalSaved} posts`,
+            currentAction: `Saved ${totalSaved.toLocaleString()} posts`,
           });
         }
 
@@ -151,7 +151,7 @@ export class PostIndexer {
               total: null,
               unknownTotal: true,
             },
-            currentAction: `Saved ${totalSaved} likes`,
+            currentAction: `Saved ${totalSaved.toLocaleString()} likes`,
           });
         }
 
@@ -218,7 +218,7 @@ export class PostIndexer {
               total: null,
               unknownTotal: true,
             },
-            currentAction: `Saved ${totalSaved} bookmarks`,
+            currentAction: `Saved ${totalSaved.toLocaleString()} bookmarks`,
           });
         }
 
@@ -275,7 +275,7 @@ export class PostIndexer {
             total: null,
             unknownTotal: true,
           },
-          currentAction: `Saved ${currentTotal} ${currentTotal === 1 ? "post" : "posts"}`,
+          currentAction: `Saved ${currentTotal.toLocaleString()} ${currentTotal === 1 ? "post" : "posts"}`,
           previewPost,
         });
       }
@@ -316,7 +316,7 @@ export class PostIndexer {
             total: null,
             unknownTotal: true,
           },
-          currentAction: `Saved ${currentTotal} ${currentTotal === 1 ? "like" : "likes"}`,
+          currentAction: `Saved ${currentTotal.toLocaleString()} ${currentTotal === 1 ? "like" : "likes"}`,
           previewPost,
         });
       }
@@ -403,7 +403,7 @@ export class PostIndexer {
             total: null,
             unknownTotal: true,
           },
-          currentAction: `Saved ${currentTotal} ${currentTotal === 1 ? "bookmark" : "bookmarks"}`,
+          currentAction: `Saved ${currentTotal.toLocaleString()} ${currentTotal === 1 ? "bookmark" : "bookmarks"}`,
           previewPost,
         });
       }

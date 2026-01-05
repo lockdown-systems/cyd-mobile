@@ -47,6 +47,7 @@ export type PostRow = {
   replyCount: number | null;
   quoteCount: number | null;
   isRepost: number;
+  isReply: number;
   handle: string | null;
   displayName: string | null;
   avatarUrl: string | null;
@@ -150,6 +151,7 @@ export function mapRowToPreview(
     replyCount: row.replyCount,
     quoteCount: row.quoteCount,
     isRepost: row.isRepost === 1,
+    isReply: row.isReply === 1,
     quotedPostUri: row.quotedPostUri,
     quotedPost,
     media,
@@ -249,7 +251,7 @@ export function buildFirstPageQuery(type: BrowseType): string {
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
-      p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost,
+      p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
     FROM post p
     LEFT JOIN profile prof ON prof.did = p.authorDid`;
@@ -278,7 +280,7 @@ export function buildLoadMoreQuery(type: BrowseType): string {
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
-      p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost,
+      p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
     FROM post p
     LEFT JOIN profile prof ON prof.did = p.authorDid`;

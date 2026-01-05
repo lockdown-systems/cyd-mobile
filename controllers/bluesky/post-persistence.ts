@@ -225,6 +225,7 @@ export class PostPersistence {
       replyCount,
       quoteCount,
       isRepost: recordInfo.kind === "repost",
+      isReply: !!postRecord?.reply,
       quotedPostUri,
       quotedPost: quotedPostWithLocalEmbed,
       media: downloadedMedia,
