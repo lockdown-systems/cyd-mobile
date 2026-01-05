@@ -24,6 +24,7 @@ export type BrowseProps = {
   handle: string;
   palette: AccountTabPalette;
   accountId?: number;
+  onCountChange?: (count: number, label: string) => void;
 };
 
 export type AccountMeta = {
@@ -345,6 +346,30 @@ export function getEmptyMessage(type: BrowseType, hasFilter: boolean): string {
   }
 }
 
+export function buildTotalCountQuery(type: BrowseType): string {
+  switch (type) {
+    case "posts":
+      return `SELECT COUNT(*) as count FROM post WHERE authorDid = ?;`;
+    case "likes":
+      return `SELECT COUNT(*) as count FROM post WHERE viewerLiked = 1;`;
+    case "bookmarks":
+      return `SELECT COUNT(*) as count FROM post WHERE viewerBookmarked = 1;`;
+  }
+}
+
+export function getTotalCountParams(
+  type: BrowseType,
+  did: string
+): (string | number)[] {
+  switch (type) {
+    case "posts":
+      return [did];
+    case "likes":
+    case "bookmarks":
+      return [];
+  }
+}
+
 /**
  * Shared browse component that can display posts, likes, or bookmarks
  */
@@ -353,8 +378,10 @@ export function BrowseList({
   palette,
   accountId,
   type,
+  onCountChange,
 }: BrowseProps & { type: BrowseType }) {
   const [posts, setPosts] = useState<PostPreviewData[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -394,6 +421,15 @@ export function BrowseList({
 
       const db = await openAccountDb(meta.uuid);
       accountDbRef.current = db;
+
+      // Fetch total count first
+      const countQuery = buildTotalCountQuery(type);
+      const countParams = getTotalCountParams(type, meta.did);
+      const countResult = await db.getFirstAsync<{ count: number }>(
+        countQuery,
+        countParams
+      );
+      setTotalCount(countResult?.count ?? 0);
 
       const query = buildFirstPageQuery(type);
       const params = getFirstPageParams(type, meta.did);
@@ -509,6 +545,27 @@ export function BrowseList({
         post.author?.displayName?.toLowerCase().includes(searchTerm)
     );
   }, [posts, filterText]);
+
+  // Report count changes to parent
+  useEffect(() => {
+    const typeLabel =
+      type === "posts" ? "posts" : type === "likes" ? "likes" : "bookmarks";
+    const hasFilter = filterText.trim().length > 0;
+
+    if (hasFilter) {
+      // When filtering, show count of filtered results
+      onCountChange?.(
+        filteredPosts.length,
+        `Showing ${filteredPosts.length.toLocaleString()} of ${totalCount.toLocaleString()} ${typeLabel} (filtered)`
+      );
+    } else {
+      // When not filtering, show total count from database
+      onCountChange?.(
+        totalCount,
+        `Showing ${totalCount.toLocaleString()} ${typeLabel}`
+      );
+    }
+  }, [filteredPosts.length, filterText, onCountChange, totalCount, type]);
 
   const renderItem = useCallback(
     ({ item }: { item: PostPreviewData }) => (

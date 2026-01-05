@@ -1,4 +1,10 @@
-import { useMemo, useState, type ComponentType } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+} from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
@@ -14,6 +20,7 @@ type CategoryComponentProps = {
   handle: string;
   palette: AccountTabPalette;
   accountId?: number;
+  onCountChange?: (count: number, label: string) => void;
 };
 
 type CategoryComponent = ComponentType<CategoryComponentProps>;
@@ -34,6 +41,16 @@ const CATEGORY_COMPONENTS: Record<BrowseCategory, CategoryComponent> = {
 
 export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
   const [category, setCategory] = useState<BrowseCategory>("posts");
+  const [countLabel, setCountLabel] = useState<string>("");
+
+  const handleCountChange = useCallback((newCount: number, label: string) => {
+    setCountLabel(label);
+  }, []);
+
+  // Reset count label when switching tabs
+  useEffect(() => {
+    setCountLabel("");
+  }, [category]);
 
   const ActiveCategory = useMemo(
     () => CATEGORY_COMPONENTS[category],
@@ -42,7 +59,7 @@ export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
-      <View style={[styles.tabsContainer, { borderColor: palette.icon }]}>
+      <View style={[styles.tabsContainer]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -82,7 +99,20 @@ export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
         </ScrollView>
       </View>
 
-      <ActiveCategory handle={handle} palette={palette} accountId={accountId} />
+      {countLabel && (
+        <View style={[styles.countBar]}>
+          <Text style={[styles.countText, { color: palette.icon }]}>
+            {countLabel}
+          </Text>
+        </View>
+      )}
+
+      <ActiveCategory
+        handle={handle}
+        palette={palette}
+        accountId={accountId}
+        onCountChange={handleCountChange}
+      />
     </View>
   );
 }
@@ -91,9 +121,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  countBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  countText: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+  },
   tabsContainer: {
-    marginBottom: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: 0,
     paddingBottom: 12,
   },
   tabsContent: {

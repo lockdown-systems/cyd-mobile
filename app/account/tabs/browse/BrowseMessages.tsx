@@ -27,6 +27,7 @@ type Props = {
   handle: string;
   palette: AccountTabPalette;
   accountId?: number;
+  onCountChange?: (count: number, label: string) => void;
 };
 
 type ConversationRow = {
@@ -64,7 +65,12 @@ type MessageRow = {
   embeddedPostUri: string | null;
 };
 
-export function BrowseMessages({ handle, palette, accountId }: Props) {
+export function BrowseMessages({
+  handle,
+  palette,
+  accountId,
+  onCountChange,
+}: Props) {
   const [conversations, setConversations] = useState<ConversationPreviewData[]>(
     []
   );
@@ -348,6 +354,36 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
       setLoadingMessages(false);
     }
   };
+
+  // Report conversation count when viewing conversations list
+  useEffect(() => {
+    if (!selectedConvo && !loadingConvos && !error) {
+      onCountChange?.(
+        conversations.length,
+        `Showing ${conversations.length.toLocaleString()} chat conversation${conversations.length === 1 ? "" : "s"}`
+      );
+    }
+  }, [
+    conversations.length,
+    selectedConvo,
+    loadingConvos,
+    error,
+    onCountChange,
+  ]);
+
+  // Report message count when viewing a specific conversation
+  useEffect(() => {
+    if (selectedConvo && !loadingMessages) {
+      const memberName =
+        selectedConvo.members[0]?.displayName ||
+        selectedConvo.members[0]?.handle ||
+        "Unknown";
+      onCountChange?.(
+        messages.length,
+        `Showing ${messages.length.toLocaleString()} message${messages.length === 1 ? "" : "s"} with ${memberName}`
+      );
+    }
+  }, [messages.length, selectedConvo, loadingMessages, onCountChange]);
 
   const renderConversation = useMemo(() => {
     const ConversationItem = ({ item }: { item: ConversationPreviewData }) => (
