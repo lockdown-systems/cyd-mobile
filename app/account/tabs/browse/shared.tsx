@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -597,7 +599,11 @@ export function BrowseList({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: palette.background }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 140 : 0}
+    >
       <FlatList
         data={filteredPosts}
         renderItem={renderItem}
@@ -621,6 +627,8 @@ export function BrowseList({
             </View>
           ) : null
         }
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       />
       <View
         style={[
@@ -644,9 +652,10 @@ export function BrowseList({
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"
+          returnKeyType="search"
         />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
