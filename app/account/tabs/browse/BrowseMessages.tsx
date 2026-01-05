@@ -75,7 +75,6 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
   const [selectedConvo, setSelectedConvo] =
     useState<ConversationPreviewData | null>(null);
   const accountUuidRef = useRef<string | null>(null);
-  const messagesListRef = useRef<FlatList<MessagePreviewData> | null>(null);
 
   useEffect(() => {
     void loadConversations();
@@ -193,7 +192,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
          FROM message m
          LEFT JOIN profile p ON p.did = m.senderDid
          WHERE m.convoId = ?
-         ORDER BY m.sentAt ASC, m.id ASC;`,
+         ORDER BY m.sentAt DESC, m.id DESC;`,
         [convoId]
       );
 
@@ -350,16 +349,6 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
     }
   };
 
-  // When messages finish loading, scroll to the bottom once so newest messages show.
-  useEffect(() => {
-    if (selectedConvo && messages.length > 0 && !loadingMessages) {
-      // Delay to allow layout to complete before scrolling.
-      setTimeout(() => {
-        messagesListRef.current?.scrollToEnd({ animated: false });
-      }, 0);
-    }
-  }, [messages, loadingMessages, selectedConvo]);
-
   const renderConversation = useMemo(() => {
     const ConversationItem = ({ item }: { item: ConversationPreviewData }) => (
       <Pressable
@@ -448,7 +437,7 @@ export function BrowseMessages({ handle, palette, accountId }: Props) {
             renderItem={renderMessage}
             keyExtractor={(item) => item.messageId}
             contentContainerStyle={styles.listContent}
-            ref={messagesListRef}
+            inverted
           />
         )}
       </View>
