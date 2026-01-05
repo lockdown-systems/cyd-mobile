@@ -460,8 +460,10 @@ function SaveReviewScreen({
           accessibilityRole="text"
         >
           <Text style={[styles.infoText, { color: palette.text }]}>
-            While Cyd is working, your phone must be unlocked and the Cyd app
-            must stay active.
+            If you have a lot of data, saving your data might take a{" "}
+            <Text style={[styles.italic]}>long time</Text>. While Cyd is
+            working, your phone must be unlocked and the Cyd app must stay
+            active the whole time.
           </Text>
         </View>
       </ScrollView>
@@ -680,8 +682,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   infoText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
   },
   reviewCard: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -723,6 +725,9 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: "600",
+  },
+  italic: {
+    fontStyle: "italic",
   },
 });
 
