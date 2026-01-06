@@ -50,6 +50,18 @@ export function AccountSettingsSheet({
         label: "Schedule Backing Up and Deleting",
         log: `Schedule saving and deleting tapped for ${handle}`,
       },
+      {
+        type: "action",
+        key: "export-archive",
+        label: "Export Bluesky Archive",
+        log: `Export archive tapped for ${handle}`,
+      },
+      {
+        type: "action",
+        key: "import-archive",
+        label: "Import Bluesky Archive",
+        log: `Import archive tapped for ${handle}`,
+      },
       { type: "separator", key: "sep-1" },
       ...(authStatus !== "authenticated"
         ? [
@@ -93,6 +105,18 @@ export function AccountSettingsSheet({
 
       if (item.key === "schedule") {
         Alert.alert("TODO: This is not implemented yet.");
+        onClose();
+        return;
+      }
+
+      if (item.key === "export-archive") {
+        Alert.alert("TODO: Export Bluesky Archive is not implemented yet.");
+        onClose();
+        return;
+      }
+
+      if (item.key === "import-archive") {
+        Alert.alert("TODO: Import Bluesky Archive is not implemented yet.");
         onClose();
         return;
       }
