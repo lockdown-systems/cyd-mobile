@@ -16,11 +16,13 @@ import { Colors } from "@/constants/theme";
 import { BlueskyAccountController } from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { trackEvent } from "@/services/analytics";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
 import {
   authenticateBlueskyAccount,
   normalizeHandle,
 } from "@/services/bluesky-oauth";
+import { PlausibleEvents } from "@/types/analytics";
 
 export default function AddAccountScreen() {
   const router = useRouter();
@@ -55,6 +57,8 @@ export default function AddAccountScreen() {
     setError(null);
     try {
       const savedAccount = await authenticateBlueskyAccount(handle);
+      // Track successful sign-in
+      trackEvent(PlausibleEvents.BLUESKY_USER_SIGNED_IN);
       try {
         const controller = new BlueskyAccountController(
           savedAccount.id,
