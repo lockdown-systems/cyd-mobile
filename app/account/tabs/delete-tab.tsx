@@ -258,7 +258,8 @@ function DeleteOptionsForm({
                 checked={state.deletePostsDaysOldEnabled}
                 disabled={!state.deletePosts}
                 onToggle={(next) => onUpdate("deletePostsDaysOldEnabled", next)}
-                trailing={
+              >
+                <View style={styles.inlineNumberRow}>
                   <NumberInput
                     palette={palette}
                     value={state.deletePostsDaysOld}
@@ -267,9 +268,10 @@ function DeleteOptionsForm({
                       !state.deletePosts || !state.deletePostsDaysOldEnabled
                     }
                     min={0}
+                    suffix="days"
                   />
-                }
-              />
+                </View>
+              </CheckboxRow>
               <CheckboxRow
                 palette={palette}
                 label="unless they have at least"
@@ -278,7 +280,8 @@ function DeleteOptionsForm({
                 onToggle={(next) =>
                   onUpdate("deletePostsLikesThresholdEnabled", next)
                 }
-                trailing={
+              >
+                <View style={styles.inlineNumberRow}>
                   <NumberInput
                     palette={palette}
                     value={state.deletePostsLikesThreshold}
@@ -290,12 +293,9 @@ function DeleteOptionsForm({
                       !state.deletePostsLikesThresholdEnabled
                     }
                     min={0}
+                    suffix="likes"
                   />
-                }
-              >
-                <Text style={[styles.inlineHint, { color: palette.icon }]}>
-                  likes
-                </Text>
+                </View>
               </CheckboxRow>
               <CheckboxRow
                 palette={palette}
@@ -305,7 +305,8 @@ function DeleteOptionsForm({
                 onToggle={(next) =>
                   onUpdate("deletePostsRepostsThresholdEnabled", next)
                 }
-                trailing={
+              >
+                <View style={styles.inlineNumberRow}>
                   <NumberInput
                     palette={palette}
                     value={state.deletePostsRepostsThreshold}
@@ -317,22 +318,25 @@ function DeleteOptionsForm({
                       !state.deletePostsRepostsThresholdEnabled
                     }
                     min={0}
+                    suffix="reposts"
                   />
-                }
-              >
-                <Text style={[styles.inlineHint, { color: palette.icon }]}>
-                  reposts
-                </Text>
+                </View>
               </CheckboxRow>
-            </Indented>
 
-            <CheckboxRow
-              palette={palette}
-              label="Preserve entire threads if any post meets these thresholds"
-              checked={state.deletePostsPreserveThreads}
-              disabled={!state.deletePosts}
-              onToggle={(next) => onUpdate("deletePostsPreserveThreads", next)}
-            />
+              <CheckboxRow
+                palette={palette}
+                label="Preserve entire threads if any post meets these thresholds"
+                checked={state.deletePostsPreserveThreads}
+                disabled={
+                  !state.deletePosts ||
+                  (!state.deletePostsLikesThresholdEnabled &&
+                    !state.deletePostsRepostsThresholdEnabled)
+                }
+                onToggle={(next) =>
+                  onUpdate("deletePostsPreserveThreads", next)
+                }
+              />
+            </Indented>
 
             <CheckboxRow
               palette={palette}
@@ -349,7 +353,8 @@ function DeleteOptionsForm({
                 onToggle={(next) =>
                   onUpdate("deleteRepostsDaysOldEnabled", next)
                 }
-                trailing={
+              >
+                <View style={styles.inlineNumberRow}>
                   <NumberInput
                     palette={palette}
                     value={state.deleteRepostsDaysOld}
@@ -360,9 +365,10 @@ function DeleteOptionsForm({
                       !state.deleteReposts || !state.deleteRepostsDaysOldEnabled
                     }
                     min={0}
+                    suffix="days"
                   />
-                }
-              />
+                </View>
+              </CheckboxRow>
             </Indented>
 
             <CheckboxRow
@@ -378,7 +384,8 @@ function DeleteOptionsForm({
                 checked={state.deleteLikesDaysOldEnabled}
                 disabled={!state.deleteLikes}
                 onToggle={(next) => onUpdate("deleteLikesDaysOldEnabled", next)}
-                trailing={
+              >
+                <View style={styles.inlineNumberRow}>
                   <NumberInput
                     palette={palette}
                     value={state.deleteLikesDaysOld}
@@ -387,17 +394,11 @@ function DeleteOptionsForm({
                       !state.deleteLikes || !state.deleteLikesDaysOldEnabled
                     }
                     min={0}
+                    suffix="days"
                   />
-                }
-              />
+                </View>
+              </CheckboxRow>
             </Indented>
-
-            <CheckboxRow
-              palette={palette}
-              label="Delete my bookmarks"
-              checked={state.deleteBookmarks}
-              onToggle={(next) => onUpdate("deleteBookmarks", next)}
-            />
 
             <CheckboxRow
               palette={palette}
@@ -412,7 +413,8 @@ function DeleteOptionsForm({
                 checked={state.deleteChatsDaysOldEnabled}
                 disabled={!state.deleteChats}
                 onToggle={(next) => onUpdate("deleteChatsDaysOldEnabled", next)}
-                trailing={
+              >
+                <View style={styles.inlineNumberRow}>
                   <NumberInput
                     palette={palette}
                     value={state.deleteChatsDaysOld}
@@ -421,10 +423,18 @@ function DeleteOptionsForm({
                       !state.deleteChats || !state.deleteChatsDaysOldEnabled
                     }
                     min={0}
+                    suffix="days"
                   />
-                }
-              />
+                </View>
+              </CheckboxRow>
             </Indented>
+
+            <CheckboxRow
+              palette={palette}
+              label="Delete my bookmarks"
+              checked={state.deleteBookmarks}
+              onToggle={(next) => onUpdate("deleteBookmarks", next)}
+            />
 
             <CheckboxRow
               palette={palette}
@@ -538,8 +548,8 @@ function DeleteReviewScreen({
           accessibilityRole="text"
         >
           <Text style={[styles.infoText, { color: palette.text }]}>
-            Deleting data is permanent. Double-check your options before
-            continuing.
+            Deleting data from Bluesky is permanent. Double-check your options
+            before continuing.
           </Text>
         </View>
       </ScrollView>
@@ -648,7 +658,7 @@ function CheckboxRow({
         name={checked ? "check-box" : "check-box-outline-blank"}
         size={24}
         color={checked ? palette.tint : palette.icon}
-        style={{ opacity: disabled ? 0.5 : 1 }}
+        style={{ opacity: disabled ? 0.5 : 1, marginTop: 2 }}
       />
       <View style={styles.optionRowContent}>
         <Text
@@ -676,12 +686,14 @@ function NumberInput({
   palette,
   disabled,
   min = 0,
+  suffix,
 }: {
   value: number;
   onChange: (next: number) => void;
   palette: AccountTabPalette;
   disabled?: boolean;
   min?: number;
+  suffix?: string;
 }) {
   const clampValue = useCallback(
     (next: number) => {
@@ -724,6 +736,16 @@ function NumberInput({
       >
         <Text style={[styles.stepperText, { color: palette.text }]}>+</Text>
       </Pressable>
+      {suffix ? (
+        <Text
+          style={[
+            styles.numberSuffix,
+            { color: palette.text, opacity: disabled ? 0.6 : 1 },
+          ]}
+        >
+          {suffix}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -819,7 +841,7 @@ const styles = StyleSheet.create({
   },
   optionRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 12,
@@ -835,8 +857,16 @@ const styles = StyleSheet.create({
   inlineHint: {
     fontSize: 13,
   },
+  inlineNumberRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+  },
   indented: {
-    paddingLeft: 32,
+    marginLeft: 28,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(0, 0, 0, 0.1)",
     gap: 4,
   },
   footerBar: {
@@ -967,6 +997,12 @@ const styles = StyleSheet.create({
   stepperText: {
     fontSize: 18,
     fontWeight: "700",
+  },
+  numberSuffix: {
+    marginLeft: 8,
+    paddingRight: 12,
+    fontSize: 15,
+    fontWeight: "500",
   },
 });
 
