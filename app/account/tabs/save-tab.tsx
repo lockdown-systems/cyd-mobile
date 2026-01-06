@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -21,6 +20,7 @@ import {
   updateAccountSaveSettings,
 } from "@/database/save-settings";
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
+import { sharedTabStyles } from "./shared-tab-styles";
 
 type SaveFlowScreen = "form" | "review";
 
@@ -475,13 +475,16 @@ function SaveReviewScreen({
         </Text>
         <View style={[styles.reviewCard, { borderColor: palette.icon + "22" }]}>
           {chosen.map((option) => (
-            <View key={option.key} style={styles.reviewRow}>
+            <View key={option.key} style={sharedTabStyles.reviewRow}>
               <MaterialIcons
                 name="check-circle"
                 size={20}
                 color={palette.tint}
+                style={sharedTabStyles.reviewIcon}
               />
-              <Text style={[styles.reviewLabel, { color: palette.text }]}>
+              <Text
+                style={[sharedTabStyles.reviewLabel, { color: palette.text }]}
+              >
                 {option.reviewLabel}
               </Text>
             </View>
@@ -498,10 +501,9 @@ function SaveReviewScreen({
           accessibilityRole="text"
         >
           <Text style={[styles.infoText, { color: palette.text }]}>
-            If you have a lot of data, saving your data might take a{" "}
-            <Text style={[styles.italic]}>long time</Text>. While Cyd is
-            working, your phone must be unlocked and the Cyd app must stay
-            active the whole time.
+            If you have a lot of data, saving your data might take a long time.
+            While Cyd is working, your phone must be unlocked and the Cyd app
+            must stay active the whole time.
           </Text>
         </View>
       </ScrollView>
@@ -624,149 +626,7 @@ function SecondaryButton({ label, palette, onPress }: SecondaryButtonProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 32,
-    gap: 16,
-  },
-  headline: {
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  subhead: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  statusCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    alignItems: "center",
-  },
-  statusText: {
-    fontSize: 15,
-    textAlign: "center",
-  },
-  statusTextDetail: {
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: "center",
-    opacity: 0.85,
-  },
-  errorText: {
-    fontSize: 14,
-    textAlign: "center",
-  },
-  optionCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 20,
-    paddingVertical: 4,
-  },
-  optionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  optionLabel: {
-    fontSize: 16,
-    flex: 1,
-  },
-  stackScreen: {
-    flex: 1,
-  },
-  footerBar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 12,
-    paddingBottom: 24,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    gap: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  backButton: {
-    padding: 4,
-    marginRight: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  reviewContent: {
-    paddingBottom: 32,
-    gap: 16,
-  },
-  reviewIntro: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  infoCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 14,
-    padding: 12,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  reviewCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 20,
-    padding: 16,
-    gap: 12,
-  },
-  reviewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  reviewLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  primaryButton: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    alignItems: "center",
-    alignSelf: "center",
-    minWidth: 220,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 32,
-    alignSelf: "center",
-    minWidth: 220,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  italic: {
-    fontStyle: "italic",
-  },
-});
+// Use shared styles for consistency across tabs
+const styles = sharedTabStyles;
 
 export default SaveTab;
