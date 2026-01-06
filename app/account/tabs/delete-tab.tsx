@@ -488,20 +488,69 @@ function DeleteReviewScreen({
   const chosen: string[] = [];
 
   if (selections.deletePosts) {
-    chosen.push("Delete posts");
+    const hasAgeFilter = selections.deletePostsDaysOldEnabled;
+    const conditions: string[] = [];
+    if (selections.deletePostsLikesThresholdEnabled) {
+      conditions.push(`${selections.deletePostsLikesThreshold} likes`);
+    }
+    if (selections.deletePostsRepostsThresholdEnabled) {
+      conditions.push(`${selections.deletePostsRepostsThreshold} reposts`);
+    }
+
+    let message =
+      hasAgeFilter || conditions.length > 0
+        ? "Delete posts"
+        : "Delete all posts";
+
+    if (hasAgeFilter) {
+      message += ` older than ${selections.deletePostsDaysOld} days`;
+    }
+
+    if (conditions.length > 0) {
+      message += ` unless they have at least ${conditions.join(" or ")}`;
+    }
+
+    if (selections.deletePostsPreserveThreads && conditions.length > 0) {
+      message += ", preserving entire threads";
+    }
+
+    chosen.push(message);
   }
+
   if (selections.deleteReposts) {
-    chosen.push("Delete reposts");
+    let message = selections.deleteRepostsDaysOldEnabled
+      ? "Delete reposts"
+      : "Delete all reposts";
+    if (selections.deleteRepostsDaysOldEnabled) {
+      message += ` older than ${selections.deleteRepostsDaysOld} days`;
+    }
+    chosen.push(message);
   }
+
   if (selections.deleteLikes) {
-    chosen.push("Delete likes");
+    let message = selections.deleteLikesDaysOldEnabled
+      ? "Delete likes"
+      : "Delete all likes";
+    if (selections.deleteLikesDaysOldEnabled) {
+      message += ` older than ${selections.deleteLikesDaysOld} days`;
+    }
+    chosen.push(message);
   }
+
   if (selections.deleteBookmarks) {
-    chosen.push("Delete bookmarks");
+    chosen.push("Delete all bookmarks");
   }
+
   if (selections.deleteChats) {
-    chosen.push("Delete chat messages");
+    let message = selections.deleteChatsDaysOldEnabled
+      ? "Delete chat messages"
+      : "Delete all chat messages";
+    if (selections.deleteChatsDaysOldEnabled) {
+      message += ` older than ${selections.deleteChatsDaysOld} days`;
+    }
+    chosen.push(message);
   }
+
   if (selections.deleteUnfollowEveryone) {
     chosen.push("Unfollow everyone");
   }
