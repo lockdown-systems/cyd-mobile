@@ -528,6 +528,8 @@ export class ChatIndexer {
       convoId,
       text: msg.text,
       sentAt: msg.sentAt ?? new Date().toISOString(),
+      savedAt: new Date().toISOString(),
+      deletedAt: null,
       sender,
       embed: (msg.embed as Record<string, unknown> | null) ?? null,
       facets: msg.facets ?? null,

@@ -42,6 +42,11 @@ export type PostRow = {
   authorDid: string;
   text: string;
   createdAt: string;
+  savedAt: number;
+  deletedPostAt: number | null;
+  deletedRepostAt: number | null;
+  deletedLikeAt: number | null;
+  deletedBookmarkAt: number | null;
   facetsJSON: string | null;
   embedJSON: string | null;
   quotedPostUri: string | null;
@@ -137,11 +142,21 @@ export function mapRowToPreview(
     };
   }
 
+  // Prefer whichever delete timestamp is set for this post state
+  const deletedAtEpoch =
+    row.deletedPostAt ??
+    row.deletedRepostAt ??
+    row.deletedLikeAt ??
+    row.deletedBookmarkAt ??
+    null;
+
   return {
     uri: row.uri,
     cid: row.cid,
     text: row.text ?? "",
     createdAt: row.createdAt,
+    savedAt: new Date(row.savedAt || row.createdAt).toISOString(),
+    deletedAt: deletedAtEpoch ? new Date(deletedAtEpoch).toISOString() : null,
     author: {
       did: row.authorDid,
       handle: row.handle ?? fallbackHandle,
@@ -252,7 +267,8 @@ export type BrowseType = "posts" | "likes" | "bookmarks";
 export function buildFirstPageQuery(type: BrowseType): string {
   const baseSelect = `
     SELECT
-      p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
+      p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt, p.savedAt,
+      p.deletedPostAt, p.deletedRepostAt, p.deletedLikeAt, p.deletedBookmarkAt,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
@@ -281,7 +297,8 @@ export function buildFirstPageQuery(type: BrowseType): string {
 export function buildLoadMoreQuery(type: BrowseType): string {
   const baseSelect = `
     SELECT
-      p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt,
+      p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt, p.savedAt,
+      p.deletedPostAt, p.deletedRepostAt, p.deletedLikeAt, p.deletedBookmarkAt,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI

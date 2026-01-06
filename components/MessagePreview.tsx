@@ -139,6 +139,11 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
   const displayName = sender?.displayName || sender?.handle || "Unknown";
   const handle = sender?.handle || "";
   const avatarUrl = sender?.avatarUrl || sender?.avatarDataURI;
+  // Persisted timestamps are always present on saved messages
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const savedTimestamp: string = message.savedAt;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const deletedTimestamp: string | null = message.deletedAt ?? null;
 
   const embeddedPost = useMemo<PostPreviewData | null>(() => {
     if (isPostPreviewData(persistedPost)) {
@@ -167,6 +172,8 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
         value && typeof value.createdAt === "string"
           ? value.createdAt
           : message.sentAt,
+      savedAt: message.sentAt,
+      deletedAt: null,
       author: {
         did: author && typeof author.did === "string" ? author.did : "unknown",
         handle:
@@ -381,6 +388,14 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
           Sent {formatTimestampFull(message.sentAt)}
         </Text>
       )}
+      <Text style={[styles.timestampFull, { color: palette.icon }]}>
+        Saved {formatTimestampFull(savedTimestamp)}
+      </Text>
+      {deletedTimestamp ? (
+        <Text style={[styles.timestampFull, { color: palette.icon }]}>
+          Deleted {formatTimestampFull(deletedTimestamp)}
+        </Text>
+      ) : null}
 
       {embeddedPost && (
         <Modal

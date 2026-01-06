@@ -1,6 +1,10 @@
-export function formatTimestampFull(isoString?: string | null): string {
-  if (!isoString) return "";
-  const date = new Date(isoString);
+export function formatTimestampFull(
+  value?: string | number | Date | null
+): string {
+  if (value == null) return "";
+
+  // Accept ISO strings, epoch milliseconds, or Date objects
+  const date = value instanceof Date ? value : new Date(value);
   return date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",

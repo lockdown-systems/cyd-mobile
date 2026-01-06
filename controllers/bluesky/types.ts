@@ -113,6 +113,8 @@ export type PostPreviewData = {
   cid: string;
   text: string;
   createdAt: string;
+  savedAt: string;
+  deletedAt?: string | null;
   author: {
     did: string;
     handle: string;
@@ -164,6 +166,8 @@ export type MessagePreviewData = {
   convoId: string;
   text: string;
   sentAt: string;
+  savedAt: string;
+  deletedAt?: string | null;
   sender: ProfileData;
   embed?: Record<string, unknown> | null;
   reactions?: unknown[] | null;

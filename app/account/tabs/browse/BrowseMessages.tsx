@@ -61,6 +61,8 @@ type MessageRow = {
   convoId: string;
   text: string;
   sentAt: string;
+  savedAt: number;
+  deletedAt: number | null;
   senderDid: string;
   handle: string | null;
   displayName: string | null;
@@ -200,7 +202,7 @@ export function BrowseMessages({
     try {
       const db = await openAccountDb(uuid);
       const rows = await db.getAllAsync<MessageRow>(
-        `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.senderDid,
+        `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.savedAt, m.deletedAt, m.senderDid,
           m.embedJSON, m.reactionsJSON, m.facetsJSON, m.embeddedPostUri,
                 p.handle, p.displayName, p.avatarUrl, p.avatarDataURI
          FROM message m
@@ -240,8 +242,10 @@ export function BrowseMessages({
           avatarUrl: string | null;
           avatarDataURI: string | null;
         }>(
-          `SELECT p.uri, p.cid, p.text, p.createdAt, p.authorDid,
-                  p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
+          `SELECT p.uri, p.cid, p.text, p.createdAt, p.savedAt,
+              p.deletedPostAt, p.deletedRepostAt, p.deletedLikeAt, p.deletedBookmarkAt,
+              p.authorDid,
+              p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
                   p.embedJSON, p.quotedPostUri,
                   prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
            FROM post p
@@ -287,11 +291,22 @@ export function BrowseMessages({
         }
 
         for (const p of postRows) {
+          const deletedAtEpoch =
+            p.deletedPostAt ??
+            p.deletedRepostAt ??
+            p.deletedLikeAt ??
+            p.deletedBookmarkAt ??
+            null;
+
           postMap.set(p.uri, {
             uri: p.uri,
             cid: p.cid,
             text: p.text,
             createdAt: p.createdAt,
+            savedAt: new Date(p.savedAt || p.createdAt).toISOString(),
+            deletedAt: deletedAtEpoch
+              ? new Date(deletedAtEpoch).toISOString()
+              : null,
             author: {
               did: p.authorDid,
               handle: p.handle ?? "unknown",
@@ -339,6 +354,8 @@ export function BrowseMessages({
         convoId: row.convoId,
         text: row.text,
         sentAt: row.sentAt,
+        savedAt: new Date(row.savedAt || row.sentAt).toISOString(),
+        deletedAt: row.deletedAt ? new Date(row.deletedAt).toISOString() : null,
         sender: {
           did: row.senderDid,
           handle: row.handle ?? "unknown",

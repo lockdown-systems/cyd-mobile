@@ -212,6 +212,8 @@ export class PostPersistence {
         repostRecord?.createdAt ??
         (postView as { indexedAt?: string }).indexedAt ??
         new Date().toISOString(),
+      savedAt: new Date(savedAt).toISOString(),
+      deletedAt: null,
       author: {
         did: String(author.did ?? ""),
         handle: String(author.handle ?? ""),

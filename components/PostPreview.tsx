@@ -308,6 +308,11 @@ export function PostPreview({
     null
   );
   const [quotedModalVisible, setQuotedModalVisible] = useState(false);
+  // These fields are provided by the persistence layer for every preview
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const savedTimestamp: string = post.savedAt;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const deletedTimestamp: string | null = post.deletedAt ?? null;
 
   const handleLinkPress = useCallback(async (url: string) => {
     try {
@@ -672,6 +677,14 @@ export function PostPreview({
       <Text style={[styles.timestampFull, { color: palette.icon }]}>
         Posted {formatTimestampFull(post.createdAt)}
       </Text>
+      <Text style={[styles.timestampFull, { color: palette.icon }]}>
+        Saved {formatTimestampFull(savedTimestamp)}
+      </Text>
+      {deletedTimestamp ? (
+        <Text style={[styles.timestampFull, { color: palette.icon }]}>
+          Deleted {formatTimestampFull(deletedTimestamp)}
+        </Text>
+      ) : null}
       {browseMode && (
         <Pressable
           onPress={() => {
