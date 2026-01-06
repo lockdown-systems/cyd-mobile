@@ -225,11 +225,16 @@ export function BrowseMessages({
       if (embeddedUris.length > 0) {
         const placeholders = embeddedUris.map(() => "?").join(",");
 
-        const postRows = await db.getAllAsync<{
+        type EmbeddedPostRow = {
           uri: string;
           cid: string;
           text: string;
           createdAt: string;
+          savedAt: number | null;
+          deletedPostAt: number | null;
+          deletedRepostAt: number | null;
+          deletedLikeAt: number | null;
+          deletedBookmarkAt: number | null;
           authorDid: string;
           embedJSON: string | null;
           quotedPostUri: string | null;
@@ -241,7 +246,9 @@ export function BrowseMessages({
           displayName: string | null;
           avatarUrl: string | null;
           avatarDataURI: string | null;
-        }>(
+        };
+
+        const postRows = await db.getAllAsync<EmbeddedPostRow>(
           `SELECT p.uri, p.cid, p.text, p.createdAt, p.savedAt,
               p.deletedPostAt, p.deletedRepostAt, p.deletedLikeAt, p.deletedBookmarkAt,
               p.authorDid,
@@ -291,6 +298,8 @@ export function BrowseMessages({
         }
 
         for (const p of postRows) {
+          const savedAtMs =
+            typeof p.savedAt === "number" ? p.savedAt : Date.parse(p.createdAt);
           const deletedAtEpoch =
             p.deletedPostAt ??
             p.deletedRepostAt ??
@@ -298,15 +307,16 @@ export function BrowseMessages({
             p.deletedBookmarkAt ??
             null;
 
+          const deletedAtMs =
+            typeof deletedAtEpoch === "number" ? deletedAtEpoch : null;
+
           postMap.set(p.uri, {
             uri: p.uri,
             cid: p.cid,
             text: p.text,
             createdAt: p.createdAt,
-            savedAt: new Date(p.savedAt || p.createdAt).toISOString(),
-            deletedAt: deletedAtEpoch
-              ? new Date(deletedAtEpoch).toISOString()
-              : null,
+            savedAt: new Date(savedAtMs || Date.now()).toISOString(),
+            deletedAt: deletedAtMs ? new Date(deletedAtMs).toISOString() : null,
             author: {
               did: p.authorDid,
               handle: p.handle ?? "unknown",
@@ -349,28 +359,37 @@ export function BrowseMessages({
         return null;
       };
 
-      const mapped: MessagePreviewData[] = rows.map((row) => ({
-        messageId: row.messageId,
-        convoId: row.convoId,
-        text: row.text,
-        sentAt: row.sentAt,
-        savedAt: new Date(row.savedAt || row.sentAt).toISOString(),
-        deletedAt: row.deletedAt ? new Date(row.deletedAt).toISOString() : null,
-        sender: {
-          did: row.senderDid,
-          handle: row.handle ?? "unknown",
-          displayName: row.displayName,
-          avatarUrl: row.avatarUrl ?? row.avatarDataURI ?? undefined,
-          avatarDataURI: row.avatarDataURI ?? undefined,
-        },
-        embed: parseEmbed(row.embedJSON),
-        reactions: parseUnknownArray(row.reactionsJSON),
-        facets: parseUnknown(row.facetsJSON) as unknown[] | null,
-        embeddedPost:
-          row.embeddedPostUri && postMap.has(row.embeddedPostUri)
-            ? (postMap.get(row.embeddedPostUri) ?? null)
-            : null,
-      }));
+      const mapped: MessagePreviewData[] = rows.map((row) => {
+        const savedAtMs =
+          typeof row.savedAt === "number"
+            ? row.savedAt
+            : Date.parse(row.sentAt);
+        const deletedAtMs =
+          typeof row.deletedAt === "number" ? row.deletedAt : null;
+
+        return {
+          messageId: row.messageId,
+          convoId: row.convoId,
+          text: row.text,
+          sentAt: row.sentAt,
+          savedAt: new Date(savedAtMs || Date.now()).toISOString(),
+          deletedAt: deletedAtMs ? new Date(deletedAtMs).toISOString() : null,
+          sender: {
+            did: row.senderDid,
+            handle: row.handle ?? "unknown",
+            displayName: row.displayName,
+            avatarUrl: row.avatarUrl ?? row.avatarDataURI ?? undefined,
+            avatarDataURI: row.avatarDataURI ?? undefined,
+          },
+          embed: parseEmbed(row.embedJSON),
+          reactions: parseUnknownArray(row.reactionsJSON),
+          facets: parseUnknown(row.facetsJSON) as unknown[] | null,
+          embeddedPost:
+            row.embeddedPostUri && postMap.has(row.embeddedPostUri)
+              ? (postMap.get(row.embeddedPostUri) ?? null)
+              : null,
+        };
+      });
 
       setMessages(mapped);
     } catch (err) {
