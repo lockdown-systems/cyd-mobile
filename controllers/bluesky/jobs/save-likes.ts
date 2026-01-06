@@ -14,6 +14,8 @@ export async function runSaveLikesJob(
   _job: BlueskyJobRecord,
   emit: JobEmit
 ): Promise<void> {
+  let lastProgress: BlueskyProgress | null = null;
+
   emit({
     speechText: "I'm saving all of your likes",
     progressMessage: "Fetching likes…",
@@ -21,6 +23,7 @@ export async function runSaveLikesJob(
   });
 
   controller.setProgressCallback((progress: BlueskyProgress) => {
+    lastProgress = progress;
     const segment = progress.likesProgress;
     const message = progress.currentAction || formatProgress(segment);
     emit({
@@ -28,6 +31,7 @@ export async function runSaveLikesJob(
       progressPercent: undefined,
       unknownTotal: segment.unknownTotal,
       previewPost: progress.previewPost,
+      progress,
     });
   });
 
@@ -45,5 +49,6 @@ export async function runSaveLikesJob(
     progressMessage: "Saved likes",
     progressPercent: 1,
     unknownTotal: false,
+    progress: lastProgress,
   });
 }

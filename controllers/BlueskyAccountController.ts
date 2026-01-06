@@ -487,6 +487,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         unknownTotal: update.unknownTotal,
         previewPost: update.previewPost,
         previewData: update.previewData,
+        progress: update.progress,
       });
     };
 
@@ -510,6 +511,14 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       emit({ activeJobId: job.id });
 
       const emitForJob: JobEmit = (update: Parameters<JobEmit>[0]) => {
+        if (update.progress !== undefined) {
+          jobs = jobs.map((existing) =>
+            existing.id === job.id
+              ? { ...existing, progress: update.progress }
+              : existing
+          );
+        }
+
         emit({
           activeJobId: job.id,
           speechText: update.speechText,
@@ -518,6 +527,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           unknownTotal: update.unknownTotal,
           previewPost: update.previewPost,
           previewData: update.previewData,
+          progress: update.progress,
         });
       };
 

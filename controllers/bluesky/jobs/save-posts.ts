@@ -14,6 +14,8 @@ export async function runSavePostsJob(
   _job: BlueskyJobRecord,
   emit: JobEmit
 ): Promise<void> {
+  let lastProgress: BlueskyProgress | null = null;
+
   emit({
     speechText: "I'm saving all of your posts",
     progressMessage: "Fetching posts…",
@@ -22,6 +24,7 @@ export async function runSavePostsJob(
 
   // Forward indexer progress to the job emitter so AutomationModal can display it.
   controller.setProgressCallback((progress: BlueskyProgress) => {
+    lastProgress = progress;
     const segment = progress.postsProgress;
     const message = progress.currentAction || formatProgress(segment);
     emit({
@@ -29,6 +32,7 @@ export async function runSavePostsJob(
       progressPercent: undefined, // No percent for unknown total
       unknownTotal: segment.unknownTotal,
       previewPost: progress.previewPost,
+      progress,
     });
   });
 
@@ -46,5 +50,6 @@ export async function runSavePostsJob(
     progressMessage: "Saved posts",
     progressPercent: 1,
     unknownTotal: false,
+    progress: lastProgress,
   });
 }

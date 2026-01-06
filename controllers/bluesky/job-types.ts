@@ -38,6 +38,8 @@ export type BlueskyJobRunUpdate = {
   previewPost?: PostPreviewData | null;
   /** Unified preview data for posts, conversations, or messages */
   previewData?: PreviewData | null;
+  /** Optional progress snapshot for the active job */
+  progress?: unknown;
 };
 
 export type JobEmit = (update: {
@@ -50,6 +52,8 @@ export type JobEmit = (update: {
   previewPost?: PostPreviewData | null;
   /** Unified preview data for posts, conversations, or messages */
   previewData?: PreviewData | null;
+  /** Optional progress snapshot for the active job */
+  progress?: unknown;
 }) => void;
 
 export type {

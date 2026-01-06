@@ -1,5 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,7 +10,11 @@ import {
 } from "react-native";
 
 import { AutomationModal } from "@/app/account/components/AutomationModal";
-import type { SaveJobOptions } from "@/controllers/bluesky/job-types";
+import { FinishedModal } from "@/app/account/components/FinishedModal";
+import type {
+  BlueskyJobRecord,
+  SaveJobOptions,
+} from "@/controllers/bluesky/job-types";
 import type { AccountSaveSettings } from "@/database/save-settings";
 import {
   getAccountSaveSettings,
@@ -88,6 +92,9 @@ export function SaveTab({
   const [automationOptions, setAutomationOptions] =
     useState<SaveOptionState | null>(null);
   const [automationKey, setAutomationKey] = useState(0);
+  const [finishedModalVisible, setFinishedModalVisible] = useState(false);
+  const [finishedJobs, setFinishedJobs] = useState<BlueskyJobRecord[]>([]);
+  const automationCancelledRef = useRef(false);
 
   const selectedOptions = useMemo(() => {
     if (!state) {
@@ -100,6 +107,11 @@ export function SaveTab({
     !loading && !error && state && selectedOptions.length > 0
   );
 
+  const goToBrowse = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+    onSelectTab?.("browse");
+  }, [onSelectTab]);
   const currentScreen = screenStack[screenStack.length - 1];
 
   const loadSettings = useCallback(async () => {
@@ -202,10 +214,24 @@ export function SaveTab({
   const handleConfirm = useCallback(() => {
     if (!state) return;
     console.log("[SaveTab] confirm automation", accountId);
+    automationCancelledRef.current = false;
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
     setAutomationOptions(state);
     setAutomationKey((prev) => prev + 1); // Force new modal instance
     setAutomationVisible(true);
   }, [accountId, state]);
+
+  const closeFinishedModal = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+  }, []);
+
+  const goToDashboard = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+    onSelectTab?.("dashboard");
+  }, [onSelectTab]);
 
   return (
     <View style={styles.container}>
@@ -241,18 +267,30 @@ export function SaveTab({
         options={mapStateToJobOptions(
           automationOptions ?? state ?? DEFAULT_STATE
         )}
-        onFinished={(result) => {
-          if (result === "completed") {
-            onSelectTab?.("dashboard");
+        onFinished={(result, jobs) => {
+          if (result === "completed" && !automationCancelledRef.current) {
+            setAutomationVisible(false);
+            setFinishedJobs(jobs);
+            setFinishedModalVisible(true);
           }
         }}
         onClose={() => {
+          automationCancelledRef.current = true;
           setAutomationVisible(false);
         }}
         onRestart={() => {
+          automationCancelledRef.current = true;
           setAutomationVisible(false);
           resetToForm();
         }}
+      />
+      <FinishedModal
+        visible={finishedModalVisible}
+        palette={palette}
+        jobs={finishedJobs}
+        onClose={closeFinishedModal}
+        onViewDashboard={goToDashboard}
+        onViewBrowse={goToBrowse}
       />
     </View>
   );

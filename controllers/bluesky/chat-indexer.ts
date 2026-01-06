@@ -53,6 +53,7 @@ export class ChatIndexer {
       currentAction: "Saving chat conversations...",
       isRunning: true,
       error: null,
+      conversationsProgress: { current: 0, total: null, unknownTotal: true },
     });
 
     let cursor: string | undefined;
@@ -79,6 +80,11 @@ export class ChatIndexer {
             const previewData = this.buildConversationPreview(convo);
             this.deps.updateProgress({
               currentAction: `Saved ${totalSaved} conversations`,
+              conversationsProgress: {
+                current: totalSaved,
+                total: null,
+                unknownTotal: true,
+              },
               previewData: previewData
                 ? { type: "conversation", data: previewData }
                 : undefined,
@@ -97,6 +103,11 @@ export class ChatIndexer {
         currentAction: "Finished saving conversations",
         isRunning: false,
         previewData: null,
+        conversationsProgress: {
+          current: totalSaved,
+          total: totalSaved,
+          unknownTotal: false,
+        },
       });
     } catch (error) {
       this.deps.updateProgress({
@@ -115,6 +126,7 @@ export class ChatIndexer {
       currentAction: "Loading conversations...",
       isRunning: true,
       error: null,
+      messagesProgress: { current: 0, total: null, unknownTotal: true },
     });
 
     try {
@@ -140,6 +152,11 @@ export class ChatIndexer {
 
         this.deps.updateProgress({
           currentAction: `Saving messages from conversation ${convoIndex}/${convos.length}...`,
+          messagesProgress: {
+            current: totalSaved,
+            total: null,
+            unknownTotal: true,
+          },
         });
 
         while (true) {
@@ -167,6 +184,11 @@ export class ChatIndexer {
               );
               this.deps.updateProgress({
                 currentAction: `Saved ${totalSaved} messages (${convoIndex}/${convos.length} conversations)`,
+                messagesProgress: {
+                  current: totalSaved,
+                  total: null,
+                  unknownTotal: true,
+                },
                 previewData: previewData
                   ? { type: "message", data: previewData }
                   : undefined,
@@ -186,6 +208,11 @@ export class ChatIndexer {
         currentAction: `Finished saving ${totalSaved} messages`,
         isRunning: false,
         previewData: null,
+        messagesProgress: {
+          current: totalSaved,
+          total: totalSaved,
+          unknownTotal: false,
+        },
       });
     } catch (error) {
       this.deps.updateProgress({

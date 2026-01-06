@@ -7,6 +7,8 @@ export async function runSaveChatConvosJob(
   _job: BlueskyJobRecord,
   emit: JobEmit
 ): Promise<void> {
+  let lastProgress: BlueskyProgress | null = null;
+
   emit({
     speechText: "I'm saving all of your chat conversations",
     progressMessage: "Fetching conversations…",
@@ -15,12 +17,14 @@ export async function runSaveChatConvosJob(
 
   // Forward indexer progress to the job emitter so AutomationModal can display it.
   controller.setProgressCallback((progress: BlueskyProgress) => {
+    lastProgress = progress;
     const message = progress.currentAction || "Saving conversations...";
     emit({
       progressMessage: message,
       progressPercent: undefined,
       unknownTotal: true,
       previewData: progress.previewData,
+      progress,
     });
   });
 
@@ -39,5 +43,6 @@ export async function runSaveChatConvosJob(
     progressPercent: 1,
     unknownTotal: false,
     previewData: null,
+    progress: lastProgress,
   });
 }

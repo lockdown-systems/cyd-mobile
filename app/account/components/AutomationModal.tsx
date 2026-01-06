@@ -38,7 +38,10 @@ export type AutomationModalProps = {
   accountUUID: string;
   palette: AccountTabPalette;
   options: SaveJobOptions;
-  onFinished: (result: "completed" | "failed") => void;
+  onFinished: (
+    result: "completed" | "failed",
+    jobs: BlueskyJobRecord[]
+  ) => void;
   onClose: () => void;
   onRestart?: () => void;
 };
@@ -213,9 +216,9 @@ export function AutomationModal({
             (job) => job.status === "failed"
           );
           setError(firstFail?.error ?? "Automation failed");
-          onFinished("failed");
+          onFinished("failed", latestJobsRef.current);
         } else {
-          onFinished("completed");
+          onFinished("completed", latestJobsRef.current);
         }
         console.log(
           "[AutomationModal] run -> finished",
@@ -227,7 +230,7 @@ export function AutomationModal({
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
         setState("failed");
-        onFinished("failed");
+        onFinished("failed", latestJobsRef.current);
         console.warn("[AutomationModal] run -> error", accountId, err);
       } finally {
         isRunningRef.current = false;
