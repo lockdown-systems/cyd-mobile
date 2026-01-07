@@ -233,6 +233,12 @@ export function SaveTab({
     onSelectTab?.("dashboard");
   }, [onSelectTab]);
 
+  const goToDelete = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+    onSelectTab?.("delete");
+  }, [onSelectTab]);
+
   return (
     <View style={styles.container}>
       {currentScreen === "form" && (
@@ -291,6 +297,7 @@ export function SaveTab({
         onClose={closeFinishedModal}
         onViewDashboard={goToDashboard}
         onViewBrowse={goToBrowse}
+        onViewDelete={goToDelete}
       />
     </View>
   );

@@ -16,25 +16,42 @@ import {
 } from "react-native";
 
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
+import { SaveStatusBanner } from "@/components/SaveStatusBanner";
+import { getLastSavedAt } from "@/database/accounts";
 import {
   getAccountDeleteSettings,
   updateAccountDeleteSettings,
   type AccountDeleteSettings,
 } from "@/database/delete-settings";
-import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
+import type {
+  AccountTabKey,
+  AccountTabPalette,
+  AccountTabProps,
+} from "@/types/account-tabs";
 import { sharedTabStyles } from "./shared-tab-styles";
 
 type DeleteFlowScreen = "form" | "review";
 
-export function DeleteTab({ accountId, handle, palette }: AccountTabProps) {
+export function DeleteTab({
+  accountId,
+  handle,
+  palette,
+  onSelectTab,
+}: AccountTabProps) {
   const [screenStack, setScreenStack] = useState<DeleteFlowScreen[]>(["form"]);
   const [state, setState] = useState<AccountDeleteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [saving, setSaving] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const currentScreen = screenStack[screenStack.length - 1];
+
+  // Refresh lastSavedAt data whenever component mounts
+  useEffect(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -137,6 +154,7 @@ export function DeleteTab({ accountId, handle, palette }: AccountTabProps) {
     <View style={styles.container}>
       {currentScreen === "form" && (
         <DeleteOptionsForm
+          accountId={accountId}
           handle={handle}
           palette={palette}
           state={state}
@@ -148,6 +166,8 @@ export function DeleteTab({ accountId, handle, palette }: AccountTabProps) {
           canContinue={canContinue}
           saving={saving}
           persistError={persistError}
+          onSelectTab={onSelectTab}
+          refreshKey={refreshKey}
         />
       )}
       {currentScreen === "review" && state && (
@@ -163,6 +183,7 @@ export function DeleteTab({ accountId, handle, palette }: AccountTabProps) {
 }
 
 type DeleteOptionsFormProps = {
+  accountId: number;
   handle: string;
   palette: AccountTabPalette;
   state: AccountDeleteSettings | null;
@@ -177,9 +198,12 @@ type DeleteOptionsFormProps = {
   canContinue: boolean;
   saving: boolean;
   persistError: string | null;
+  onSelectTab?: (tab: AccountTabKey) => void;
+  refreshKey: number;
 };
 
 function DeleteOptionsForm({
+  accountId,
   handle,
   palette,
   state,
@@ -191,7 +215,22 @@ function DeleteOptionsForm({
   canContinue,
   saving,
   persistError,
+  onSelectTab,
+  refreshKey,
 }: DeleteOptionsFormProps) {
+  const [lastSavedAt, setLastSavedAt] = useState<number | null | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    void (async () => {
+      const ts = await getLastSavedAt(accountId);
+      setLastSavedAt(ts);
+    })();
+  }, [accountId, refreshKey]);
+
+  const hasSavedData = lastSavedAt !== null && lastSavedAt !== undefined;
+
   return (
     <View style={styles.stackScreen}>
       <PremiumRequiredBanner palette={palette} />
@@ -207,270 +246,296 @@ function DeleteOptionsForm({
           What data would you like Cyd to delete for you?
         </Text>
 
-        {loading ? (
-          <StatusCard palette={palette}>
-            <ActivityIndicator color={palette.tint} size="large" />
-            <Text style={[styles.statusText, { color: palette.icon }]}>
-              Loading your current settings…
-            </Text>
-          </StatusCard>
-        ) : error ? (
-          <StatusCard palette={palette}>
-            <MaterialIcons
-              name="error-outline"
-              size={20}
-              color={palette.tint}
-            />
-            <Text style={[styles.statusText, { color: palette.icon }]}>
-              Failed to load your existing preferences.
-            </Text>
-            {error?.message ? (
-              <Text
-                style={[styles.statusTextDetail, { color: palette.icon }]}
-                numberOfLines={3}
+        <SaveStatusBanner
+          accountId={accountId}
+          palette={palette}
+          onSelectTab={onSelectTab}
+          refreshKey={refreshKey}
+        />
+
+        {hasSavedData && (
+          <>
+            {loading ? (
+              <StatusCard palette={palette}>
+                <ActivityIndicator color={palette.tint} size="large" />
+                <Text style={[styles.statusText, { color: palette.icon }]}>
+                  Loading your current settings…
+                </Text>
+              </StatusCard>
+            ) : error ? (
+              <StatusCard palette={palette}>
+                <MaterialIcons
+                  name="error-outline"
+                  size={20}
+                  color={palette.tint}
+                />
+                <Text style={[styles.statusText, { color: palette.icon }]}>
+                  Failed to load your existing preferences.
+                </Text>
+                {error?.message ? (
+                  <Text
+                    style={[styles.statusTextDetail, { color: palette.icon }]}
+                    numberOfLines={3}
+                  >
+                    {error.message}
+                  </Text>
+                ) : null}
+                <SecondaryButton
+                  label="Try again"
+                  palette={palette}
+                  onPress={onRetry}
+                />
+              </StatusCard>
+            ) : state ? (
+              <View
+                style={[
+                  styles.optionCard,
+                  {
+                    borderColor: palette.icon + "22",
+                    backgroundColor: palette.card,
+                  },
+                ]}
               >
-                {error.message}
-              </Text>
+                <CheckboxRow
+                  palette={palette}
+                  label="Delete my posts"
+                  checked={state.deletePosts}
+                  onToggle={(next) => onUpdate("deletePosts", next)}
+                />
+                <Indented>
+                  <CheckboxRow
+                    palette={palette}
+                    label="older than"
+                    checked={state.deletePostsDaysOldEnabled}
+                    disabled={!state.deletePosts}
+                    onToggle={(next) =>
+                      onUpdate("deletePostsDaysOldEnabled", next)
+                    }
+                  >
+                    <View style={styles.inlineNumberRow}>
+                      <NumberInput
+                        palette={palette}
+                        value={state.deletePostsDaysOld}
+                        onChange={(value) =>
+                          onUpdate("deletePostsDaysOld", value)
+                        }
+                        disabled={
+                          !state.deletePosts || !state.deletePostsDaysOldEnabled
+                        }
+                        min={0}
+                        suffix="days"
+                      />
+                    </View>
+                  </CheckboxRow>
+                  <CheckboxRow
+                    palette={palette}
+                    label="unless they have at least"
+                    checked={state.deletePostsLikesThresholdEnabled}
+                    disabled={!state.deletePosts}
+                    onToggle={(next) =>
+                      onUpdate("deletePostsLikesThresholdEnabled", next)
+                    }
+                  >
+                    <View style={styles.inlineNumberRow}>
+                      <NumberInput
+                        palette={palette}
+                        value={state.deletePostsLikesThreshold}
+                        onChange={(value) =>
+                          onUpdate("deletePostsLikesThreshold", value)
+                        }
+                        disabled={
+                          !state.deletePosts ||
+                          !state.deletePostsLikesThresholdEnabled
+                        }
+                        min={0}
+                        suffix="likes"
+                      />
+                    </View>
+                  </CheckboxRow>
+                  <CheckboxRow
+                    palette={palette}
+                    label="or at least"
+                    checked={state.deletePostsRepostsThresholdEnabled}
+                    disabled={!state.deletePosts}
+                    onToggle={(next) =>
+                      onUpdate("deletePostsRepostsThresholdEnabled", next)
+                    }
+                  >
+                    <View style={styles.inlineNumberRow}>
+                      <NumberInput
+                        palette={palette}
+                        value={state.deletePostsRepostsThreshold}
+                        onChange={(value) =>
+                          onUpdate("deletePostsRepostsThreshold", value)
+                        }
+                        disabled={
+                          !state.deletePosts ||
+                          !state.deletePostsRepostsThresholdEnabled
+                        }
+                        min={0}
+                        suffix="reposts"
+                      />
+                    </View>
+                  </CheckboxRow>
+
+                  <CheckboxRow
+                    palette={palette}
+                    label="Preserve entire threads if any post meets these thresholds"
+                    checked={state.deletePostsPreserveThreads}
+                    disabled={
+                      !state.deletePosts ||
+                      (!state.deletePostsLikesThresholdEnabled &&
+                        !state.deletePostsRepostsThresholdEnabled)
+                    }
+                    onToggle={(next) =>
+                      onUpdate("deletePostsPreserveThreads", next)
+                    }
+                  />
+                </Indented>
+
+                <CheckboxRow
+                  palette={palette}
+                  label="Delete my reposts"
+                  checked={state.deleteReposts}
+                  onToggle={(next) => onUpdate("deleteReposts", next)}
+                />
+                <Indented>
+                  <CheckboxRow
+                    palette={palette}
+                    label="older than"
+                    checked={state.deleteRepostsDaysOldEnabled}
+                    disabled={!state.deleteReposts}
+                    onToggle={(next) =>
+                      onUpdate("deleteRepostsDaysOldEnabled", next)
+                    }
+                  >
+                    <View style={styles.inlineNumberRow}>
+                      <NumberInput
+                        palette={palette}
+                        value={state.deleteRepostsDaysOld}
+                        onChange={(value) =>
+                          onUpdate("deleteRepostsDaysOld", value)
+                        }
+                        disabled={
+                          !state.deleteReposts ||
+                          !state.deleteRepostsDaysOldEnabled
+                        }
+                        min={0}
+                        suffix="days"
+                      />
+                    </View>
+                  </CheckboxRow>
+                </Indented>
+
+                <CheckboxRow
+                  palette={palette}
+                  label="Delete my likes"
+                  checked={state.deleteLikes}
+                  onToggle={(next) => onUpdate("deleteLikes", next)}
+                />
+                <Indented>
+                  <CheckboxRow
+                    palette={palette}
+                    label="older than"
+                    checked={state.deleteLikesDaysOldEnabled}
+                    disabled={!state.deleteLikes}
+                    onToggle={(next) =>
+                      onUpdate("deleteLikesDaysOldEnabled", next)
+                    }
+                  >
+                    <View style={styles.inlineNumberRow}>
+                      <NumberInput
+                        palette={palette}
+                        value={state.deleteLikesDaysOld}
+                        onChange={(value) =>
+                          onUpdate("deleteLikesDaysOld", value)
+                        }
+                        disabled={
+                          !state.deleteLikes || !state.deleteLikesDaysOldEnabled
+                        }
+                        min={0}
+                        suffix="days"
+                      />
+                    </View>
+                  </CheckboxRow>
+                </Indented>
+
+                <CheckboxRow
+                  palette={palette}
+                  label="Delete my chat messages"
+                  checked={state.deleteChats}
+                  onToggle={(next) => onUpdate("deleteChats", next)}
+                />
+                <Indented>
+                  <CheckboxRow
+                    palette={palette}
+                    label="older than"
+                    checked={state.deleteChatsDaysOldEnabled}
+                    disabled={!state.deleteChats}
+                    onToggle={(next) =>
+                      onUpdate("deleteChatsDaysOldEnabled", next)
+                    }
+                  >
+                    <View style={styles.inlineNumberRow}>
+                      <NumberInput
+                        palette={palette}
+                        value={state.deleteChatsDaysOld}
+                        onChange={(value) =>
+                          onUpdate("deleteChatsDaysOld", value)
+                        }
+                        disabled={
+                          !state.deleteChats || !state.deleteChatsDaysOldEnabled
+                        }
+                        min={0}
+                        suffix="days"
+                      />
+                    </View>
+                  </CheckboxRow>
+                </Indented>
+
+                <CheckboxRow
+                  palette={palette}
+                  label="Delete my bookmarks"
+                  checked={state.deleteBookmarks}
+                  onToggle={(next) => onUpdate("deleteBookmarks", next)}
+                />
+
+                <CheckboxRow
+                  palette={palette}
+                  label="Unfollow everyone"
+                  checked={state.deleteUnfollowEveryone}
+                  onToggle={(next) => onUpdate("deleteUnfollowEveryone", next)}
+                />
+              </View>
             ) : null}
-            <SecondaryButton
-              label="Try again"
-              palette={palette}
-              onPress={onRetry}
-            />
-          </StatusCard>
-        ) : state ? (
-          <View
-            style={[
-              styles.optionCard,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <CheckboxRow
-              palette={palette}
-              label="Delete my posts"
-              checked={state.deletePosts}
-              onToggle={(next) => onUpdate("deletePosts", next)}
-            />
-            <Indented>
-              <CheckboxRow
-                palette={palette}
-                label="older than"
-                checked={state.deletePostsDaysOldEnabled}
-                disabled={!state.deletePosts}
-                onToggle={(next) => onUpdate("deletePostsDaysOldEnabled", next)}
-              >
-                <View style={styles.inlineNumberRow}>
-                  <NumberInput
-                    palette={palette}
-                    value={state.deletePostsDaysOld}
-                    onChange={(value) => onUpdate("deletePostsDaysOld", value)}
-                    disabled={
-                      !state.deletePosts || !state.deletePostsDaysOldEnabled
-                    }
-                    min={0}
-                    suffix="days"
-                  />
-                </View>
-              </CheckboxRow>
-              <CheckboxRow
-                palette={palette}
-                label="unless they have at least"
-                checked={state.deletePostsLikesThresholdEnabled}
-                disabled={!state.deletePosts}
-                onToggle={(next) =>
-                  onUpdate("deletePostsLikesThresholdEnabled", next)
-                }
-              >
-                <View style={styles.inlineNumberRow}>
-                  <NumberInput
-                    palette={palette}
-                    value={state.deletePostsLikesThreshold}
-                    onChange={(value) =>
-                      onUpdate("deletePostsLikesThreshold", value)
-                    }
-                    disabled={
-                      !state.deletePosts ||
-                      !state.deletePostsLikesThresholdEnabled
-                    }
-                    min={0}
-                    suffix="likes"
-                  />
-                </View>
-              </CheckboxRow>
-              <CheckboxRow
-                palette={palette}
-                label="or at least"
-                checked={state.deletePostsRepostsThresholdEnabled}
-                disabled={!state.deletePosts}
-                onToggle={(next) =>
-                  onUpdate("deletePostsRepostsThresholdEnabled", next)
-                }
-              >
-                <View style={styles.inlineNumberRow}>
-                  <NumberInput
-                    palette={palette}
-                    value={state.deletePostsRepostsThreshold}
-                    onChange={(value) =>
-                      onUpdate("deletePostsRepostsThreshold", value)
-                    }
-                    disabled={
-                      !state.deletePosts ||
-                      !state.deletePostsRepostsThresholdEnabled
-                    }
-                    min={0}
-                    suffix="reposts"
-                  />
-                </View>
-              </CheckboxRow>
-
-              <CheckboxRow
-                palette={palette}
-                label="Preserve entire threads if any post meets these thresholds"
-                checked={state.deletePostsPreserveThreads}
-                disabled={
-                  !state.deletePosts ||
-                  (!state.deletePostsLikesThresholdEnabled &&
-                    !state.deletePostsRepostsThresholdEnabled)
-                }
-                onToggle={(next) =>
-                  onUpdate("deletePostsPreserveThreads", next)
-                }
-              />
-            </Indented>
-
-            <CheckboxRow
-              palette={palette}
-              label="Delete my reposts"
-              checked={state.deleteReposts}
-              onToggle={(next) => onUpdate("deleteReposts", next)}
-            />
-            <Indented>
-              <CheckboxRow
-                palette={palette}
-                label="older than"
-                checked={state.deleteRepostsDaysOldEnabled}
-                disabled={!state.deleteReposts}
-                onToggle={(next) =>
-                  onUpdate("deleteRepostsDaysOldEnabled", next)
-                }
-              >
-                <View style={styles.inlineNumberRow}>
-                  <NumberInput
-                    palette={palette}
-                    value={state.deleteRepostsDaysOld}
-                    onChange={(value) =>
-                      onUpdate("deleteRepostsDaysOld", value)
-                    }
-                    disabled={
-                      !state.deleteReposts || !state.deleteRepostsDaysOldEnabled
-                    }
-                    min={0}
-                    suffix="days"
-                  />
-                </View>
-              </CheckboxRow>
-            </Indented>
-
-            <CheckboxRow
-              palette={palette}
-              label="Delete my likes"
-              checked={state.deleteLikes}
-              onToggle={(next) => onUpdate("deleteLikes", next)}
-            />
-            <Indented>
-              <CheckboxRow
-                palette={palette}
-                label="older than"
-                checked={state.deleteLikesDaysOldEnabled}
-                disabled={!state.deleteLikes}
-                onToggle={(next) => onUpdate("deleteLikesDaysOldEnabled", next)}
-              >
-                <View style={styles.inlineNumberRow}>
-                  <NumberInput
-                    palette={palette}
-                    value={state.deleteLikesDaysOld}
-                    onChange={(value) => onUpdate("deleteLikesDaysOld", value)}
-                    disabled={
-                      !state.deleteLikes || !state.deleteLikesDaysOldEnabled
-                    }
-                    min={0}
-                    suffix="days"
-                  />
-                </View>
-              </CheckboxRow>
-            </Indented>
-
-            <CheckboxRow
-              palette={palette}
-              label="Delete my chat messages"
-              checked={state.deleteChats}
-              onToggle={(next) => onUpdate("deleteChats", next)}
-            />
-            <Indented>
-              <CheckboxRow
-                palette={palette}
-                label="older than"
-                checked={state.deleteChatsDaysOldEnabled}
-                disabled={!state.deleteChats}
-                onToggle={(next) => onUpdate("deleteChatsDaysOldEnabled", next)}
-              >
-                <View style={styles.inlineNumberRow}>
-                  <NumberInput
-                    palette={palette}
-                    value={state.deleteChatsDaysOld}
-                    onChange={(value) => onUpdate("deleteChatsDaysOld", value)}
-                    disabled={
-                      !state.deleteChats || !state.deleteChatsDaysOldEnabled
-                    }
-                    min={0}
-                    suffix="days"
-                  />
-                </View>
-              </CheckboxRow>
-            </Indented>
-
-            <CheckboxRow
-              palette={palette}
-              label="Delete my bookmarks"
-              checked={state.deleteBookmarks}
-              onToggle={(next) => onUpdate("deleteBookmarks", next)}
-            />
-
-            <CheckboxRow
-              palette={palette}
-              label="Unfollow everyone"
-              checked={state.deleteUnfollowEveryone}
-              onToggle={(next) => onUpdate("deleteUnfollowEveryone", next)}
-            />
-          </View>
-        ) : null}
+          </>
+        )}
       </ScrollView>
 
-      <View
-        style={[
-          styles.footerBar,
-          {
-            borderColor: palette.icon + "22",
-            backgroundColor: palette.background,
-          },
-        ]}
-      >
-        {persistError ? (
-          <Text style={[styles.errorText, { color: palette.tint }]}>
-            {persistError}
-          </Text>
-        ) : null}
-        {saving ? <ActivityIndicator color={palette.tint} /> : null}
-        <PrimaryButton
-          label="Continue to Review"
-          onPress={onContinue}
-          disabled={!canContinue || saving}
-          palette={palette}
-        />
-      </View>
+      {hasSavedData && (
+        <View
+          style={[
+            styles.footerBar,
+            {
+              borderColor: palette.icon + "22",
+              backgroundColor: palette.background,
+            },
+          ]}
+        >
+          {persistError ? (
+            <Text style={[styles.errorText, { color: palette.tint }]}>
+              {persistError}
+            </Text>
+          ) : null}
+          {saving ? <ActivityIndicator color={palette.tint} /> : null}
+          <PrimaryButton
+            label="Continue to Review"
+            onPress={onContinue}
+            disabled={!canContinue || saving}
+            palette={palette}
+          />
+        </View>
+      )}
     </View>
   );
 }

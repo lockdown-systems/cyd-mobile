@@ -19,6 +19,7 @@ export type FinishedModalProps = {
   onClose: () => void;
   onViewDashboard?: () => void;
   onViewBrowse?: () => void;
+  onViewDelete?: () => void;
 };
 
 function jobLabel(jobType: BlueskyJobRecord["jobType"]): string {
@@ -123,6 +124,7 @@ export function FinishedModal({
   onClose,
   onViewDashboard,
   onViewBrowse,
+  onViewDelete,
 }: FinishedModalProps) {
   const orderedJobs = useMemo(
     () => [...jobs].sort((a, b) => a.scheduledAt - b.scheduledAt),
@@ -271,6 +273,30 @@ export function FinishedModal({
               Close
             </Text>
           </Pressable>
+          {onViewDelete ? (
+            <Pressable
+              onPress={() => {
+                onViewDelete();
+              }}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                {
+                  backgroundColor: palette.button?.background ?? palette.tint,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+            >
+              <Text
+                style={[
+                  styles.primaryButtonText,
+                  { color: palette.button?.text ?? "#ffffff" },
+                ]}
+              >
+                Delete Data
+              </Text>
+            </Pressable>
+          ) : null}
           {onViewBrowse ? (
             <Pressable
               onPress={() => {

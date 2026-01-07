@@ -290,3 +290,42 @@ function createUUID(): string {
   const random = Math.random().toString(16).slice(2, 12);
   return `uuid-${Date.now().toString(16)}-${random}`;
 }
+
+/**
+ * Get the timestamp of when data was last saved for an account.
+ * @param accountId The account ID
+ * @returns The timestamp in milliseconds, or null if never saved
+ */
+export async function getLastSavedAt(
+  accountId: number
+): Promise<number | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ lastSavedAt: number | null }>(
+    `SELECT b.lastSavedAt
+     FROM account a
+     INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+     WHERE a.id = ?
+     LIMIT 1;`,
+    [accountId]
+  );
+  return row?.lastSavedAt ?? null;
+}
+
+/**
+ * Update the last saved timestamp for an account.
+ * @param accountId The account ID
+ * @param timestamp Optional timestamp in milliseconds; defaults to now
+ */
+export async function setLastSavedAt(
+  accountId: number,
+  timestamp?: number
+): Promise<void> {
+  const db = await getDatabase();
+  const ts = timestamp ?? Date.now();
+  await db.runAsync(
+    `UPDATE bsky_account
+     SET lastSavedAt = ?
+     WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
+    [ts, accountId]
+  );
+}

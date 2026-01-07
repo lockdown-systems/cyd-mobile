@@ -79,4 +79,9 @@ export const migrations: Migration[] = [
       `INSERT OR IGNORE INTO cyd_account (id) VALUES (1);`,
     ],
   },
+  {
+    version: 4,
+    name: "add lastSavedAt to bsky_account",
+    statements: [`ALTER TABLE bsky_account ADD COLUMN lastSavedAt INTEGER;`],
+  },
 ];
