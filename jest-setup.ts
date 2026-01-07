@@ -52,9 +52,14 @@ jest.mock("react-native", () => {
     TextInput: createMockComponent("TextInput"),
     ActivityIndicator: createMockComponent("ActivityIndicator"),
     ScrollView: createMockComponent("ScrollView"),
+    KeyboardAvoidingView: createMockComponent("KeyboardAvoidingView"),
+    Switch: createMockComponent("Switch"),
     Linking: {
       openURL: jest.fn().mockResolvedValue(true),
       canOpenURL: jest.fn().mockResolvedValue(true),
+    },
+    Alert: {
+      alert: jest.fn(),
     },
     Dimensions: {
       get: jest.fn(() => ({ height: 800, width: 400 })),
@@ -133,7 +138,7 @@ jest.mock("expo-file-system", () => {
     uri: string;
 
     constructor(base?: { uri?: string } | string, ...paths: string[]) {
-      const baseUri = typeof base === "string" ? base : base?.uri ?? "";
+      const baseUri = typeof base === "string" ? base : (base?.uri ?? "");
       const joined = [baseUri, ...paths].filter(Boolean).join("/");
       this.uri = joined.endsWith("/") ? joined : `${joined}/`;
     }
