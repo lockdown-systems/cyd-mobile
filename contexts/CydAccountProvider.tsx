@@ -15,9 +15,14 @@ import {
 } from "@/database/cyd-account";
 import CydAPIClient from "@/services/cyd-api-client";
 
-// Configuration - same as production cyd desktop app
-const API_URL = "https://api.cyd.social";
-const DASH_URL = "https://dash.cyd.social";
+// Configuration for API environments
+const PROD_API_URL = "https://api.cyd.social";
+const PROD_DASH_URL = "https://dash.cyd.social";
+const DEV_API_URL = "https://dev-api.cyd.social";
+const DEV_DASH_URL = "https://dev-dash.cyd.social";
+
+const API_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
+const DASH_URL = __DEV__ ? DEV_DASH_URL : PROD_DASH_URL;
 
 export type CydAccountState = {
   isSignedIn: boolean;
