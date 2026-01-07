@@ -194,12 +194,12 @@ function DeleteOptionsForm({
 }: DeleteOptionsFormProps) {
   return (
     <View style={styles.stackScreen}>
+      <PremiumRequiredBanner palette={palette} />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <PremiumRequiredBanner palette={palette} />
-
         <Text style={[styles.headline, { color: palette.text }]}>
           Choose what to delete
         </Text>
