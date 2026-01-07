@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 
+import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import {
   getAccountDeleteSettings,
   updateAccountDeleteSettings,
@@ -121,7 +122,7 @@ export function DeleteTab({ accountId, handle, palette }: AccountTabProps) {
     try {
       await updateAccountDeleteSettings(accountId, state);
       pushScreen("review");
-    } catch (err) {
+    } catch {
       setPersistError("Failed to save your selections. Please try again.");
     } finally {
       setSaving(false);
@@ -197,6 +198,8 @@ function DeleteOptionsForm({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <PremiumRequiredBanner palette={palette} />
+
         <Text style={[styles.headline, { color: palette.text }]}>
           Choose what to delete
         </Text>

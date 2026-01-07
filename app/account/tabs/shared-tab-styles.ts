@@ -12,7 +12,7 @@ export const sharedTabStyles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingBottom: 32,
     gap: 16,
   },
@@ -145,6 +145,11 @@ export const sharedTabStyles = StyleSheet.create({
   infoText: {
     fontSize: 16,
     lineHeight: 22,
+  },
+  bannerButtonRow: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
   },
   primaryButton: {
     borderRadius: 14,
