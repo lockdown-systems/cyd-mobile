@@ -64,4 +64,19 @@ export const migrations: Migration[] = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did ON bsky_account(did);`,
     ],
   },
+  {
+    version: 3,
+    name: "add cyd account credentials",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS cyd_account (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        userEmail TEXT,
+        deviceToken TEXT,
+        deviceUUID TEXT,
+        createdAt INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        updatedAt INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+      );`,
+      `INSERT OR IGNORE INTO cyd_account (id) VALUES (1);`,
+    ],
+  },
 ];

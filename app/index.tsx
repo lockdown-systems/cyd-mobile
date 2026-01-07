@@ -11,10 +11,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
+import { CydAccountBar } from "@/components/CydAccountBar";
 import { Colors } from "@/constants/theme";
 import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -28,6 +32,7 @@ export default function AccountSelectionScreen() {
   const Wordmark = colorScheme === "dark" ? WordmarkDark : WordmarkLight;
   const { accounts, loading, error, refresh } = useAccounts();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [navigatingAccountId, setNavigatingAccountId] = useState<string | null>(
     null
   );
@@ -112,6 +117,7 @@ export default function AccountSelectionScreen() {
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
+      edges={["top", "left", "right"]}
     >
       <View style={styles.container}>
         {error ? (
@@ -187,6 +193,8 @@ export default function AccountSelectionScreen() {
           on a computer.
         </Text>
       </View>
+
+      <CydAccountBar bottomInset={insets.bottom} />
     </SafeAreaView>
   );
 }
