@@ -686,34 +686,6 @@ export function PostPreview({
         </Text>
       ) : null}
 
-      {/* Preserve badge/toggle - only for non-repost posts */}
-      {!post.isRepost && browseMode && onPreserveToggle && (
-        <Pressable
-          onPress={() => onPreserveToggle(post.uri)}
-          style={[
-            styles.preserveBadge,
-            post.preserve
-              ? {
-                  backgroundColor: palette.tint + "22",
-                  borderColor: palette.tint,
-                }
-              : {
-                  backgroundColor: palette.icon + "11",
-                  borderColor: palette.icon + "44",
-                },
-          ]}
-        >
-          <Text
-            style={[
-              styles.preserveBadgeText,
-              { color: post.preserve ? palette.tint : palette.icon },
-            ]}
-          >
-            {post.preserve ? "🛡️ Preserved" : "🛡️ Preserve"}
-          </Text>
-        </Pressable>
-      )}
-
       {/* Static preserve badge for non-browse mode */}
       {!post.isRepost && !browseMode && post.preserve && (
         <View
@@ -728,17 +700,48 @@ export function PostPreview({
         </View>
       )}
 
+      {/* Action row with copy link and preserve toggle */}
       {browseMode && (
-        <Pressable
-          onPress={() => {
-            void handleCopyLink();
-          }}
-          style={styles.copyLinkButton}
-        >
-          <Text style={[styles.copyLinkText, { color: palette.icon }]}>
-            📋 Copy Link
-          </Text>
-        </Pressable>
+        <View style={styles.actionRow}>
+          <Pressable
+            onPress={() => {
+              void handleCopyLink();
+            }}
+            style={styles.copyLinkButton}
+          >
+            <Text style={[styles.copyLinkText, { color: palette.icon }]}>
+              📋 Copy Link
+            </Text>
+          </Pressable>
+
+          {/* Preserve toggle - only for non-repost posts */}
+          {!post.isRepost && onPreserveToggle && (
+            <Pressable
+              onPress={() => onPreserveToggle(post.uri)}
+              style={[
+                styles.preserveBadge,
+                post.preserve
+                  ? {
+                      backgroundColor: palette.tint + "22",
+                      borderColor: palette.tint,
+                    }
+                  : {
+                      backgroundColor: palette.icon + "11",
+                      borderColor: palette.icon + "44",
+                    },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.preserveBadgeText,
+                  { color: post.preserve ? palette.tint : palette.icon },
+                ]}
+              >
+                {post.preserve ? "🛡️ Preserved" : "🛡️ Preserve"}
+              </Text>
+            </Pressable>
+          )}
+        </View>
       )}
 
       {post.quotedPost && (
@@ -1012,11 +1015,15 @@ const styles = StyleSheet.create({
   linkText: {
     textDecorationLine: "underline",
   },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
   copyLinkButton: {
-    alignSelf: "flex-start",
     paddingVertical: 2,
     paddingHorizontal: 0,
-    marginTop: 4,
   },
   copyLinkText: {
     fontSize: 13,
@@ -1024,14 +1031,12 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   preserveBadge: {
-    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 16,
     borderWidth: 1,
-    marginTop: 4,
   },
   preserveBadgeText: {
     fontSize: 13,
