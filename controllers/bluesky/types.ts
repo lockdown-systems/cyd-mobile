@@ -115,6 +115,7 @@ export type PostPreviewData = {
   createdAt: string;
   savedAt: string;
   deletedAt?: string | null;
+  preserve?: boolean;
   author: {
     did: string;
     handle: string;

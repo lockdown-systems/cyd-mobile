@@ -47,6 +47,7 @@ export type PostRow = {
   deletedRepostAt: number | null;
   deletedLikeAt: number | null;
   deletedBookmarkAt: number | null;
+  preserve: number;
   facetsJSON: string | null;
   embedJSON: string | null;
   quotedPostUri: string | null;
@@ -157,6 +158,7 @@ export function mapRowToPreview(
     createdAt: row.createdAt,
     savedAt: new Date(row.savedAt || row.createdAt).toISOString(),
     deletedAt: deletedAtEpoch ? new Date(deletedAtEpoch).toISOString() : null,
+    preserve: row.preserve === 1,
     author: {
       did: row.authorDid,
       handle: row.handle ?? fallbackHandle,
@@ -269,6 +271,7 @@ export function buildFirstPageQuery(type: BrowseType): string {
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt, p.savedAt,
       p.deletedPostAt, p.deletedRepostAt, p.deletedLikeAt, p.deletedBookmarkAt,
+      p.preserve,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
@@ -299,6 +302,7 @@ export function buildLoadMoreQuery(type: BrowseType): string {
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt, p.savedAt,
       p.deletedPostAt, p.deletedRepostAt, p.deletedLikeAt, p.deletedBookmarkAt,
+      p.preserve,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
       prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
@@ -547,6 +551,37 @@ export function BrowseList({
     }
   }, [handle, hasMore, loadingInitial, loadingMore, type]);
 
+  // Toggle preserve flag for a post (only for "posts" type browsing)
+  const handlePreserveToggle = useCallback(async (postUri: string) => {
+    const db = accountDbRef.current;
+    if (!db) return;
+
+    try {
+      // Get current preserve value
+      const row = await db.getFirstAsync<{ preserve: number }>(
+        `SELECT preserve FROM post WHERE uri = ?;`,
+        [postUri]
+      );
+      if (!row) return;
+
+      // Toggle preserve value
+      const newValue = row.preserve === 1 ? 0 : 1;
+      await db.runAsync(`UPDATE post SET preserve = ? WHERE uri = ?;`, [
+        newValue,
+        postUri,
+      ]);
+
+      // Update local state
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.uri === postUri ? { ...post, preserve: newValue === 1 } : post
+        )
+      );
+    } catch (err) {
+      console.error("Failed to toggle preserve:", err);
+    }
+  }, []);
+
   useEffect(() => {
     void loadFirstPage();
   }, [loadFirstPage]);
@@ -588,9 +623,14 @@ export function BrowseList({
 
   const renderItem = useCallback(
     ({ item }: { item: PostPreviewData }) => (
-      <PostPreview post={item} palette={palette} browseMode />
+      <PostPreview
+        post={item}
+        palette={palette}
+        browseMode
+        onPreserveToggle={type === "posts" ? handlePreserveToggle : undefined}
+      />
     ),
-    [palette]
+    [palette, type, handlePreserveToggle]
   );
 
   const keyExtractor = useCallback((item: PostPreviewData) => item.uri, []);

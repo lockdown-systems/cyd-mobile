@@ -39,6 +39,8 @@ type PostPreviewProps = {
   post: PostPreviewData;
   palette: AccountTabPalette;
   browseMode?: boolean;
+  /** Callback to toggle preserve flag (only for user's own posts, not reposts) */
+  onPreserveToggle?: (postUri: string) => void;
 };
 
 type ImageItem = {
@@ -300,6 +302,7 @@ export function PostPreview({
   post,
   palette,
   browseMode = false,
+  onPreserveToggle,
 }: PostPreviewProps): JSX.Element {
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -682,6 +685,49 @@ export function PostPreview({
           Deleted {formatTimestampFull(deletedTimestamp)}
         </Text>
       ) : null}
+
+      {/* Preserve badge/toggle - only for non-repost posts */}
+      {!post.isRepost && browseMode && onPreserveToggle && (
+        <Pressable
+          onPress={() => onPreserveToggle(post.uri)}
+          style={[
+            styles.preserveBadge,
+            post.preserve
+              ? {
+                  backgroundColor: palette.tint + "22",
+                  borderColor: palette.tint,
+                }
+              : {
+                  backgroundColor: palette.icon + "11",
+                  borderColor: palette.icon + "44",
+                },
+          ]}
+        >
+          <Text
+            style={[
+              styles.preserveBadgeText,
+              { color: post.preserve ? palette.tint : palette.icon },
+            ]}
+          >
+            {post.preserve ? "🛡️ Preserved" : "🛡️ Preserve"}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* Static preserve badge for non-browse mode */}
+      {!post.isRepost && !browseMode && post.preserve && (
+        <View
+          style={[
+            styles.preserveBadge,
+            { backgroundColor: palette.tint + "22", borderColor: palette.tint },
+          ]}
+        >
+          <Text style={[styles.preserveBadgeText, { color: palette.tint }]}>
+            🛡️ Preserved
+          </Text>
+        </View>
+      )}
+
       {browseMode && (
         <Pressable
           onPress={() => {
@@ -976,6 +1022,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "400",
     opacity: 0.9,
+  },
+  preserveBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  preserveBadgeText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
 

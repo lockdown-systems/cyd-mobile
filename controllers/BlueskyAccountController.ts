@@ -850,6 +850,62 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     throw new Error("Not implemented yet");
   }
 
+  // ==================== Post Preservation ====================
+
+  /**
+   * Set the preserve flag for a post.
+   * @param postUri The AT-URI of the post
+   * @param preserve Whether to preserve the post from deletion
+   * @returns True if the post was updated, false if not found
+   */
+  setPostPreserve(postUri: string, preserve: boolean): boolean {
+    const db = this.requireDb();
+    const result = db.runSync(`UPDATE post SET preserve = ? WHERE uri = ?;`, [
+      preserve ? 1 : 0,
+      postUri,
+    ]);
+    return result.changes > 0;
+  }
+
+  /**
+   * Toggle the preserve flag for a post.
+   * @param postUri The AT-URI of the post
+   * @returns The new preserve value, or null if post not found
+   */
+  togglePostPreserve(postUri: string): boolean | null {
+    const db = this.requireDb();
+    const row = db.getFirstSync<{ preserve: number }>(
+      `SELECT preserve FROM post WHERE uri = ?;`,
+      [postUri]
+    );
+    if (!row) {
+      return null;
+    }
+    const newValue = row.preserve === 1 ? 0 : 1;
+    db.runSync(`UPDATE post SET preserve = ? WHERE uri = ?;`, [
+      newValue,
+      postUri,
+    ]);
+    return newValue === 1;
+  }
+
+  /**
+   * Get the preserve flag for a post.
+   * @param postUri The AT-URI of the post
+   * @returns The preserve value, or null if post not found
+   */
+  getPostPreserve(postUri: string): boolean | null {
+    const db = this.requireDb();
+    const row = db.getFirstSync<{ preserve: number }>(
+      `SELECT preserve FROM post WHERE uri = ?;`,
+      [postUri]
+    );
+    if (!row) {
+      return null;
+    }
+    return row.preserve === 1;
+  }
+
   // ==================== Media Operations ====================
   // These will be implemented in Phase 4
 

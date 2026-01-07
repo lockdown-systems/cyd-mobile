@@ -253,6 +253,14 @@ export const blueskyAccountMigrations: AccountMigration[] = [
       `CREATE INDEX IF NOT EXISTS idx_message_sent ON message(sentAt);`,
     ],
   },
+  {
+    version: 2,
+    name: "add preserve flag to post table",
+    statements: [
+      `ALTER TABLE post ADD COLUMN preserve INTEGER NOT NULL DEFAULT 0;`,
+      `CREATE INDEX IF NOT EXISTS idx_post_preserve ON post(preserve);`,
+    ],
+  },
 ];
 
 /**

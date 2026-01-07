@@ -251,6 +251,17 @@ describe("calculatePostsToDelete", () => {
     expect(call.sql).toContain("repostCount < ?");
   });
 
+  it("should exclude posts with preserve flag", () => {
+    const db = createMockDb({ posts: [] });
+    const settings = { ...createDefaultSettings(), deletePosts: true };
+
+    calculatePostsToDelete(db, userDid, settings);
+
+    // Check that the SQL includes the preserve = 0 condition
+    const call = db._calls[0];
+    expect(call.sql).toContain("preserve = 0");
+  });
+
   describe("deletePostsPreserveThreads", () => {
     it("should preserve entire thread when one post meets threshold", () => {
       // Scenario: User has 3 posts in a thread

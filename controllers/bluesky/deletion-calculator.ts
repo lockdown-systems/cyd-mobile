@@ -113,6 +113,7 @@ export function calculatePostsToDelete(
   let whereClause = `
     isRepost = 0
     AND deletedPostAt IS NULL
+    AND preserve = 0
     AND authorDid = ?
   `;
   const params: (string | number)[] = [userDid];
