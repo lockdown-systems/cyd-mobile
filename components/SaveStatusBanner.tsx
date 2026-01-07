@@ -101,7 +101,15 @@ export function SaveStatusBanner({
       ]}
     >
       <Text style={[styles.simpleText, { color: palette.icon }]}>
-        You last saved your data on {formatTimestamp(lastSavedAt)}.
+        You last saved your data on {formatTimestamp(lastSavedAt)}.{" "}
+        <Text
+          style={[styles.linkText, { color: palette.tint }]}
+          onPress={() => onSelectTab?.("save")}
+          accessibilityRole="button"
+        >
+          Save again
+        </Text>
+        .
       </Text>
     </View>
   );
@@ -156,6 +164,11 @@ const styles = StyleSheet.create({
   simpleText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  linkText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textDecorationLine: "underline",
   },
 });
 

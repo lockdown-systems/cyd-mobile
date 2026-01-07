@@ -14,6 +14,7 @@ import type {
   BlueskyJobRecord,
   SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
+import { setLastSavedAt } from "@/database/accounts";
 import type { AccountSaveSettings } from "@/database/save-settings";
 import {
   getAccountSaveSettings,
@@ -277,6 +278,7 @@ export function SaveTab({
           if (result === "completed" && !automationCancelledRef.current) {
             setAutomationVisible(false);
             setFinishedJobs(jobs);
+            void setLastSavedAt(accountId, Date.now());
             setFinishedModalVisible(true);
           }
         }}
