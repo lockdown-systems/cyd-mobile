@@ -182,18 +182,23 @@ export function CydSignInModal({ visible, onClose }: SignInModalProps) {
 
               <View style={styles.switchRow}>
                 <Text style={[styles.switchLabel, { color: palette.text }]}>
-                  Subscribe to Cyd newsletter
+                  Subscribe to occasional email updates from Lockdown System,
+                  the collective that makes Cyd
                 </Text>
-                <Switch
-                  value={subscribeToNewsletter}
-                  onValueChange={setSubscribeToNewsletter}
-                  trackColor={{
-                    false: palette.icon + "33",
-                    true: palette.tint + "88",
-                  }}
-                  thumbColor={subscribeToNewsletter ? palette.tint : "#f4f3f4"}
-                  disabled={isLoading}
-                />
+                <View style={styles.switchControl}>
+                  <Switch
+                    value={subscribeToNewsletter}
+                    onValueChange={setSubscribeToNewsletter}
+                    trackColor={{
+                      false: palette.icon + "33",
+                      true: palette.tint + "88",
+                    }}
+                    thumbColor={
+                      subscribeToNewsletter ? palette.tint : "#f4f3f4"
+                    }
+                    disabled={isLoading}
+                  />
+                </View>
               </View>
 
               {error ? (
@@ -225,8 +230,8 @@ export function CydSignInModal({ visible, onClose }: SignInModalProps) {
               </Pressable>
 
               <Text style={[styles.privacyText, { color: palette.icon }]}>
-                Your email address will only be used to sign in to Cyd and
-                manage your account.
+                Your email address will be used to identify your account. We
+                won&apos;t share it or send you unsoliciated emails.
               </Text>
             </View>
           )}
@@ -365,12 +370,18 @@ const styles = StyleSheet.create({
   },
   switchRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "flex-start",
     paddingVertical: 8,
   },
   switchLabel: {
+    flex: 1,
     fontSize: 15,
+    marginRight: 12,
+  },
+  switchControl: {
+    paddingTop: 2,
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
   },
   button: {
     borderRadius: 12,
