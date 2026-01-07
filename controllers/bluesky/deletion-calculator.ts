@@ -77,6 +77,29 @@ export interface FollowToUnfollow {
 }
 
 /**
+ * Extended post data for preview in the deletion review UI.
+ * Includes author info and additional fields needed for PostPreview component.
+ */
+export interface PostToDeletePreview {
+  uri: string;
+  cid: string;
+  text: string;
+  createdAt: string;
+  savedAt: number;
+  likeCount: number;
+  repostCount: number;
+  replyCount: number;
+  quoteCount: number;
+  isReply: boolean;
+  preserve: boolean;
+  authorDid: string;
+  authorHandle: string | null;
+  authorDisplayName: string | null;
+  avatarUrl: string | null;
+  avatarDataURI: string | null;
+}
+
+/**
  * Get the ISO timestamp for N days ago from now
  */
 export function getTimestampDaysAgo(days: number): string {
@@ -172,6 +195,225 @@ export function calculatePostsToDelete(
     const threadRoot = post.replyRootUri ?? post.uri;
     return !preservedThreadRoots.has(threadRoot);
   });
+}
+
+/**
+ * Calculate posts to delete with full preview data for UI display.
+ * This includes author info and additional fields needed for PostPreview component.
+ */
+export function calculatePostsToDeleteWithPreview(
+  db: SQLiteDatabase,
+  userDid: string,
+  settings: AccountDeleteSettings
+): PostToDeletePreview[] {
+  if (!settings.deletePosts) {
+    return [];
+  }
+
+  // Calculate the timestamp cutoff if days-old filter is enabled
+  const daysOldTimestamp = settings.deletePostsDaysOldEnabled
+    ? getTimestampDaysAgo(settings.deletePostsDaysOld)
+    : null;
+
+  // Build the WHERE clause dynamically
+  let whereClause = `
+    p.isRepost = 0
+    AND p.deletedPostAt IS NULL
+    AND p.preserve = 0
+    AND p.authorDid = ?
+  `;
+  const params: (string | number)[] = [userDid];
+
+  if (daysOldTimestamp) {
+    whereClause += " AND p.createdAt <= ?";
+    params.push(daysOldTimestamp);
+  }
+
+  if (settings.deletePostsLikesThresholdEnabled) {
+    whereClause += " AND p.likeCount < ?";
+    params.push(settings.deletePostsLikesThreshold);
+  }
+
+  if (settings.deletePostsRepostsThresholdEnabled) {
+    whereClause += " AND p.repostCount < ?";
+    params.push(settings.deletePostsRepostsThreshold);
+  }
+
+  // Get posts with author info via JOIN
+  const candidatePosts = db.getAllSync<{
+    uri: string;
+    cid: string;
+    text: string;
+    createdAt: string;
+    savedAt: number;
+    likeCount: number;
+    repostCount: number;
+    replyCount: number;
+    quoteCount: number;
+    isReply: number;
+    preserve: number;
+    replyRootUri: string | null;
+    authorDid: string;
+    authorHandle: string | null;
+    authorDisplayName: string | null;
+    avatarUrl: string | null;
+    avatarDataURI: string | null;
+  }>(
+    `SELECT p.uri, p.cid, p.text, p.createdAt, p.savedAt,
+            p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
+            p.isReply, p.preserve, p.replyRootUri, p.authorDid,
+            prof.handle as authorHandle, prof.displayName as authorDisplayName,
+            prof.avatarUrl, prof.avatarDataURI
+     FROM post p
+     LEFT JOIN profile prof ON prof.did = p.authorDid
+     WHERE ${whereClause}
+     ORDER BY p.createdAt DESC;`,
+    params
+  );
+
+  const mapPost = (post: (typeof candidatePosts)[0]): PostToDeletePreview => ({
+    uri: post.uri,
+    cid: post.cid,
+    text: post.text,
+    createdAt: post.createdAt,
+    savedAt: post.savedAt,
+    likeCount: post.likeCount,
+    repostCount: post.repostCount,
+    replyCount: post.replyCount,
+    quoteCount: post.quoteCount,
+    isReply: post.isReply === 1,
+    preserve: post.preserve === 1,
+    authorDid: post.authorDid,
+    authorHandle: post.authorHandle,
+    authorDisplayName: post.authorDisplayName,
+    avatarUrl: post.avatarUrl,
+    avatarDataURI: post.avatarDataURI,
+  });
+
+  if (!settings.deletePostsPreserveThreads) {
+    return candidatePosts.map(mapPost);
+  }
+
+  // Thread preservation logic
+  const preservedThreadRoots = findPreservedThreadRoots(db, userDid, settings);
+
+  return candidatePosts
+    .filter((post) => {
+      const threadRoot = post.replyRootUri ?? post.uri;
+      return !preservedThreadRoots.has(threadRoot);
+    })
+    .map(mapPost);
+}
+
+/**
+ * Calculate posts for the deletion review UI.
+ * Unlike calculatePostsToDeleteWithPreview, this INCLUDES preserved posts
+ * so users can toggle preservation status in the review modal.
+ *
+ * This shows a "snapshot" of posts that match the deletion criteria
+ * (regardless of preserve status), allowing users to toggle preserve on/off.
+ */
+export function calculatePostsForDeletionReview(
+  db: SQLiteDatabase,
+  userDid: string,
+  settings: AccountDeleteSettings
+): PostToDeletePreview[] {
+  if (!settings.deletePosts) {
+    return [];
+  }
+
+  // Calculate the timestamp cutoff if days-old filter is enabled
+  const daysOldTimestamp = settings.deletePostsDaysOldEnabled
+    ? getTimestampDaysAgo(settings.deletePostsDaysOld)
+    : null;
+
+  // Build the WHERE clause dynamically - NOTE: does NOT filter out preserved posts
+  let whereClause = `
+    p.isRepost = 0
+    AND p.deletedPostAt IS NULL
+    AND p.authorDid = ?
+  `;
+  const params: (string | number)[] = [userDid];
+
+  if (daysOldTimestamp) {
+    whereClause += " AND p.createdAt <= ?";
+    params.push(daysOldTimestamp);
+  }
+
+  if (settings.deletePostsLikesThresholdEnabled) {
+    whereClause += " AND p.likeCount < ?";
+    params.push(settings.deletePostsLikesThreshold);
+  }
+
+  if (settings.deletePostsRepostsThresholdEnabled) {
+    whereClause += " AND p.repostCount < ?";
+    params.push(settings.deletePostsRepostsThreshold);
+  }
+
+  // Get posts with author info via JOIN
+  const candidatePosts = db.getAllSync<{
+    uri: string;
+    cid: string;
+    text: string;
+    createdAt: string;
+    savedAt: number;
+    likeCount: number;
+    repostCount: number;
+    replyCount: number;
+    quoteCount: number;
+    isReply: number;
+    preserve: number;
+    replyRootUri: string | null;
+    authorDid: string;
+    authorHandle: string | null;
+    authorDisplayName: string | null;
+    avatarUrl: string | null;
+    avatarDataURI: string | null;
+  }>(
+    `SELECT p.uri, p.cid, p.text, p.createdAt, p.savedAt,
+            p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
+            p.isReply, p.preserve, p.replyRootUri, p.authorDid,
+            prof.handle as authorHandle, prof.displayName as authorDisplayName,
+            prof.avatarUrl, prof.avatarDataURI
+     FROM post p
+     LEFT JOIN profile prof ON prof.did = p.authorDid
+     WHERE ${whereClause}
+     ORDER BY p.createdAt DESC;`,
+    params
+  );
+
+  const mapPost = (post: (typeof candidatePosts)[0]): PostToDeletePreview => ({
+    uri: post.uri,
+    cid: post.cid,
+    text: post.text,
+    createdAt: post.createdAt,
+    savedAt: post.savedAt,
+    likeCount: post.likeCount,
+    repostCount: post.repostCount,
+    replyCount: post.replyCount,
+    quoteCount: post.quoteCount,
+    isReply: post.isReply === 1,
+    preserve: post.preserve === 1,
+    authorDid: post.authorDid,
+    authorHandle: post.authorHandle,
+    authorDisplayName: post.authorDisplayName,
+    avatarUrl: post.avatarUrl,
+    avatarDataURI: post.avatarDataURI,
+  });
+
+  if (!settings.deletePostsPreserveThreads) {
+    return candidatePosts.map(mapPost);
+  }
+
+  // Thread preservation logic - but still include preserved posts in results
+  const preservedThreadRoots = findPreservedThreadRoots(db, userDid, settings);
+
+  return candidatePosts
+    .filter((post) => {
+      const threadRoot = post.replyRootUri ?? post.uri;
+      return !preservedThreadRoots.has(threadRoot);
+    })
+    .map(mapPost);
 }
 
 /**

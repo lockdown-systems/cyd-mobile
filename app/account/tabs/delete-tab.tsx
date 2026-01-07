@@ -1,5 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import {
+import React, {
   useCallback,
   useEffect,
   useMemo,
@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 
+import { PostsToDeleteReviewModal } from "@/components/PostsToDeleteReviewModal";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveStatusBanner } from "@/components/SaveStatusBanner";
 import { BlueskyAccountController } from "@/controllers";
@@ -565,6 +566,10 @@ function DeleteReviewScreen({
   const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
   const [countsLoading, setCountsLoading] = useState(true);
   const [countsError, setCountsError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Modal state for reviewing posts to delete
+  const [postsModalVisible, setPostsModalVisible] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -598,12 +603,26 @@ function DeleteReviewScreen({
     return () => {
       cancelled = true;
     };
-  }, [accountId, accountUUID, selections]);
+  }, [accountId, accountUUID, selections, refreshKey]);
+
+  // Handle modal open
+  const handleOpenPostsModal = useCallback(() => {
+    setPostsModalVisible(true);
+  }, []);
+
+  // Handle modal close - recalculate counts
+  const handleClosePostsModal = useCallback(() => {
+    setPostsModalVisible(false);
+    // Trigger a refresh of the counts
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   type DeletionItem = {
     label: string;
     count: number | null;
     isChatMessage?: boolean;
+    showReviewButton?: boolean;
+    onReview?: () => void;
   };
 
   const chosen: DeletionItem[] = [];
@@ -635,7 +654,12 @@ function DeleteReviewScreen({
       message += ", preserving entire threads";
     }
 
-    chosen.push({ label: message, count: counts?.posts ?? null });
+    chosen.push({
+      label: message,
+      count: counts?.posts ?? null,
+      showReviewButton: true,
+      onReview: handleOpenPostsModal,
+    });
   }
 
   if (selections.deleteReposts) {
@@ -743,6 +767,24 @@ function DeleteReviewScreen({
                       )}
                     </View>
                   </View>
+                  {item.showReviewButton && item.onReview && (
+                    <Pressable
+                      onPress={item.onReview}
+                      style={[
+                        styles.reviewPostsButton,
+                        { borderColor: palette.tint },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.reviewPostsButtonText,
+                          { color: palette.tint },
+                        ]}
+                      >
+                        Review Posts
+                      </Text>
+                    </Pressable>
+                  )}
                   {item.isChatMessage && (
                     <Text
                       style={[
@@ -797,6 +839,16 @@ function DeleteReviewScreen({
           palette={palette}
         />
       </View>
+
+      {/* Posts to delete review modal */}
+      <PostsToDeleteReviewModal
+        visible={postsModalVisible}
+        onClose={handleClosePostsModal}
+        accountId={accountId}
+        accountUUID={accountUUID}
+        palette={palette}
+        selections={selections}
+      />
     </View>
   );
 }
@@ -1054,6 +1106,19 @@ const styles = {
   reviewCount: {
     fontSize: 14,
     fontWeight: "500" as const,
+  },
+  reviewPostsButton: {
+    alignSelf: "flex-start" as const,
+    marginLeft: 28,
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 16,
+  },
+  reviewPostsButtonText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
 };
 

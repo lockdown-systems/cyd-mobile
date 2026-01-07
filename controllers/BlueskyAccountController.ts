@@ -20,10 +20,13 @@ import {
   calculateFollowsToUnfollow,
   calculateLikesToDelete,
   calculateMessagesToDelete,
+  calculatePostsForDeletionReview,
   calculatePostsToDelete,
+  calculatePostsToDeleteWithPreview,
   calculateRepostsToDelete,
   type DeletionPreview,
   type DeletionPreviewCounts,
+  type PostToDeletePreview,
 } from "./bluesky/deletion-calculator";
 import { BlueskyIndexer } from "./bluesky/indexer";
 import { mapJobRow, type JobRow } from "./bluesky/job-helpers";
@@ -90,6 +93,7 @@ export type {
   LikeToDelete,
   MessageToDelete,
   PostToDelete,
+  PostToDeletePreview,
   RepostToDelete,
 } from "./bluesky/deletion-calculator";
 
@@ -746,6 +750,35 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       throw new Error("User DID not available");
     }
     return calculatePostsToDelete(db, userDid, settings);
+  }
+
+  /**
+   * Get posts that will be deleted with full preview data for UI display
+   */
+  getPostsToDeleteWithPreview(
+    settings: AccountDeleteSettings
+  ): PostToDeletePreview[] {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculatePostsToDeleteWithPreview(db, userDid, settings);
+  }
+
+  /**
+   * Get posts for the deletion review UI (includes preserved posts).
+   * This allows users to toggle preservation status in the review modal.
+   */
+  getPostsForDeletionReview(
+    settings: AccountDeleteSettings
+  ): PostToDeletePreview[] {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculatePostsForDeletionReview(db, userDid, settings);
   }
 
   /**
