@@ -7,11 +7,24 @@ import {
   applyAccountMigrations,
   blueskyAccountMigrations,
 } from "@/database/account-db";
+import type { AccountDeleteSettings } from "@/database/delete-settings";
 import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import {
   BaseAccountController,
   buildAccountPaths,
 } from "./BaseAccountController";
+import {
+  calculateBookmarksToDelete,
+  calculateDeletionPreview,
+  calculateDeletionPreviewCounts,
+  calculateFollowsToUnfollow,
+  calculateLikesToDelete,
+  calculateMessagesToDelete,
+  calculatePostsToDelete,
+  calculateRepostsToDelete,
+  type DeletionPreview,
+  type DeletionPreviewCounts,
+} from "./bluesky/deletion-calculator";
 import { BlueskyIndexer } from "./bluesky/indexer";
 import { mapJobRow, type JobRow } from "./bluesky/job-helpers";
 import { runJob } from "./bluesky/job-runner";
@@ -68,6 +81,17 @@ export type {
   DeleteRepostsOptions,
   RateLimitInfo,
 } from "./bluesky/types";
+
+export type {
+  BookmarkToDelete,
+  DeletionPreview,
+  DeletionPreviewCounts,
+  FollowToUnfollow,
+  LikeToDelete,
+  MessageToDelete,
+  PostToDelete,
+  RepostToDelete,
+} from "./bluesky/deletion-calculator";
 
 /**
  * Controller for managing a Bluesky account's data archive.
@@ -681,6 +705,102 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
   // ==================== Delete Operations ====================
   // These will be implemented in Phase 6
+
+  // ==================== Delete Preview Calculations ====================
+
+  /**
+   * Calculate a preview of all items that will be deleted based on settings.
+   * This should be called when the user clicks "Continue to Review" in the delete tab.
+   */
+  getDeletionPreview(settings: AccountDeleteSettings): DeletionPreview {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculateDeletionPreview(db, userDid, settings);
+  }
+
+  /**
+   * Calculate counts of items that will be deleted based on settings.
+   * This is a lighter-weight version that just returns counts instead of full items.
+   */
+  getDeletionPreviewCounts(
+    settings: AccountDeleteSettings
+  ): DeletionPreviewCounts {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculateDeletionPreviewCounts(db, userDid, settings);
+  }
+
+  /**
+   * Get posts that will be deleted based on settings
+   */
+  getPostsToDelete(settings: AccountDeleteSettings) {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculatePostsToDelete(db, userDid, settings);
+  }
+
+  /**
+   * Get reposts that will be deleted based on settings
+   */
+  getRepostsToDelete(settings: AccountDeleteSettings) {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculateRepostsToDelete(db, userDid, settings);
+  }
+
+  /**
+   * Get likes that will be deleted based on settings
+   */
+  getLikesToDelete(settings: AccountDeleteSettings) {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculateLikesToDelete(db, userDid, settings);
+  }
+
+  /**
+   * Get messages that will be deleted based on settings
+   */
+  getMessagesToDelete(settings: AccountDeleteSettings) {
+    const db = this.requireDb();
+    const userDid = this.did;
+    if (!userDid) {
+      throw new Error("User DID not available");
+    }
+    return calculateMessagesToDelete(db, userDid, settings);
+  }
+
+  /**
+   * Get bookmarks that will be deleted based on settings
+   */
+  getBookmarksToDelete(settings: AccountDeleteSettings) {
+    const db = this.requireDb();
+    return calculateBookmarksToDelete(db, settings);
+  }
+
+  /**
+   * Get follows that will be unfollowed based on settings
+   */
+  getFollowsToUnfollow(settings: AccountDeleteSettings) {
+    const db = this.requireDb();
+    return calculateFollowsToUnfollow(db, settings);
+  }
+
+  // ==================== Delete Execution ====================
 
   /**
    * Delete posts matching the given options
