@@ -7,6 +7,8 @@ export {
   type DeleteMessagesOptions,
   type DeletePostsOptions,
   type DeleteRepostsOptions,
+  type DeletionPreview,
+  type DeletionPreviewCounts,
   type RateLimitInfo,
 } from "./BlueskyAccountController";
 

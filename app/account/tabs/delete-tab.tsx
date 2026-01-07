@@ -17,6 +17,8 @@ import {
 
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveStatusBanner } from "@/components/SaveStatusBanner";
+import { BlueskyAccountController } from "@/controllers";
+import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import { getLastSavedAt } from "@/database/accounts";
 import {
   getAccountDeleteSettings,
@@ -34,6 +36,7 @@ type DeleteFlowScreen = "form" | "review";
 
 export function DeleteTab({
   accountId,
+  accountUUID,
   handle,
   palette,
   onSelectTab,
@@ -172,6 +175,8 @@ export function DeleteTab({
       )}
       {currentScreen === "review" && state && (
         <DeleteReviewScreen
+          accountId={accountId}
+          accountUUID={accountUUID}
           palette={palette}
           selections={state}
           onBack={popScreen}
@@ -541,6 +546,8 @@ function DeleteOptionsForm({
 }
 
 type DeleteReviewScreenProps = {
+  accountId: number;
+  accountUUID: string;
   palette: AccountTabPalette;
   selections: AccountDeleteSettings;
   onBack: () => void;
@@ -548,12 +555,58 @@ type DeleteReviewScreenProps = {
 };
 
 function DeleteReviewScreen({
+  accountId,
+  accountUUID,
   palette,
   selections,
   onBack,
   onConfirm,
 }: DeleteReviewScreenProps) {
-  const chosen: string[] = [];
+  const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
+  const [countsLoading, setCountsLoading] = useState(true);
+  const [countsError, setCountsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCounts() {
+      setCountsLoading(true);
+      setCountsError(null);
+      try {
+        const controller = new BlueskyAccountController(accountId, accountUUID);
+        await controller.initDB();
+        await controller.initAgent();
+        const result = controller.getDeletionPreviewCounts(selections);
+        if (!cancelled) {
+          setCounts(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCountsError(
+            err instanceof Error ? err.message : "Failed to calculate counts"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCountsLoading(false);
+        }
+      }
+    }
+
+    void loadCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, accountUUID, selections]);
+
+  type DeletionItem = {
+    label: string;
+    count: number | null;
+    isChatMessage?: boolean;
+  };
+
+  const chosen: DeletionItem[] = [];
 
   if (selections.deletePosts) {
     const hasAgeFilter = selections.deletePostsDaysOldEnabled;
@@ -582,7 +635,7 @@ function DeleteReviewScreen({
       message += ", preserving entire threads";
     }
 
-    chosen.push(message);
+    chosen.push({ label: message, count: counts?.posts ?? null });
   }
 
   if (selections.deleteReposts) {
@@ -592,7 +645,7 @@ function DeleteReviewScreen({
     if (selections.deleteRepostsDaysOldEnabled) {
       message += ` older than ${selections.deleteRepostsDaysOld} days`;
     }
-    chosen.push(message);
+    chosen.push({ label: message, count: counts?.reposts ?? null });
   }
 
   if (selections.deleteLikes) {
@@ -602,11 +655,14 @@ function DeleteReviewScreen({
     if (selections.deleteLikesDaysOldEnabled) {
       message += ` older than ${selections.deleteLikesDaysOld} days`;
     }
-    chosen.push(message);
+    chosen.push({ label: message, count: counts?.likes ?? null });
   }
 
   if (selections.deleteBookmarks) {
-    chosen.push("Delete all bookmarks");
+    chosen.push({
+      label: "Delete all bookmarks",
+      count: counts?.bookmarks ?? null,
+    });
   }
 
   if (selections.deleteChats) {
@@ -616,11 +672,18 @@ function DeleteReviewScreen({
     if (selections.deleteChatsDaysOldEnabled) {
       message += ` older than ${selections.deleteChatsDaysOld} days`;
     }
-    chosen.push(message);
+    chosen.push({
+      label: message,
+      count: counts?.messages ?? null,
+      isChatMessage: true,
+    });
   }
 
   if (selections.deleteUnfollowEveryone) {
-    chosen.push("Unfollow everyone");
+    chosen.push({
+      label: "Unfollow everyone",
+      count: counts?.follows ?? null,
+    });
   }
 
   return (
@@ -635,17 +698,25 @@ function DeleteReviewScreen({
           Here’s what Cyd will delete on this device:
         </Text>
         <View style={[styles.reviewCard, { borderColor: palette.icon + "22" }]}>
-          {chosen.length === 0 ? (
+          {countsLoading ? (
+            <View style={styles.countsLoadingContainer}>
+              <ActivityIndicator size="small" color={palette.tint} />
+              <Text style={[styles.countsLoadingText, { color: palette.icon }]}>
+                Calculating items to delete...
+              </Text>
+            </View>
+          ) : countsError ? (
+            <Text style={[styles.reviewLabel, { color: palette.icon }]}>
+              {countsError}
+            </Text>
+          ) : chosen.length === 0 ? (
             <Text style={[styles.reviewLabel, { color: palette.icon }]}>
               No data selected for deletion.
             </Text>
           ) : (
-            chosen.map((label) => {
-              const isChatMessage = label
-                .toLowerCase()
-                .includes("chat message");
+            chosen.map((item) => {
               return (
-                <View key={label}>
+                <View key={item.label}>
                   <View style={sharedTabStyles.reviewRow}>
                     <MaterialIcons
                       name="check-circle"
@@ -653,16 +724,26 @@ function DeleteReviewScreen({
                       color={palette.tint}
                       style={sharedTabStyles.reviewIcon}
                     />
-                    <Text
-                      style={[
-                        sharedTabStyles.reviewLabel,
-                        { color: palette.text },
-                      ]}
-                    >
-                      {label}
-                    </Text>
+                    <View style={styles.reviewLabelContainer}>
+                      <Text
+                        style={[
+                          sharedTabStyles.reviewLabel,
+                          { color: palette.text },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                      {item.count !== null && (
+                        <Text
+                          style={[styles.reviewCount, { color: palette.tint }]}
+                        >
+                          {item.count.toLocaleString()}{" "}
+                          {item.count === 1 ? "item" : "items"}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  {isChatMessage && (
+                  {item.isChatMessage && (
                     <Text
                       style={[
                         styles.reviewSubtext,
@@ -954,7 +1035,26 @@ function SecondaryButton({
   );
 }
 
-// Use shared styles for consistency across tabs
-const styles = sharedTabStyles;
+// Use shared styles for consistency across tabs, with local extensions
+const styles = {
+  ...sharedTabStyles,
+  countsLoadingContainer: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    paddingVertical: 8,
+  },
+  countsLoadingText: {
+    fontSize: 14,
+  },
+  reviewLabelContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  reviewCount: {
+    fontSize: 14,
+    fontWeight: "500" as const,
+  },
+};
 
 export default DeleteTab;
