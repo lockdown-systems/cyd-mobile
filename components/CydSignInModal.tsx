@@ -361,6 +361,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
+    letterSpacing: 0,
   },
   codeInput: {
     fontSize: 24,
