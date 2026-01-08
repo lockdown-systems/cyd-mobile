@@ -13,8 +13,9 @@ import { BrowseBookmarks } from "./browse/BrowseBookmarks";
 import { BrowseLikes } from "./browse/BrowseLikes";
 import { BrowseMessages } from "./browse/BrowseMessages";
 import { BrowsePosts } from "./browse/BrowsePosts";
+import { BrowseReposts } from "./browse/BrowseReposts";
 
-type BrowseCategory = "posts" | "likes" | "bookmarks" | "messages";
+type BrowseCategory = "posts" | "reposts" | "likes" | "bookmarks" | "messages";
 
 type CategoryComponentProps = {
   handle: string;
@@ -34,6 +35,7 @@ type CategoryComponent = ComponentType<CategoryComponentProps>;
 
 const CATEGORY_DEFINITIONS: { key: BrowseCategory; label: string }[] = [
   { key: "posts", label: "Posts" },
+  { key: "reposts", label: "Reposts" },
   { key: "likes", label: "Likes" },
   { key: "bookmarks", label: "Bookmarks" },
   { key: "messages", label: "Messages" },
@@ -41,6 +43,7 @@ const CATEGORY_DEFINITIONS: { key: BrowseCategory; label: string }[] = [
 
 const CATEGORY_COMPONENTS: Record<BrowseCategory, CategoryComponent> = {
   posts: BrowsePosts,
+  reposts: BrowseReposts,
   likes: BrowseLikes,
   bookmarks: BrowseBookmarks,
   messages: BrowseMessages,

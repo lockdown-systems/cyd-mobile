@@ -153,6 +153,8 @@ export function mapRowToPreview(
     deletedAtEpoch = row.deletedBookmarkAt;
   } else if (browseType === "likes") {
     deletedAtEpoch = row.deletedLikeAt;
+  } else if (browseType === "reposts") {
+    deletedAtEpoch = row.deletedRepostAt;
   } else {
     // For posts, use the first available
     deletedAtEpoch =
@@ -290,6 +292,9 @@ function getDeletedFilterClause(
     case "posts":
       deletedColumn = "p.deletedPostAt";
       break;
+    case "reposts":
+      deletedColumn = "p.deletedRepostAt";
+      break;
     case "likes":
       deletedColumn = "p.deletedLikeAt";
       break;
@@ -308,7 +313,7 @@ function getDeletedFilterClause(
 /**
  * Query builders for different browse types
  */
-export type BrowseType = "posts" | "likes" | "bookmarks";
+export type BrowseType = "posts" | "reposts" | "likes" | "bookmarks";
 
 export function buildFirstPageQuery(
   type: BrowseType,
@@ -330,7 +335,12 @@ export function buildFirstPageQuery(
   switch (type) {
     case "posts":
       return `${baseSelect}
-        WHERE p.authorDid = ?${deletedClause}
+        WHERE p.authorDid = ? AND p.isRepost = 0${deletedClause}
+        ORDER BY p.createdAt DESC, p.id DESC
+        LIMIT ?;`;
+    case "reposts":
+      return `${baseSelect}
+        WHERE p.authorDid = ? AND p.isRepost = 1${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "likes":
@@ -366,7 +376,12 @@ export function buildLoadMoreQuery(
   switch (type) {
     case "posts":
       return `${baseSelect}
-        WHERE p.authorDid = ? AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
+        WHERE p.authorDid = ? AND p.isRepost = 0 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
+        ORDER BY p.createdAt DESC, p.id DESC
+        LIMIT ?;`;
+    case "reposts":
+      return `${baseSelect}
+        WHERE p.authorDid = ? AND p.isRepost = 1 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "likes":
@@ -388,6 +403,7 @@ export function getFirstPageParams(
 ): (string | number)[] {
   switch (type) {
     case "posts":
+    case "reposts":
       return [did, PAGE_SIZE];
     case "likes":
     case "bookmarks":
@@ -402,6 +418,7 @@ export function getLoadMoreParams(
 ): (string | number)[] {
   switch (type) {
     case "posts":
+    case "reposts":
       return [did, cursor.createdAt, cursor.createdAt, cursor.id, PAGE_SIZE];
     case "likes":
     case "bookmarks":
@@ -416,6 +433,8 @@ export function getEmptyMessage(type: BrowseType, hasFilter: boolean): string {
   switch (type) {
     case "posts":
       return "No posts saved yet.";
+    case "reposts":
+      return "No reposts saved yet.";
     case "likes":
       return "No liked posts saved yet.";
     case "bookmarks":
@@ -426,7 +445,9 @@ export function getEmptyMessage(type: BrowseType, hasFilter: boolean): string {
 export function buildTotalCountQuery(type: BrowseType): string {
   switch (type) {
     case "posts":
-      return `SELECT COUNT(*) as count FROM post WHERE authorDid = ?;`;
+      return `SELECT COUNT(*) as count FROM post WHERE authorDid = ? AND isRepost = 0;`;
+    case "reposts":
+      return `SELECT COUNT(*) as count FROM post WHERE authorDid = ? AND isRepost = 1;`;
     case "likes":
       return `SELECT COUNT(*) as count FROM post WHERE viewerLiked = 1;`;
     case "bookmarks":
@@ -440,6 +461,7 @@ export function getTotalCountParams(
 ): (string | number)[] {
   switch (type) {
     case "posts":
+    case "reposts":
       return [did];
     case "likes":
     case "bookmarks":
