@@ -1,4 +1,3 @@
-import { MaterialIcons } from "@expo/vector-icons";
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
   useCallback,
@@ -7,14 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Modal, ScrollView, Text, View } from "react-native";
 
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
@@ -28,11 +20,20 @@ import type {
 } from "@/controllers/bluesky/job-types";
 import type { PostPreviewData, PreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
-import { AutomationProgressBar } from "./AutomationProgressBar";
+import {
+  type AutomationModalState,
+  ButtonRow,
+  ErrorCard,
+  InfoBar,
+  StepRow,
+  SuccessCard,
+  styles,
+} from "./AutomationModalShared";
+import { SaveAutomationProgressBar } from "./SaveAutomationProgressBar";
 
-export type AutomationModalState = "idle" | "running" | "failed" | "completed";
+export type { AutomationModalState as SaveAutomationModalState };
 
-export type AutomationModalProps = {
+export type SaveAutomationModalProps = {
   visible: boolean;
   accountId: number;
   accountUUID: string;
@@ -46,7 +47,7 @@ export type AutomationModalProps = {
   onRestart?: () => void;
 };
 
-export function AutomationModal({
+export function SaveAutomationModal({
   visible,
   accountId,
   accountUUID,
@@ -55,7 +56,7 @@ export function AutomationModal({
   onFinished,
   onClose,
   onRestart,
-}: AutomationModalProps) {
+}: SaveAutomationModalProps) {
   // Keep the screen awake while automation is running
   useKeepAwake();
 
@@ -89,7 +90,7 @@ export function AutomationModal({
     if (controllerRef.current) {
       return controllerRef.current;
     }
-    console.log("[AutomationModal] ensureController -> create", accountId);
+    console.log("[SaveAutomationModal] ensureController -> create", accountId);
     const controller = new BlueskyAccountController(accountId, accountUUID);
     controllerRef.current = controller;
     controller.setProgressCallback(() => {
@@ -98,12 +99,12 @@ export function AutomationModal({
     await controller.initDB();
     try {
       await controller.initAgent();
-      console.log("[AutomationModal] ensureController -> ready", accountId);
+      console.log("[SaveAutomationModal] ensureController -> ready", accountId);
     } catch (err) {
       if (err instanceof Error && err.name === "MissingBlueskySessionError") {
         // Expected when user is signed out; verifyAuthorization job will reauth.
         console.log(
-          "[AutomationModal] ensureController -> missing session (signed out)",
+          "[SaveAutomationModal] ensureController -> missing session (signed out)",
           accountId
         );
       } else {
@@ -157,7 +158,7 @@ export function AutomationModal({
       if (!visible || isRunningRef.current) {
         return;
       }
-      console.log("[AutomationModal] run -> start", accountId);
+      console.log("[SaveAutomationModal] run -> start", accountId);
       isRunningRef.current = true;
       setState("running");
       setPaused(false);
@@ -167,7 +168,7 @@ export function AutomationModal({
         const controller = await ensureController();
         const definedJobs = await controller.defineJobs(options);
         console.log(
-          "[AutomationModal] jobs defined",
+          "[SaveAutomationModal] jobs defined",
           accountId,
           definedJobs.length
         );
@@ -221,7 +222,7 @@ export function AutomationModal({
           onFinished("completed", latestJobsRef.current);
         }
         console.log(
-          "[AutomationModal] run -> finished",
+          "[SaveAutomationModal] run -> finished",
           accountId,
           failed ? "failed" : "completed"
         );
@@ -231,7 +232,7 @@ export function AutomationModal({
         setError(message);
         setState("failed");
         onFinished("failed", latestJobsRef.current);
-        console.warn("[AutomationModal] run -> error", accountId, err);
+        console.warn("[SaveAutomationModal] run -> error", accountId, err);
       } finally {
         isRunningRef.current = false;
       }
@@ -284,20 +285,6 @@ export function AutomationModal({
       unsub?.();
     };
   }, [ensureController]);
-
-  const statusIcon = (status: BlueskyJobRecord["status"]) => {
-    if (status === "completed") return "check-circle" as const;
-    if (status === "running") return "play-circle" as const;
-    if (status === "failed") return "error-outline" as const;
-    return "schedule" as const;
-  };
-
-  const statusColor = (status: BlueskyJobRecord["status"]) => {
-    if (status === "failed") return palette.warning ?? palette.tint;
-    if (status === "completed") return palette.tint;
-    if (status === "running") return palette.tint;
-    return palette.icon;
-  };
 
   const totalJobs = jobs.length;
   const completedCount = jobs.filter(
@@ -357,19 +344,15 @@ export function AutomationModal({
       >
         <SpeechBubble message={speech ?? "Preparing to start…"} />
 
-        <View style={styles.stepRow}>
-          <MaterialIcons
-            name={statusIcon(statusForUi)}
-            size={20}
-            color={statusColor(statusForUi)}
-          />
-          <Text style={[styles.stepText, { color: palette.text }]}>
-            Step {Math.max(currentIndex, 0)}/{Math.max(totalJobs, 0)}:{" "}
-            {currentLabel}
-          </Text>
-        </View>
+        <StepRow
+          currentIndex={currentIndex}
+          totalJobs={totalJobs}
+          currentLabel={currentLabel}
+          statusForUi={statusForUi}
+          palette={palette}
+        />
 
-        <AutomationProgressBar
+        <SaveAutomationProgressBar
           palette={palette}
           jobs={jobs}
           activeJobProgress={activeJobProgress}
@@ -405,273 +388,34 @@ export function AutomationModal({
         </ScrollView>
 
         {state === "failed" && error ? (
-          <View
-            style={[
-              styles.errorCard,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name="error-outline"
-              size={20}
-              color={palette.warning ?? palette.tint}
-            />
-            <Text style={[styles.errorText, { color: palette.text }]}>
-              {error}
-            </Text>
-          </View>
+          <ErrorCard error={error} palette={palette} />
         ) : null}
 
         {state === "completed" ? (
-          <View
-            style={[
-              styles.successCard,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <MaterialIcons name="check-circle" size={24} color={palette.tint} />
-            <Text style={[styles.statusText, { color: palette.text }]}>
-              Finished. You can close this dialog.
-            </Text>
-          </View>
+          <SuccessCard
+            message="Finished. You can close this dialog."
+            palette={palette}
+          />
         ) : null}
 
-        <View
-          style={[styles.infoBar, { backgroundColor: palette.icon + "11" }]}
-        >
-          <MaterialIcons
-            name="info-outline"
-            size={16}
-            color={palette.icon}
-            style={{ opacity: 0.7 }}
-          />
-          <Text style={[styles.infoText, { color: palette.text }]}>
-            Keep your phone unlocked and don&apos;t switch apps
-          </Text>
-        </View>
+        <InfoBar
+          message="Keep your phone unlocked and don't switch apps"
+          palette={palette}
+        />
 
-        <View style={styles.buttonRow}>
-          {state === "running" ? (
-            <SecondaryButton
-              label={paused ? "Resume" : "Pause"}
-              palette={palette}
-              onPress={paused ? handleResume : handlePause}
-              iconName={paused ? "play-arrow" : "pause"}
-              variant={paused ? "resume" : "pause"}
-            />
-          ) : (
-            <SecondaryButton
-              label={onRestart ? "Back to Save Options" : "Close"}
-              palette={palette}
-              onPress={onRestart ?? onClose}
-            />
-          )}
-          <DangerButton label="Cancel" palette={palette} onPress={onClose} />
-        </View>
+        <ButtonRow
+          state={state}
+          paused={paused}
+          palette={palette}
+          onPause={handlePause}
+          onResume={handleResume}
+          onRestart={onRestart}
+          onClose={onClose}
+          restartLabel="Back to Save Options"
+        />
       </View>
     </Modal>
   );
 }
 
-function SecondaryButton({
-  label,
-  palette,
-  onPress,
-  iconName,
-  variant = "default",
-}: {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  iconName?: React.ComponentProps<typeof MaterialIcons>["name"];
-  variant?: "default" | "pause" | "resume";
-}) {
-  const isResume = variant === "resume";
-  const isPause = variant === "pause";
-  const backgroundColor = isResume ? "#1fa971" : palette.card;
-  const borderColor = isResume ? "#1fa971" : palette.icon + "33";
-  const textColor = isResume ? "#ffffff" : palette.text;
-  const paddingVertical = isResume ? 12 : 10;
-  const paddingHorizontal = isResume ? 24 : 20;
-
-  return (
-    <Pressable
-      onPress={() => {
-        void onPress();
-      }}
-      style={({ pressed }) => [
-        styles.secondaryButton,
-        {
-          borderColor,
-          backgroundColor,
-          paddingVertical,
-          paddingHorizontal,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-    >
-      <View style={styles.buttonContent}>
-        {iconName ? (
-          <MaterialIcons
-            name={iconName}
-            size={18}
-            color={textColor}
-            style={{ marginRight: 6, opacity: isPause ? 0.8 : 1 }}
-          />
-        ) : null}
-        <Text style={[styles.secondaryButtonText, { color: textColor }]}>
-          {label}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function DangerButton({
-  label,
-  palette,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  disabled?: boolean;
-}) {
-  const backgroundColor = palette.danger ?? "#b00020";
-  return (
-    <Pressable
-      onPress={
-        disabled
-          ? undefined
-          : () => {
-              void onPress();
-            }
-      }
-      style={({ pressed }) => [
-        styles.dangerButton,
-        {
-          backgroundColor,
-          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-    >
-      <Text style={styles.dangerButtonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  progressCard: {
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  previewScrollView: {
-    flex: 1,
-    minHeight: 0,
-  },
-  previewScrollContent: {
-    flexGrow: 0,
-    paddingBottom: 8,
-  },
-  progressMessage: {
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: "center",
-  },
-  errorCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 12,
-  },
-  successCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 12,
-  },
-  infoBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  infoText: {
-    fontSize: 13,
-    opacity: 0.8,
-  },
-  buttonRow: {
-    marginTop: "auto",
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-  secondaryButton: {
-    borderRadius: 14,
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  statusText: {
-    fontSize: 15,
-    textAlign: "center",
-  },
-  errorText: {
-    fontSize: 14,
-    textAlign: "center",
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  stepText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  dangerButton: {
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  dangerButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});
-
-export default AutomationModal;
+export default SaveAutomationModal;

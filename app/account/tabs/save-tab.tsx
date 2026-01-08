@@ -8,8 +8,8 @@ import {
   View,
 } from "react-native";
 
-import { AutomationModal } from "@/app/account/components/AutomationModal";
 import { FinishedModal } from "@/app/account/components/FinishedModal";
+import { SaveAutomationModal } from "@/app/account/components/SaveAutomationModal";
 import type {
   BlueskyJobRecord,
   SaveJobOptions,
@@ -265,7 +265,7 @@ export function SaveTab({
           onConfirm={handleConfirm}
         />
       )}
-      <AutomationModal
+      <SaveAutomationModal
         key={automationKey}
         visible={automationVisible}
         accountId={accountId}

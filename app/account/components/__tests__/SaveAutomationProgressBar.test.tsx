@@ -1,5 +1,5 @@
 /**
- * @fileoverview Tests for AutomationProgressBar component
+ * @fileoverview Tests for SaveAutomationProgressBar component
  */
 
 import React from "react";
@@ -7,7 +7,7 @@ import React from "react";
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
-import { AutomationProgressBar } from "../AutomationProgressBar";
+import { SaveAutomationProgressBar } from "../SaveAutomationProgressBar";
 
 const mockPalette: AccountTabPalette = {
   background: "#ffffff",
@@ -42,17 +42,17 @@ function createJob(
   };
 }
 
-describe("AutomationProgressBar", () => {
+describe("SaveAutomationProgressBar", () => {
   describe("exports", () => {
-    it("should export AutomationProgressBar component", () => {
-      expect(AutomationProgressBar).toBeDefined();
-      expect(typeof AutomationProgressBar).toBe("function");
+    it("should export SaveAutomationProgressBar component", () => {
+      expect(SaveAutomationProgressBar).toBeDefined();
+      expect(typeof SaveAutomationProgressBar).toBe("function");
     });
   });
 
   describe("component creation", () => {
     it("should render without jobs", () => {
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs: [],
         activeJobProgress: 0,
         activeJobUnknownTotal: false,
@@ -68,7 +68,7 @@ describe("AutomationProgressBar", () => {
         createJob(2, "savePosts", "running"),
       ];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0.5,
         activeJobUnknownTotal: true,
@@ -80,7 +80,7 @@ describe("AutomationProgressBar", () => {
     });
 
     it("should accept activeJobProgress prop", () => {
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs: [],
         activeJobProgress: 0.75,
         activeJobUnknownTotal: false,
@@ -91,7 +91,7 @@ describe("AutomationProgressBar", () => {
     });
 
     it("should accept activeJobUnknownTotal prop for indeterminate progress", () => {
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs: [],
         activeJobProgress: 0,
         activeJobUnknownTotal: true,
@@ -102,7 +102,7 @@ describe("AutomationProgressBar", () => {
     });
 
     it("should accept palette prop", () => {
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs: [],
         activeJobProgress: 0,
         activeJobUnknownTotal: false,
@@ -119,7 +119,7 @@ describe("AutomationProgressBar", () => {
         createJob(1, "verifyAuthorization", "running"),
       ];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0,
         activeJobUnknownTotal: false,
@@ -132,7 +132,7 @@ describe("AutomationProgressBar", () => {
     it("should handle savePosts job", () => {
       const jobs: BlueskyJobRecord[] = [createJob(1, "savePosts", "running")];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0.5,
         activeJobUnknownTotal: true,
@@ -145,7 +145,7 @@ describe("AutomationProgressBar", () => {
     it("should handle saveLikes job", () => {
       const jobs: BlueskyJobRecord[] = [createJob(1, "saveLikes", "running")];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0.3,
         activeJobUnknownTotal: true,
@@ -160,7 +160,7 @@ describe("AutomationProgressBar", () => {
         createJob(1, "saveBookmarks", "running"),
       ];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0.8,
         activeJobUnknownTotal: true,
@@ -178,7 +178,7 @@ describe("AutomationProgressBar", () => {
         createJob(4, "saveBookmarks", "pending"),
       ];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0.5,
         activeJobUnknownTotal: true,
@@ -197,7 +197,7 @@ describe("AutomationProgressBar", () => {
     it("should handle pending status", () => {
       const jobs: BlueskyJobRecord[] = [createJob(1, "savePosts", "pending")];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0,
         activeJobUnknownTotal: false,
@@ -211,7 +211,7 @@ describe("AutomationProgressBar", () => {
     it("should handle running status", () => {
       const jobs: BlueskyJobRecord[] = [createJob(1, "savePosts", "running")];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0.5,
         activeJobUnknownTotal: true,
@@ -225,7 +225,7 @@ describe("AutomationProgressBar", () => {
     it("should handle completed status", () => {
       const jobs: BlueskyJobRecord[] = [createJob(1, "savePosts", "completed")];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 1,
         activeJobUnknownTotal: false,
@@ -239,7 +239,7 @@ describe("AutomationProgressBar", () => {
     it("should handle failed status", () => {
       const jobs: BlueskyJobRecord[] = [createJob(1, "savePosts", "failed")];
 
-      const element = React.createElement(AutomationProgressBar, {
+      const element = React.createElement(SaveAutomationProgressBar, {
         jobs,
         activeJobProgress: 0,
         activeJobUnknownTotal: false,

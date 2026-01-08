@@ -3,24 +3,20 @@ import { StyleSheet, View } from "react-native";
 
 import type { AccountTabPalette } from "@/types/account-tabs";
 
-type DeleteAutomationProgressBarProps = {
+type SimpleProgressBarProps = {
   palette: AccountTabPalette;
   /** Progress from 0 to 1 */
   progress: number;
-  /** Current item index (for display) */
-  currentItemIndex: number;
-  /** Total items to process */
-  totalItems: number;
 };
 
 /**
- * A simpler progress bar for delete operations that shows actual progress
- * based on the known total items to delete.
+ * A simple progress bar that shows linear progress based on a known percentage.
+ * Used for operations where the total count is known upfront (like delete operations).
  */
-export function DeleteAutomationProgressBar({
+export function SimpleProgressBar({
   palette,
   progress,
-}: DeleteAutomationProgressBarProps) {
+}: SimpleProgressBarProps) {
   const fillPercent = Math.max(0, Math.min(1, progress)) * 100;
 
   return (
@@ -56,4 +52,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DeleteAutomationProgressBar;
+export default SimpleProgressBar;

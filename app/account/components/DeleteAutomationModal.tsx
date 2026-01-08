@@ -1,4 +1,3 @@
-import { MaterialIcons } from "@expo/vector-icons";
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
   useCallback,
@@ -7,14 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Modal, ScrollView, Text, View } from "react-native";
 
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
@@ -29,13 +21,18 @@ import type {
 } from "@/controllers/bluesky/job-types";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 import type { AccountTabPalette } from "@/types/account-tabs";
-import { DeleteAutomationProgressBar } from "./DeleteAutomationProgressBar";
+import {
+  type AutomationModalState,
+  ButtonRow,
+  ErrorCard,
+  InfoBar,
+  StepRow,
+  SuccessCard,
+  styles,
+} from "./AutomationModalShared";
+import { SimpleProgressBar } from "./SimpleProgressBar";
 
-export type DeleteAutomationModalState =
-  | "idle"
-  | "running"
-  | "failed"
-  | "completed";
+export type { AutomationModalState as DeleteAutomationModalState };
 
 export type DeleteAutomationModalProps = {
   visible: boolean;
@@ -76,7 +73,7 @@ export function DeleteAutomationModal({
   const [jobs, setJobs] = useState<BlueskyJobRecord[]>([]);
   const [speech, setSpeech] = useState<string | null>(null);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
-  const [state, setState] = useState<DeleteAutomationModalState>("idle");
+  const [state, setState] = useState<AutomationModalState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
@@ -318,20 +315,6 @@ export function DeleteAutomationModal({
     };
   }, [ensureController]);
 
-  const statusIcon = (status: BlueskyJobRecord["status"]) => {
-    if (status === "completed") return "check-circle" as const;
-    if (status === "running") return "play-circle" as const;
-    if (status === "failed") return "error-outline" as const;
-    return "schedule" as const;
-  };
-
-  const statusColor = (status: BlueskyJobRecord["status"]) => {
-    if (status === "failed") return palette.warning ?? palette.tint;
-    if (status === "completed") return palette.tint;
-    if (status === "running") return palette.tint;
-    return palette.icon;
-  };
-
   const totalJobs = jobs.length;
   const completedCount = jobs.filter(
     (job) => job.status === "completed"
@@ -396,26 +379,17 @@ export function DeleteAutomationModal({
       >
         <SpeechBubble message={speech ?? "Preparing to delete your data…"} />
 
-        <View style={styles.stepRow}>
-          <MaterialIcons
-            name={statusIcon(statusForUi)}
-            size={20}
-            color={statusColor(statusForUi)}
-          />
-          <Text style={[styles.stepText, { color: palette.text }]}>
-            Step {Math.max(currentIndex, 0)}/{Math.max(totalJobs, 0)}:{" "}
-            {currentLabel}
-          </Text>
-        </View>
-
-        <DeleteAutomationProgressBar
+        <StepRow
+          currentIndex={currentIndex}
+          totalJobs={totalJobs}
+          currentLabel={currentLabel}
+          statusForUi={statusForUi}
           palette={palette}
-          progress={overallProgress}
-          currentItemIndex={currentItemIndex}
-          totalItems={totalItems}
         />
 
-        <View style={styles.progressCard}>
+        <SimpleProgressBar palette={palette} progress={overallProgress} />
+
+        <View style={styles.progressCardWithCount}>
           <Text style={[styles.progressMessage, { color: palette.text }]}>
             {progressMessage ?? "Awaiting progress…"}
           </Text>
@@ -443,278 +417,34 @@ export function DeleteAutomationModal({
         </ScrollView>
 
         {state === "failed" && error ? (
-          <View
-            style={[
-              styles.errorCard,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name="error-outline"
-              size={20}
-              color={palette.warning ?? palette.tint}
-            />
-            <Text style={[styles.errorText, { color: palette.text }]}>
-              {error}
-            </Text>
-          </View>
+          <ErrorCard error={error} palette={palette} />
         ) : null}
 
         {state === "completed" ? (
-          <View
-            style={[
-              styles.successCard,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <MaterialIcons name="check-circle" size={24} color={palette.tint} />
-            <Text style={[styles.statusText, { color: palette.text }]}>
-              Deletion complete. You can close this dialog.
-            </Text>
-          </View>
+          <SuccessCard
+            message="Deletion complete. You can close this dialog."
+            palette={palette}
+          />
         ) : null}
 
-        <View
-          style={[styles.infoBar, { backgroundColor: palette.icon + "11" }]}
-        >
-          <MaterialIcons
-            name="info-outline"
-            size={16}
-            color={palette.icon}
-            style={{ opacity: 0.7 }}
-          />
-          <Text style={[styles.infoText, { color: palette.text }]}>
-            Keep your phone unlocked and don&apos;t switch apps
-          </Text>
-        </View>
+        <InfoBar
+          message="Keep your phone unlocked and don't switch apps"
+          palette={palette}
+        />
 
-        <View style={styles.buttonRow}>
-          {state === "running" ? (
-            <SecondaryButton
-              label={paused ? "Resume" : "Pause"}
-              palette={palette}
-              onPress={paused ? handleResume : handlePause}
-              iconName={paused ? "play-arrow" : "pause"}
-              variant={paused ? "resume" : "pause"}
-            />
-          ) : (
-            <SecondaryButton
-              label={onRestart ? "Back to Delete Options" : "Close"}
-              palette={palette}
-              onPress={onRestart ?? onClose}
-            />
-          )}
-          <DangerButton label="Cancel" palette={palette} onPress={onClose} />
-        </View>
+        <ButtonRow
+          state={state}
+          paused={paused}
+          palette={palette}
+          onPause={handlePause}
+          onResume={handleResume}
+          onRestart={onRestart}
+          onClose={onClose}
+          restartLabel="Back to Delete Options"
+        />
       </View>
     </Modal>
   );
 }
-
-function SecondaryButton({
-  label,
-  palette,
-  onPress,
-  iconName,
-  variant = "default",
-}: {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  iconName?: React.ComponentProps<typeof MaterialIcons>["name"];
-  variant?: "default" | "pause" | "resume";
-}) {
-  const isResume = variant === "resume";
-  const isPause = variant === "pause";
-  const backgroundColor = isResume ? "#1fa971" : palette.card;
-  const borderColor = isResume ? "#1fa971" : palette.icon + "33";
-  const textColor = isResume ? "#ffffff" : palette.text;
-  const paddingVertical = isResume ? 12 : 10;
-  const paddingHorizontal = isResume ? 24 : 20;
-
-  return (
-    <Pressable
-      onPress={() => {
-        void onPress();
-      }}
-      style={({ pressed }) => [
-        styles.secondaryButton,
-        {
-          borderColor,
-          backgroundColor,
-          paddingVertical,
-          paddingHorizontal,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-    >
-      <View style={styles.buttonContent}>
-        {iconName ? (
-          <MaterialIcons
-            name={iconName}
-            size={18}
-            color={textColor}
-            style={{ marginRight: 6, opacity: isPause ? 0.8 : 1 }}
-          />
-        ) : null}
-        <Text style={[styles.secondaryButtonText, { color: textColor }]}>
-          {label}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function DangerButton({
-  label,
-  palette,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  disabled?: boolean;
-}) {
-  const backgroundColor = palette.danger ?? "#b00020";
-  return (
-    <Pressable
-      onPress={
-        disabled
-          ? undefined
-          : () => {
-              void onPress();
-            }
-      }
-      style={({ pressed }) => [
-        styles.dangerButton,
-        {
-          backgroundColor,
-          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-    >
-      <Text style={styles.dangerButtonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  progressCard: {
-    alignItems: "center",
-    paddingVertical: 8,
-    gap: 4,
-  },
-  previewScrollView: {
-    flex: 1,
-    minHeight: 0,
-  },
-  previewScrollContent: {
-    flexGrow: 0,
-    paddingBottom: 8,
-  },
-  progressMessage: {
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: "center",
-  },
-  itemCount: {
-    fontSize: 14,
-    textAlign: "center",
-  },
-  errorCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 12,
-  },
-  successCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 12,
-  },
-  infoBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  infoText: {
-    fontSize: 13,
-    opacity: 0.8,
-  },
-  buttonRow: {
-    marginTop: "auto",
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-  secondaryButton: {
-    borderRadius: 14,
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  statusText: {
-    fontSize: 15,
-    textAlign: "center",
-  },
-  errorText: {
-    fontSize: 14,
-    textAlign: "center",
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  stepText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  dangerButton: {
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  dangerButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});
 
 export default DeleteAutomationModal;

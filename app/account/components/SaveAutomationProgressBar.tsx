@@ -4,7 +4,7 @@ import { Animated, StyleSheet, View } from "react-native";
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
-type AutomationProgressBarProps = {
+type SaveAutomationProgressBarProps = {
   jobs: BlueskyJobRecord[];
   activeJobProgress: number;
   activeJobUnknownTotal: boolean;
@@ -68,12 +68,12 @@ function AnimatedStripes({
   );
 }
 
-export function AutomationProgressBar({
+export function SaveAutomationProgressBar({
   jobs,
   activeJobProgress,
   activeJobUnknownTotal,
   palette,
-}: AutomationProgressBarProps) {
+}: SaveAutomationProgressBarProps) {
   const segments = useMemo((): SegmentInfo[] => {
     if (jobs.length === 0) return [];
 
@@ -217,4 +217,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AutomationProgressBar;
+export default SaveAutomationProgressBar;
