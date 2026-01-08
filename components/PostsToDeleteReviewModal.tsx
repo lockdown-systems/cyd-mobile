@@ -10,12 +10,21 @@ import {
   View,
 } from "react-native";
 
+import {
+  fetchExternalEmbedsForPosts,
+  fetchMediaForPosts,
+} from "@/app/account/tabs/browse/shared";
 import { PostPreview } from "@/components/PostPreview";
 import { BlueskyAccountController } from "@/controllers";
 import type { PostToDeletePreview } from "@/controllers/bluesky/deletion-calculator";
-import type { PostPreviewData } from "@/controllers/bluesky/types";
+import type {
+  ExternalEmbed,
+  MediaAttachment,
+  PostPreviewData,
+} from "@/controllers/bluesky/types";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 import type { AccountTabPalette } from "@/types/account-tabs";
+import { extractEmbeddedPostFromJson } from "@/utils/embeddedPost";
 
 type PostsToDeleteReviewModalProps = {
   visible: boolean;
@@ -38,30 +47,70 @@ export function PostsToDeleteReviewModal({
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
 
+  // Helper to parse facets JSON
+  const parseFacets = useCallback(
+    (facetsJSON: string | null): unknown[] | null => {
+      if (!facetsJSON) return null;
+      try {
+        const parsed: unknown = JSON.parse(facetsJSON);
+        return Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
+    },
+    []
+  );
+
   // Helper to map PostToDeletePreview to PostPreviewData
   const mapToPreviewData = useCallback(
-    (post: PostToDeletePreview): PostPreviewData => ({
-      uri: post.uri,
-      cid: post.cid,
-      text: post.text,
-      createdAt: post.createdAt,
-      savedAt: new Date(post.savedAt).toISOString(),
-      preserve: post.preserve,
-      author: {
-        did: post.authorDid,
-        handle: post.authorHandle ?? "unknown",
-        displayName: post.authorDisplayName,
-        avatarUrl: post.avatarUrl,
-        avatarDataURI: post.avatarDataURI,
-      },
-      likeCount: post.likeCount,
-      repostCount: post.repostCount,
-      replyCount: post.replyCount,
-      quoteCount: post.quoteCount,
-      isReply: post.isReply,
-      isRepost: false,
-    }),
-    []
+    (
+      post: PostToDeletePreview,
+      mediaMap: Map<string, MediaAttachment[]>,
+      externalMap: Map<string, ExternalEmbed>,
+      quotedPostExternalMap: Map<string, ExternalEmbed>
+    ): PostPreviewData => {
+      // Parse quoted post from embed JSON
+      let quotedPost = extractEmbeddedPostFromJson(
+        post.embedJSON,
+        post.createdAt
+      );
+
+      // Apply external embed to quoted post if available
+      if (quotedPost && post.quotedPostUri) {
+        const quotedPostEmbed = quotedPostExternalMap.get(post.quotedPostUri);
+        if (quotedPostEmbed) {
+          quotedPost = { ...quotedPost, externalEmbed: quotedPostEmbed };
+        }
+      }
+
+      return {
+        uri: post.uri,
+        cid: post.cid,
+        text: post.text,
+        createdAt: post.createdAt,
+        savedAt: new Date(post.savedAt).toISOString(),
+        preserve: post.preserve,
+        author: {
+          did: post.authorDid,
+          handle: post.authorHandle ?? "unknown",
+          displayName: post.authorDisplayName,
+          avatarUrl: post.avatarUrl,
+          avatarDataURI: post.avatarDataURI,
+        },
+        likeCount: post.likeCount,
+        repostCount: post.repostCount,
+        replyCount: post.replyCount,
+        quoteCount: post.quoteCount,
+        isReply: post.isReply,
+        isRepost: false,
+        media: mediaMap.get(post.uri),
+        quotedPost,
+        quotedPostUri: post.quotedPostUri,
+        externalEmbed: externalMap.get(post.uri),
+        facets: parseFacets(post.facetsJSON),
+      };
+    },
+    [parseFacets]
   );
 
   // Load posts when modal becomes visible
@@ -75,8 +124,31 @@ export function PostsToDeleteReviewModal({
         await controller.initDB();
         await controller.initAgent();
         controllerRef.current = controller;
+
         const posts = controller.getPostsForDeletionReview(selections);
-        setPostsToDelete(posts.map(mapToPreviewData));
+
+        // Get the database from controller
+        const db = controller.getDB();
+
+        // Collect post URIs and quoted post URIs
+        const postUris = posts.map((p) => p.uri);
+        const quotedPostUris = posts
+          .map((p) => p.quotedPostUri)
+          .filter((uri): uri is string => uri !== null);
+
+        // Fetch media and external embeds for all posts
+        const [mediaMap, externalMap, quotedPostExternalMap] =
+          await Promise.all([
+            fetchMediaForPosts(db, postUris),
+            fetchExternalEmbedsForPosts(db, postUris),
+            fetchExternalEmbedsForPosts(db, quotedPostUris),
+          ]);
+
+        setPostsToDelete(
+          posts.map((p) =>
+            mapToPreviewData(p, mediaMap, externalMap, quotedPostExternalMap)
+          )
+        );
       } catch (err) {
         console.error("Failed to load posts to delete:", err);
       } finally {

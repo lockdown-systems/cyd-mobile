@@ -98,6 +98,9 @@ export interface PostToDeletePreview {
   authorDisplayName: string | null;
   avatarUrl: string | null;
   avatarDataURI: string | null;
+  embedJSON: string | null;
+  quotedPostUri: string | null;
+  facetsJSON: string | null;
 }
 
 /**
@@ -259,10 +262,14 @@ export function calculatePostsToDeleteWithPreview(
     authorDisplayName: string | null;
     avatarUrl: string | null;
     avatarDataURI: string | null;
+    embedJSON: string | null;
+    quotedPostUri: string | null;
+    facetsJSON: string | null;
   }>(
     `SELECT p.uri, p.cid, p.text, p.createdAt, p.savedAt,
             p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
             p.isReply, p.preserve, p.replyRootUri, p.authorDid,
+            p.embedJSON, p.quotedPostUri, p.facetsJSON,
             prof.handle as authorHandle, prof.displayName as authorDisplayName,
             prof.avatarUrl, prof.avatarDataURI
      FROM post p
@@ -289,6 +296,9 @@ export function calculatePostsToDeleteWithPreview(
     authorDisplayName: post.authorDisplayName,
     avatarUrl: post.avatarUrl,
     avatarDataURI: post.avatarDataURI,
+    embedJSON: post.embedJSON,
+    quotedPostUri: post.quotedPostUri,
+    facetsJSON: post.facetsJSON,
   });
 
   if (!settings.deletePostsPreserveThreads) {
@@ -370,10 +380,14 @@ export function calculatePostsForDeletionReview(
     authorDisplayName: string | null;
     avatarUrl: string | null;
     avatarDataURI: string | null;
+    embedJSON: string | null;
+    quotedPostUri: string | null;
+    facetsJSON: string | null;
   }>(
     `SELECT p.uri, p.cid, p.text, p.createdAt, p.savedAt,
             p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
             p.isReply, p.preserve, p.replyRootUri, p.authorDid,
+            p.embedJSON, p.quotedPostUri, p.facetsJSON,
             prof.handle as authorHandle, prof.displayName as authorDisplayName,
             prof.avatarUrl, prof.avatarDataURI
      FROM post p
@@ -400,6 +414,9 @@ export function calculatePostsForDeletionReview(
     authorDisplayName: post.authorDisplayName,
     avatarUrl: post.avatarUrl,
     avatarDataURI: post.avatarDataURI,
+    embedJSON: post.embedJSON,
+    quotedPostUri: post.quotedPostUri,
+    facetsJSON: post.facetsJSON,
   });
 
   if (!settings.deletePostsPreserveThreads) {

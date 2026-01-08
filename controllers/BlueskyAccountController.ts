@@ -1,6 +1,7 @@
 import { Agent, type AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
 import { Directory, File, Paths } from "expo-file-system";
+import type { SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
 import {
@@ -742,6 +743,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       throw new Error("Database not initialized");
     }
     return this.db;
+  }
+
+  /**
+   * Get the database instance (throws if not initialized)
+   */
+  getDB(): SQLiteDatabase {
+    return this.requireDb();
   }
 
   private requireAgent(): Agent {
