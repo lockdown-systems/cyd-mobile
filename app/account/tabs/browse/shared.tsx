@@ -5,6 +5,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -28,6 +29,8 @@ export type BrowseProps = {
   accountId?: number;
   onCountChange?: (count: number, label: string) => void;
 };
+
+export type DeletedFilter = "all" | "deleted" | "not-deleted";
 
 export type AccountMeta = {
   uuid: string;
@@ -130,7 +133,8 @@ export function mapRowToPreview(
   fallbackHandle: string,
   media?: MediaAttachment[],
   externalEmbed?: ExternalEmbed | null,
-  quotedPostExternalEmbed?: ExternalEmbed | null
+  quotedPostExternalEmbed?: ExternalEmbed | null,
+  browseType?: BrowseType
 ): PostPreviewData {
   let quotedPost = extractEmbeddedPostFromJson(row.embedJSON, row.createdAt);
   const facets = parseFacets(row.facetsJSON);
@@ -143,13 +147,21 @@ export function mapRowToPreview(
     };
   }
 
-  // Prefer whichever delete timestamp is set for this post state
-  const deletedAtEpoch =
-    row.deletedPostAt ??
-    row.deletedRepostAt ??
-    row.deletedLikeAt ??
-    row.deletedBookmarkAt ??
-    null;
+  // Use the appropriate delete timestamp based on browse type
+  let deletedAtEpoch: number | null = null;
+  if (browseType === "bookmarks") {
+    deletedAtEpoch = row.deletedBookmarkAt;
+  } else if (browseType === "likes") {
+    deletedAtEpoch = row.deletedLikeAt;
+  } else {
+    // For posts, use the first available
+    deletedAtEpoch =
+      row.deletedPostAt ??
+      row.deletedRepostAt ??
+      row.deletedLikeAt ??
+      row.deletedBookmarkAt ??
+      null;
+  }
 
   return {
     uri: row.uri,
@@ -262,11 +274,46 @@ export async function openAccountDb(uuid: string): Promise<SQLiteDatabase> {
 }
 
 /**
+ * Get the deleted filter clause for the appropriate browse type
+ */
+function getDeletedFilterClause(
+  type: BrowseType,
+  deletedFilter: DeletedFilter
+): string {
+  if (deletedFilter === "all") {
+    return "";
+  }
+
+  // Use the appropriate deleted column based on browse type
+  let deletedColumn: string;
+  switch (type) {
+    case "posts":
+      deletedColumn = "p.deletedPostAt";
+      break;
+    case "likes":
+      deletedColumn = "p.deletedLikeAt";
+      break;
+    case "bookmarks":
+      deletedColumn = "p.deletedBookmarkAt";
+      break;
+  }
+
+  if (deletedFilter === "deleted") {
+    return ` AND ${deletedColumn} IS NOT NULL`;
+  } else {
+    return ` AND ${deletedColumn} IS NULL`;
+  }
+}
+
+/**
  * Query builders for different browse types
  */
 export type BrowseType = "posts" | "likes" | "bookmarks";
 
-export function buildFirstPageQuery(type: BrowseType): string {
+export function buildFirstPageQuery(
+  type: BrowseType,
+  deletedFilter: DeletedFilter = "all"
+): string {
   const baseSelect = `
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt, p.savedAt,
@@ -278,26 +325,31 @@ export function buildFirstPageQuery(type: BrowseType): string {
     FROM post p
     LEFT JOIN profile prof ON prof.did = p.authorDid`;
 
+  const deletedClause = getDeletedFilterClause(type, deletedFilter);
+
   switch (type) {
     case "posts":
       return `${baseSelect}
-        WHERE p.authorDid = ?
+        WHERE p.authorDid = ?${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "likes":
       return `${baseSelect}
-        WHERE p.viewerLiked = 1
+        WHERE p.viewerLiked = 1${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "bookmarks":
       return `${baseSelect}
-        WHERE p.viewerBookmarked = 1
+        WHERE p.viewerBookmarked = 1${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
   }
 }
 
-export function buildLoadMoreQuery(type: BrowseType): string {
+export function buildLoadMoreQuery(
+  type: BrowseType,
+  deletedFilter: DeletedFilter = "all"
+): string {
   const baseSelect = `
     SELECT
       p.id, p.uri, p.cid, p.authorDid, p.text, p.createdAt, p.savedAt,
@@ -309,20 +361,22 @@ export function buildLoadMoreQuery(type: BrowseType): string {
     FROM post p
     LEFT JOIN profile prof ON prof.did = p.authorDid`;
 
+  const deletedClause = getDeletedFilterClause(type, deletedFilter);
+
   switch (type) {
     case "posts":
       return `${baseSelect}
-        WHERE p.authorDid = ? AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))
+        WHERE p.authorDid = ? AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "likes":
       return `${baseSelect}
-        WHERE p.viewerLiked = 1 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))
+        WHERE p.viewerLiked = 1 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "bookmarks":
       return `${baseSelect}
-        WHERE p.viewerBookmarked = 1 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))
+        WHERE p.viewerBookmarked = 1 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
   }
@@ -408,6 +462,7 @@ export function BrowseList({
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("all");
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const cursorRef = useRef<Cursor | null>(null);
@@ -454,7 +509,7 @@ export function BrowseList({
       );
       setTotalCount(countResult?.count ?? 0);
 
-      const query = buildFirstPageQuery(type);
+      const query = buildFirstPageQuery(type, deletedFilter);
       const params = getFirstPageParams(type, meta.did);
       const rows = await db.getAllAsync<PostRow>(query, params);
 
@@ -478,7 +533,8 @@ export function BrowseList({
           externalMap.get(row.uri) ?? null,
           row.quotedPostUri
             ? (externalMap.get(row.quotedPostUri) ?? null)
-            : null
+            : null,
+          type
         )
       );
       setPosts(mapped);
@@ -493,7 +549,7 @@ export function BrowseList({
     } finally {
       setLoadingInitial(false);
     }
-  }, [accountId, handle, type]);
+  }, [accountId, deletedFilter, handle, type]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || loadingInitial || !hasMore) {
@@ -510,7 +566,7 @@ export function BrowseList({
 
     setLoadingMore(true);
     try {
-      const query = buildLoadMoreQuery(type);
+      const query = buildLoadMoreQuery(type, deletedFilter);
       const params = getLoadMoreParams(type, meta.did, cursor);
       const rows = await db.getAllAsync<PostRow>(query, params);
 
@@ -534,7 +590,8 @@ export function BrowseList({
           externalMap.get(row.uri) ?? null,
           row.quotedPostUri
             ? (externalMap.get(row.quotedPostUri) ?? null)
-            : null
+            : null,
+          type
         )
       );
       setPosts((prev) => [...prev, ...mapped]);
@@ -549,7 +606,7 @@ export function BrowseList({
     } finally {
       setLoadingMore(false);
     }
-  }, [handle, hasMore, loadingInitial, loadingMore, type]);
+  }, [deletedFilter, handle, hasMore, loadingInitial, loadingMore, type]);
 
   // Toggle preserve flag for a post (only for "posts" type browsing)
   const handlePreserveToggle = useCallback((postUri: string) => {
@@ -606,22 +663,34 @@ export function BrowseList({
   useEffect(() => {
     const typeLabel =
       type === "posts" ? "posts" : type === "likes" ? "likes" : "bookmarks";
-    const hasFilter = filterText.trim().length > 0;
+    const hasTextFilter = filterText.trim().length > 0;
+    const hasDeletedFilter = deletedFilter !== "all";
 
-    if (hasFilter) {
-      // When filtering, show count of filtered results
-      onCountChange?.(
-        filteredPosts.length,
-        `Showing ${filteredPosts.length.toLocaleString()} of ${totalCount.toLocaleString()} ${typeLabel} (filtered)`
-      );
-    } else {
-      // When not filtering, show total count from database
-      onCountChange?.(
-        totalCount,
-        `Showing ${totalCount.toLocaleString()} ${typeLabel}`
-      );
+    // Determine the base count - when deleted filter is active, use loaded posts count
+    const baseCount = hasDeletedFilter ? posts.length : totalCount;
+    const displayCount = hasTextFilter ? filteredPosts.length : baseCount;
+
+    // Build the label
+    let label = `Showing ${displayCount.toLocaleString()} ${typeLabel}`;
+    if (hasDeletedFilter) {
+      const filterLabel =
+        deletedFilter === "deleted" ? "deleted" : "not deleted";
+      label = `Showing ${displayCount.toLocaleString()} ${filterLabel} ${typeLabel}`;
     }
-  }, [filteredPosts.length, filterText, onCountChange, totalCount, type]);
+    if (hasTextFilter) {
+      label += " (filtered)";
+    }
+
+    onCountChange?.(displayCount, label);
+  }, [
+    deletedFilter,
+    filteredPosts.length,
+    filterText,
+    onCountChange,
+    posts.length,
+    totalCount,
+    type,
+  ]);
 
   const renderItem = useCallback(
     ({ item }: { item: PostPreviewData }) => (
@@ -716,6 +785,42 @@ export function BrowseList({
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
+        <View style={styles.toggleRow}>
+          {(["all", "deleted", "not-deleted"] as const).map((option) => (
+            <Pressable
+              key={option}
+              onPress={() => setDeletedFilter(option)}
+              style={[
+                styles.toggleOption,
+                {
+                  backgroundColor:
+                    deletedFilter === option
+                      ? palette.tint
+                      : palette.background,
+                  borderColor: palette.icon,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  {
+                    color:
+                      deletedFilter === option
+                        ? palette.background
+                        : palette.text,
+                  },
+                ]}
+              >
+                {option === "all"
+                  ? "Show All"
+                  : option === "deleted"
+                    ? "Deleted"
+                    : "Not Deleted"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -751,6 +856,7 @@ const styles = StyleSheet.create({
   filterBar: {
     paddingHorizontal: 12,
     paddingVertical: 8,
+    gap: 8,
   },
   filterInput: {
     height: 40,
@@ -758,5 +864,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 15,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  toggleOption: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  toggleText: {
+    fontSize: 13,
+    fontWeight: "500",
   },
 });

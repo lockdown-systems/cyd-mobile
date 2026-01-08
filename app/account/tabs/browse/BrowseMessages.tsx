@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -21,7 +24,7 @@ import type { AccountTabPalette } from "@/types/account-tabs";
 import { extractEmbeddedPostFromJson } from "@/utils/embeddedPost";
 
 import { BrowsePlaceholderCard } from "./BrowsePlaceholderCard";
-import { fetchAccountMeta, openAccountDb } from "./shared";
+import { type DeletedFilter, fetchAccountMeta, openAccountDb } from "./shared";
 
 type Props = {
   handle: string;
@@ -90,6 +93,8 @@ export function BrowseMessages({
   const [error, setError] = useState<string | null>(null);
   const [selectedConvo, setSelectedConvo] =
     useState<ConversationPreviewData | null>(null);
+  const [filterText, setFilterText] = useState("");
+  const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("all");
   const accountUuidRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -201,13 +206,22 @@ export function BrowseMessages({
     setLoadingMessages(true);
     try {
       const db = await openAccountDb(uuid);
+
+      // Build deleted filter clause
+      let deletedClause = "";
+      if (deletedFilter === "deleted") {
+        deletedClause = " AND m.deletedAt IS NOT NULL";
+      } else if (deletedFilter === "not-deleted") {
+        deletedClause = " AND m.deletedAt IS NULL";
+      }
+
       const rows = await db.getAllAsync<MessageRow>(
         `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.savedAt, m.deletedAt, m.senderDid,
           m.embedJSON, m.reactionsJSON, m.facetsJSON, m.embeddedPostUri,
                 p.handle, p.displayName, p.avatarUrl, p.avatarDataURI
          FROM message m
          LEFT JOIN profile p ON p.did = m.senderDid
-         WHERE m.convoId = ?
+         WHERE m.convoId = ?${deletedClause}
          ORDER BY m.sentAt DESC, m.id DESC;`,
         [convoId]
       );
@@ -399,6 +413,20 @@ export function BrowseMessages({
     }
   };
 
+  // Filter messages based on filter text (case insensitive)
+  const filteredMessages = useMemo(() => {
+    if (!filterText.trim()) {
+      return messages;
+    }
+    const searchTerm = filterText.toLowerCase();
+    return messages.filter(
+      (message) =>
+        message.text?.toLowerCase().includes(searchTerm) ||
+        message.sender?.handle?.toLowerCase().includes(searchTerm) ||
+        message.sender?.displayName?.toLowerCase().includes(searchTerm)
+    );
+  }, [messages, filterText]);
+
   // Report conversation count when viewing conversations list
   useEffect(() => {
     if (!selectedConvo && !loadingConvos && !error) {
@@ -425,10 +453,26 @@ export function BrowseMessages({
         selectedConvo.members[0]?.displayName ||
         selectedConvo.members[0]?.handle ||
         "Unknown";
-      onCountChange?.(
-        messages.length,
-        `Showing ${messages.length.toLocaleString()} message${messages.length === 1 ? "" : "s"} with ${memberName}`
-      );
+
+      const hasTextFilter = filterText.trim().length > 0;
+      const hasDeletedFilter = deletedFilter !== "all";
+      const displayCount = hasTextFilter
+        ? filteredMessages.length
+        : messages.length;
+
+      // Build the label
+      let label = `Showing ${displayCount.toLocaleString()} message${displayCount === 1 ? "" : "s"} with ${memberName}`;
+      if (hasDeletedFilter) {
+        const filterLabel =
+          deletedFilter === "deleted" ? "deleted" : "not deleted";
+        label = `Showing ${displayCount.toLocaleString()} ${filterLabel} message${displayCount === 1 ? "" : "s"} with ${memberName}`;
+      }
+      if (hasTextFilter) {
+        label += " (filtered)";
+      }
+
+      onCountChange?.(displayCount, label);
+
       // Report header info
       onHeaderChange?.({
         visible: true,
@@ -443,6 +487,9 @@ export function BrowseMessages({
       });
     }
   }, [
+    deletedFilter,
+    filterText,
+    filteredMessages.length,
     messages.length,
     selectedConvo,
     loadingMessages,
@@ -463,6 +510,8 @@ export function BrowseMessages({
     );
     ConversationItem.displayName = "BrowseMessagesConversationItem";
     return ConversationItem;
+    // loadMessages is stable - only reads from refs and deletedFilter which is handled separately
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [palette]);
 
   const renderMessage = useMemo(() => {
@@ -472,6 +521,15 @@ export function BrowseMessages({
     MessageItem.displayName = "BrowseMessagesMessageItem";
     return MessageItem;
   }, [palette]);
+
+  // Reload messages when deleted filter changes
+  useEffect(() => {
+    if (selectedConvo) {
+      void loadMessages(selectedConvo.convoId);
+    }
+    // loadMessages uses deletedFilter internally, so it will trigger a refetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deletedFilter, selectedConvo]);
 
   if (loadingConvos) {
     return (
@@ -506,7 +564,11 @@ export function BrowseMessages({
 
   if (selectedConvo) {
     return (
-      <View style={styles.flex}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 140 : 0}
+      >
         {loadingMessages ? (
           <View style={styles.centered}>
             <ActivityIndicator color={palette.tint} />
@@ -516,14 +578,80 @@ export function BrowseMessages({
           </View>
         ) : (
           <FlatList
-            data={messages}
+            data={filteredMessages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.messageId}
             contentContainerStyle={styles.listContent}
             inverted
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           />
         )}
-      </View>
+        <View
+          style={[
+            styles.filterBar,
+            {
+              backgroundColor: palette.background,
+              borderTopColor: palette.icon,
+            },
+          ]}
+        >
+          <TextInput
+            style={[
+              styles.filterInput,
+              {
+                backgroundColor: palette.background,
+                color: palette.text,
+                borderColor: palette.icon,
+              },
+            ]}
+            placeholder="Filter messages..."
+            placeholderTextColor={palette.icon}
+            value={filterText}
+            onChangeText={setFilterText}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+          />
+          <View style={styles.toggleRow}>
+            {(["all", "deleted", "not-deleted"] as const).map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => setDeletedFilter(option)}
+                style={[
+                  styles.toggleOption,
+                  {
+                    backgroundColor:
+                      deletedFilter === option
+                        ? palette.tint
+                        : palette.background,
+                    borderColor: palette.icon,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.toggleText,
+                    {
+                      color:
+                        deletedFilter === option
+                          ? palette.background
+                          : palette.text,
+                    },
+                  ]}
+                >
+                  {option === "all"
+                    ? "Show All"
+                    : option === "deleted"
+                      ? "Deleted"
+                      : "Not Deleted"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -567,6 +695,34 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     flexShrink: 1,
+  },
+  filterBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  filterInput: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 15,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  toggleOption: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  toggleText: {
+    fontSize: 13,
+    fontWeight: "500",
   },
 });
 

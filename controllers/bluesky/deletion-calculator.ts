@@ -567,7 +567,7 @@ export function calculateLikesToDelete(
  */
 export function calculateMessagesToDelete(
   db: SQLiteDatabase,
-  userDid: string,
+  _userDid: string,
   settings: AccountDeleteSettings
 ): MessageToDelete[] {
   if (!settings.deleteChats) {
@@ -575,12 +575,12 @@ export function calculateMessagesToDelete(
   }
 
   // Messages are stored in the message table
-  // Only delete messages sent by the user
+  // Delete ALL messages in conversations (both sent and received)
+  // The API deleteMessageForSelf removes messages from the user's view
   let whereClause = `
     m.deletedAt IS NULL
-    AND m.senderDid = ?
   `;
-  const params: (string | number)[] = [userDid];
+  const params: (string | number)[] = [];
 
   if (settings.deleteChatsDaysOldEnabled) {
     const daysOldTimestamp = getTimestampDaysAgo(settings.deleteChatsDaysOld);

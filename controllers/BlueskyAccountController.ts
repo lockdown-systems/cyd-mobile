@@ -1068,9 +1068,9 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       )
     );
 
-    // Mark as deleted in local DB
+    // Mark as deleted in local DB (store as epoch milliseconds)
     db.runSync(`UPDATE message SET deletedAt = ? WHERE messageId = ?;`, [
-      new Date().toISOString(),
+      Date.now(),
       messageId,
     ]);
   }
