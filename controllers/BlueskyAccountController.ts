@@ -36,6 +36,7 @@ import {
   type BlueskyJobRunUpdate,
   type BlueskyJobStatus,
   type BlueskyJobType,
+  type DeleteJobOptions,
   type JobEmit,
   type SaveJobOptions,
 } from "./bluesky/job-types";
@@ -111,6 +112,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   private sessionExpiredCallback?: () => Promise<void>;
   private rateLimitCallback?: (info: RateLimitInfo) => void;
   private progressCallback?: (progress: BlueskyProgress) => void;
+  private deleteSettings: AccountDeleteSettings | null = null;
 
   constructor(accountId: number, accountUUID?: string) {
     super(accountId, accountUUID);
@@ -488,6 +490,79 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     return inserted;
   }
 
+  async defineDeleteJobs(
+    options: DeleteJobOptions
+  ): Promise<BlueskyJobRecord[]> {
+    console.log(
+      "[BlueskyController] defineDeleteJobs -> start",
+      this.accountId,
+      {
+        settings: options.settings,
+        counts: options.counts,
+      }
+    );
+    const db = this.requireDb();
+    const scheduledAt = Date.now();
+    const jobTypes: BlueskyJobType[] = ["verifyAuthorization"];
+    const { settings, counts } = options;
+
+    // Store the delete settings for use during job execution
+    this.deleteSettings = settings;
+
+    // Add delete jobs based on what the user selected and if there's data to delete
+    if (settings.deletePosts && counts.posts > 0) {
+      jobTypes.push("deletePosts");
+    }
+
+    if (settings.deleteReposts && counts.reposts > 0) {
+      jobTypes.push("deleteReposts");
+    }
+
+    if (settings.deleteLikes && counts.likes > 0) {
+      jobTypes.push("deleteLikes");
+    }
+
+    if (settings.deleteBookmarks && counts.bookmarks > 0) {
+      jobTypes.push("deleteBookmarks");
+    }
+
+    if (settings.deleteChats && counts.messages > 0) {
+      jobTypes.push("deleteMessages");
+    }
+
+    if (settings.deleteUnfollowEveryone && counts.follows > 0) {
+      jobTypes.push("unfollowUsers");
+    }
+
+    const inserted: BlueskyJobRecord[] = [];
+
+    for (const jobType of jobTypes) {
+      const result = await db.runAsync(
+        `INSERT INTO job (jobType, status, scheduledAt, progressJSON) VALUES (?, 'pending', ?, NULL);`,
+        [jobType, scheduledAt]
+      );
+      const id = Number(result.lastInsertRowId);
+      inserted.push({
+        id,
+        jobType,
+        status: "pending",
+        scheduledAt,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      });
+    }
+
+    console.log(
+      "[BlueskyController] defineDeleteJobs -> inserted",
+      this.accountId,
+      inserted.map((j) => j.jobType)
+    );
+
+    return inserted;
+  }
+
   async getPendingJobs(): Promise<BlueskyJobRecord[]> {
     const db = this.requireDb();
     const rows = await db.getAllAsync<JobRow>(
@@ -669,6 +744,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     return this.db;
   }
 
+  private requireAgent(): Agent {
+    if (!this.agent) {
+      throw new Error("Agent not initialized");
+    }
+    return this.agent;
+  }
+
   // ==================== Save Operations ====================
   // These will be implemented in Phase 3
 
@@ -834,6 +916,175 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   // ==================== Delete Execution ====================
+
+  /**
+   * Get the current delete settings stored on this controller
+   */
+  getDeleteSettings(): AccountDeleteSettings | null {
+    return this.deleteSettings;
+  }
+
+  /**
+   * Set the delete settings on this controller
+   */
+  setDeleteSettings(settings: AccountDeleteSettings): void {
+    this.deleteSettings = settings;
+  }
+
+  /**
+   * Delete a single post by its AT-URI
+   */
+  async deletePost(postUri: string): Promise<void> {
+    const agent = this.requireAgent();
+    const db = this.requireDb();
+    const did = this.did;
+    if (!did) throw new Error("DID not available");
+
+    // Delete from Bluesky
+    await this.makeApiRequest(() =>
+      agent.api.com.atproto.repo.deleteRecord({
+        repo: did,
+        collection: "app.bsky.feed.post",
+        rkey: postUri.split("/").pop() ?? "",
+      })
+    );
+
+    // Mark as deleted in local DB
+    db.runSync(`UPDATE post SET deletedPostAt = ? WHERE uri = ?;`, [
+      new Date().toISOString(),
+      postUri,
+    ]);
+  }
+
+  /**
+   * Delete a single repost by its AT-URI
+   */
+  async deleteRepost(repostUri: string): Promise<void> {
+    const agent = this.requireAgent();
+    const db = this.requireDb();
+    const did = this.did;
+    if (!did) throw new Error("DID not available");
+
+    // Delete from Bluesky
+    await this.makeApiRequest(() =>
+      agent.api.com.atproto.repo.deleteRecord({
+        repo: did,
+        collection: "app.bsky.feed.repost",
+        rkey: repostUri.split("/").pop() ?? "",
+      })
+    );
+
+    // Mark as deleted in local DB
+    db.runSync(`UPDATE post SET deletedRepostAt = ? WHERE repostUri = ?;`, [
+      new Date().toISOString(),
+      repostUri,
+    ]);
+  }
+
+  /**
+   * Delete a single like by its AT-URI
+   */
+  async deleteLike(likeUri: string): Promise<void> {
+    const agent = this.requireAgent();
+    const db = this.requireDb();
+    const did = this.did;
+    if (!did) throw new Error("DID not available");
+
+    // Delete from Bluesky
+    await this.makeApiRequest(() =>
+      agent.api.com.atproto.repo.deleteRecord({
+        repo: did,
+        collection: "app.bsky.feed.like",
+        rkey: likeUri.split("/").pop() ?? "",
+      })
+    );
+
+    // Mark as deleted in local DB
+    db.runSync(`UPDATE post_like SET deletedAt = ? WHERE uri = ?;`, [
+      new Date().toISOString(),
+      likeUri,
+    ]);
+  }
+
+  /**
+   * Delete a single bookmark by its ID
+   */
+  async deleteBookmark(bookmarkId: number): Promise<void> {
+    const agent = this.requireAgent();
+    const db = this.requireDb();
+    const did = this.did;
+    if (!did) throw new Error("DID not available");
+
+    // Get the bookmark record first
+    const bookmark = db.getFirstSync<{ recordUri: string | null }>(
+      `SELECT recordUri FROM bookmark WHERE id = ?;`,
+      [bookmarkId]
+    );
+
+    if (bookmark?.recordUri) {
+      // Delete from Bluesky
+      await this.makeApiRequest(() =>
+        agent.api.com.atproto.repo.deleteRecord({
+          repo: did,
+          collection: "blue.bookmark.record",
+          rkey: bookmark.recordUri!.split("/").pop() ?? "",
+        })
+      );
+    }
+
+    // Mark as deleted in local DB
+    db.runSync(`UPDATE bookmark SET deletedAt = ? WHERE id = ?;`, [
+      new Date().toISOString(),
+      bookmarkId,
+    ]);
+  }
+
+  /**
+   * Delete a single message by its ID
+   */
+  async deleteMessage(convoId: string, messageId: string): Promise<void> {
+    const agent = this.requireAgent();
+    const db = this.requireDb();
+
+    // Delete from Bluesky using chat API
+    await this.makeApiRequest(() =>
+      agent.api.chat.bsky.convo.deleteMessageForSelf({
+        convoId,
+        messageId,
+      })
+    );
+
+    // Mark as deleted in local DB
+    db.runSync(`UPDATE message SET deletedAt = ? WHERE messageId = ?;`, [
+      new Date().toISOString(),
+      messageId,
+    ]);
+  }
+
+  /**
+   * Unfollow a single user by the follow record AT-URI
+   */
+  async unfollowUser(followUri: string): Promise<void> {
+    const agent = this.requireAgent();
+    const db = this.requireDb();
+    const did = this.did;
+    if (!did) throw new Error("DID not available");
+
+    // Delete the follow record from Bluesky
+    await this.makeApiRequest(() =>
+      agent.api.com.atproto.repo.deleteRecord({
+        repo: did,
+        collection: "app.bsky.graph.follow",
+        rkey: followUri.split("/").pop() ?? "",
+      })
+    );
+
+    // Mark as unfollowed in local DB
+    db.runSync(`UPDATE follow SET unfollowedAt = ? WHERE uri = ?;`, [
+      new Date().toISOString(),
+      followUri,
+    ]);
+  }
 
   /**
    * Delete posts matching the given options

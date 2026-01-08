@@ -182,7 +182,8 @@ export type MessagePreviewData = {
 export type PreviewData =
   | { type: "post"; data: PostPreviewData }
   | { type: "conversation"; data: ConversationPreviewData }
-  | { type: "message"; data: MessagePreviewData };
+  | { type: "message"; data: MessagePreviewData }
+  | { type: "profile"; data: ProfileData };
 
 /**
  * Database statistics for the account

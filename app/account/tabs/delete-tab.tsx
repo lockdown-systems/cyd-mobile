@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -15,11 +16,13 @@ import {
   View,
 } from "react-native";
 
+import { DeleteAutomationModal } from "@/app/account/components/DeleteAutomationModal";
 import { PostsToDeleteReviewModal } from "@/components/PostsToDeleteReviewModal";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveStatusBanner } from "@/components/SaveStatusBanner";
 import { BlueskyAccountController } from "@/controllers";
 import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
+import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
 import { getLastSavedAt } from "@/database/accounts";
 import {
   getAccountDeleteSettings,
@@ -49,6 +52,21 @@ export function DeleteTab({
   const [saving, setSaving] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Automation modal state
+  const [automationVisible, setAutomationVisible] = useState(false);
+  const [automationSettings, setAutomationSettings] =
+    useState<AccountDeleteSettings | null>(null);
+  const [automationCounts, setAutomationCounts] = useState<{
+    posts: number;
+    reposts: number;
+    likes: number;
+    bookmarks: number;
+    messages: number;
+    follows: number;
+  } | null>(null);
+  const [automationKey, setAutomationKey] = useState(0);
+  const automationCancelledRef = useRef(false);
 
   const currentScreen = screenStack[screenStack.length - 1];
 
@@ -150,9 +168,54 @@ export function DeleteTab({
     }
   }, [accountId, canContinue, state, pushScreen]);
 
-  const handleDelete = useCallback(() => {
-    // Placeholder: future automation hook
+  const resetToForm = useCallback(() => {
+    setScreenStack(["form"]);
+    setPersistError(null);
+    setSaving(false);
+    setAutomationVisible(false);
+    setAutomationSettings(null);
+    setAutomationCounts(null);
   }, []);
+
+  const handleStartDelete = useCallback(
+    (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
+      automationCancelledRef.current = false;
+      setAutomationSettings(settings);
+      setAutomationCounts({
+        posts: counts.posts,
+        reposts: counts.reposts,
+        likes: counts.likes,
+        bookmarks: counts.bookmarks,
+        messages: counts.messages,
+        follows: counts.follows,
+      });
+      setAutomationKey((prev) => prev + 1);
+      setAutomationVisible(true);
+    },
+    []
+  );
+
+  const handleAutomationFinished = useCallback(
+    (result: "completed" | "failed", _jobs: BlueskyJobRecord[]) => {
+      if (result === "completed" && !automationCancelledRef.current) {
+        setAutomationVisible(false);
+        // Optionally refresh the review screen counts
+        setRefreshKey((prev) => prev + 1);
+      }
+    },
+    []
+  );
+
+  const handleAutomationClose = useCallback(() => {
+    automationCancelledRef.current = true;
+    setAutomationVisible(false);
+  }, []);
+
+  const handleAutomationRestart = useCallback(() => {
+    automationCancelledRef.current = true;
+    setAutomationVisible(false);
+    resetToForm();
+  }, [resetToForm]);
 
   return (
     <View style={styles.container}>
@@ -181,7 +244,22 @@ export function DeleteTab({
           palette={palette}
           selections={state}
           onBack={popScreen}
-          onConfirm={handleDelete}
+          onConfirm={handleStartDelete}
+          refreshKey={refreshKey}
+        />
+      )}
+      {automationSettings && automationCounts && (
+        <DeleteAutomationModal
+          key={automationKey}
+          visible={automationVisible}
+          accountId={accountId}
+          accountUUID={accountUUID}
+          palette={palette}
+          settings={automationSettings}
+          counts={automationCounts}
+          onFinished={handleAutomationFinished}
+          onClose={handleAutomationClose}
+          onRestart={handleAutomationRestart}
         />
       )}
     </View>
@@ -552,7 +630,11 @@ type DeleteReviewScreenProps = {
   palette: AccountTabPalette;
   selections: AccountDeleteSettings;
   onBack: () => void;
-  onConfirm: () => void;
+  onConfirm: (
+    settings: AccountDeleteSettings,
+    counts: DeletionPreviewCounts
+  ) => void;
+  refreshKey: number;
 };
 
 function DeleteReviewScreen({
@@ -562,11 +644,17 @@ function DeleteReviewScreen({
   selections,
   onBack,
   onConfirm,
+  refreshKey: externalRefreshKey,
 }: DeleteReviewScreenProps) {
   const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
   const [countsLoading, setCountsLoading] = useState(true);
   const [countsError, setCountsError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Refresh when external key changes (e.g., after automation completes)
+  useEffect(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, [externalRefreshKey]);
 
   // Modal state for reviewing posts to delete
   const [postsModalVisible, setPostsModalVisible] = useState(false);
@@ -834,8 +922,12 @@ function DeleteReviewScreen({
         />
         <PrimaryButton
           label="Delete My Data"
-          onPress={onConfirm}
-          disabled={chosen.length === 0}
+          onPress={() => {
+            if (counts) {
+              onConfirm(selections, counts);
+            }
+          }}
+          disabled={chosen.length === 0 || !counts}
           palette={palette}
         />
       </View>

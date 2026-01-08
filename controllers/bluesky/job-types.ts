@@ -1,8 +1,11 @@
+import type { AccountDeleteSettings } from "@/database/delete-settings";
+
 import type {
   ConversationPreviewData,
   MessagePreviewData,
   PostPreviewData,
   PreviewData,
+  ProfileData,
 } from "./types";
 
 export type BlueskyJobType =
@@ -11,7 +14,13 @@ export type BlueskyJobType =
   | "saveLikes"
   | "saveBookmarks"
   | "saveChatConvos"
-  | "saveChatMessages";
+  | "saveChatMessages"
+  | "deletePosts"
+  | "deleteReposts"
+  | "deleteLikes"
+  | "deleteBookmarks"
+  | "deleteMessages"
+  | "unfollowUsers";
 
 export type BlueskyJobStatus = "pending" | "running" | "completed" | "failed";
 
@@ -61,6 +70,7 @@ export type {
   MessagePreviewData,
   PostPreviewData,
   PreviewData,
+  ProfileData,
 };
 
 export type SaveJobOptions = {
@@ -68,4 +78,21 @@ export type SaveJobOptions = {
   likes: boolean;
   bookmarks: boolean;
   chat: boolean;
+};
+
+/**
+ * Options for defining delete jobs based on user's delete settings.
+ * This includes all the settings from AccountDeleteSettings plus the pre-calculated counts.
+ */
+export type DeleteJobOptions = {
+  settings: AccountDeleteSettings;
+  /** Pre-calculated counts for each type of data to delete */
+  counts: {
+    posts: number;
+    reposts: number;
+    likes: number;
+    bookmarks: number;
+    messages: number;
+    follows: number;
+  };
 };

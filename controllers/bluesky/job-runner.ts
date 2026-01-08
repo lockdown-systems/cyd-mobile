@@ -3,19 +3,24 @@ import { PlausibleEvents } from "@/types/analytics";
 
 import type { BlueskyAccountController } from "../BlueskyAccountController";
 import type { BlueskyJobRecord, BlueskyJobType, JobEmit } from "./job-types";
+import { runDeleteBookmarksJob } from "./jobs/delete-bookmarks";
+import { runDeleteLikesJob } from "./jobs/delete-likes";
+import { runDeleteMessagesJob } from "./jobs/delete-messages";
+import { runDeletePostsJob } from "./jobs/delete-posts";
+import { runDeleteRepostsJob } from "./jobs/delete-reposts";
 import { runSaveBookmarksJob } from "./jobs/save-bookmarks";
 import { runSaveChatConvosJob } from "./jobs/save-chat-convos";
 import { runSaveChatMessagesJob } from "./jobs/save-chat-messages";
 import { runSaveLikesJob } from "./jobs/save-likes";
 import { runSavePostsJob } from "./jobs/save-posts";
+import { runUnfollowUsersJob } from "./jobs/unfollow-users";
 import { runVerifyAuthorizationJob } from "./jobs/verify-authorization";
 
 /**
  * Map of job types to their corresponding Plausible event names
  */
-const JOB_TYPE_TO_EVENT: Record<
-  BlueskyJobType,
-  (typeof PlausibleEvents)[keyof typeof PlausibleEvents]
+const JOB_TYPE_TO_EVENT: Partial<
+  Record<BlueskyJobType, (typeof PlausibleEvents)[keyof typeof PlausibleEvents]>
 > = {
   verifyAuthorization: PlausibleEvents.BLUESKY_JOB_STARTED_VERIFY_AUTHORIZATION,
   savePosts: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_POSTS,
@@ -23,6 +28,7 @@ const JOB_TYPE_TO_EVENT: Record<
   saveBookmarks: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_BOOKMARKS,
   saveChatConvos: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_CHAT_CONVOS,
   saveChatMessages: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_CHAT_MESSAGES,
+  // Delete job events can be added later when analytics are set up for them
 };
 
 export async function runJob(
@@ -45,6 +51,12 @@ export async function runJob(
     saveBookmarks: () => runSaveBookmarksJob(controller, job, emit),
     saveChatConvos: () => runSaveChatConvosJob(controller, job, emit),
     saveChatMessages: () => runSaveChatMessagesJob(controller, job, emit),
+    deletePosts: () => runDeletePostsJob(controller, job, emit),
+    deleteReposts: () => runDeleteRepostsJob(controller, job, emit),
+    deleteLikes: () => runDeleteLikesJob(controller, job, emit),
+    deleteBookmarks: () => runDeleteBookmarksJob(controller, job, emit),
+    deleteMessages: () => runDeleteMessagesJob(controller, job, emit),
+    unfollowUsers: () => runUnfollowUsersJob(controller, job, emit),
   };
 
   const handler = handlers[job.jobType];
