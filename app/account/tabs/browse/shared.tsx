@@ -552,34 +552,36 @@ export function BrowseList({
   }, [handle, hasMore, loadingInitial, loadingMore, type]);
 
   // Toggle preserve flag for a post (only for "posts" type browsing)
-  const handlePreserveToggle = useCallback(async (postUri: string) => {
+  const handlePreserveToggle = useCallback((postUri: string) => {
     const db = accountDbRef.current;
     if (!db) return;
 
-    try {
-      // Get current preserve value
-      const row = await db.getFirstAsync<{ preserve: number }>(
-        `SELECT preserve FROM post WHERE uri = ?;`,
-        [postUri]
-      );
-      if (!row) return;
+    void (async () => {
+      try {
+        // Get current preserve value
+        const row = await db.getFirstAsync<{ preserve: number }>(
+          `SELECT preserve FROM post WHERE uri = ?;`,
+          [postUri]
+        );
+        if (!row) return;
 
-      // Toggle preserve value
-      const newValue = row.preserve === 1 ? 0 : 1;
-      await db.runAsync(`UPDATE post SET preserve = ? WHERE uri = ?;`, [
-        newValue,
-        postUri,
-      ]);
+        // Toggle preserve value
+        const newValue = row.preserve === 1 ? 0 : 1;
+        await db.runAsync(`UPDATE post SET preserve = ? WHERE uri = ?;`, [
+          newValue,
+          postUri,
+        ]);
 
-      // Update local state
-      setPosts((prev) =>
-        prev.map((post) =>
-          post.uri === postUri ? { ...post, preserve: newValue === 1 } : post
-        )
-      );
-    } catch (err) {
-      console.error("Failed to toggle preserve:", err);
-    }
+        // Update local state
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.uri === postUri ? { ...post, preserve: newValue === 1 } : post
+          )
+        );
+      } catch (err) {
+        console.error("Failed to toggle preserve:", err);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -635,9 +637,12 @@ export function BrowseList({
 
   const keyExtractor = useCallback((item: PostPreviewData) => item.uri, []);
 
-  const handleEndReached = useCallback(() => {
-    void loadMore();
-  }, [loadMore]);
+  const handleEndReached = useCallback(
+    (_info: { distanceFromEnd: number }) => {
+      void loadMore();
+    },
+    [loadMore]
+  );
 
   if (loadingInitial) {
     return (

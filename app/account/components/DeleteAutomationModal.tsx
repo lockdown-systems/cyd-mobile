@@ -77,7 +77,6 @@ export function DeleteAutomationModal({
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
-  const [_activeJobProgress, setActiveJobProgress] = useState(0);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
@@ -207,9 +206,6 @@ export function DeleteAutomationModal({
                 (update.progressMessage as string | undefined) ?? null
               );
             }
-            if (update.progressPercent !== undefined) {
-              setActiveJobProgress(update.progressPercent);
-            }
             if (update.previewData !== undefined) {
               setPreviewData(update.previewData ?? null);
             }
@@ -282,7 +278,6 @@ export function DeleteAutomationModal({
   }, [visible]);
 
   useEffect(() => {
-    setActiveJobProgress(0);
     setPreviewData(null);
   }, [activeJobId]);
 
