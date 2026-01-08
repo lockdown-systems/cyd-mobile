@@ -184,12 +184,12 @@ describe("CydAccountBar", () => {
       expect(screen.getByText("test@example.com")).toBeTruthy();
     });
 
-    it("should show Manage my account option", () => {
+    it("should show Manage my Cyd account option", () => {
       render(<CydAccountBar />);
 
       fireEvent.press(screen.getByText("☰"));
 
-      expect(screen.getByText("Manage my account")).toBeTruthy();
+      expect(screen.getByText("Manage my Cyd account")).toBeTruthy();
     });
 
     it("should show Sign out option", () => {
@@ -200,7 +200,7 @@ describe("CydAccountBar", () => {
       expect(screen.getByText("Sign out")).toBeTruthy();
     });
 
-    it("should open dashboard URL when Manage my account is pressed", () => {
+    it("should open dashboard URL when Manage my Cyd account is pressed", () => {
       const mockOpenURL = jest
         .spyOn(Linking, "openURL")
         .mockResolvedValue(undefined);
@@ -208,7 +208,7 @@ describe("CydAccountBar", () => {
       render(<CydAccountBar />);
 
       fireEvent.press(screen.getByText("☰"));
-      fireEvent.press(screen.getByText("Manage my account"));
+      fireEvent.press(screen.getByText("Manage my Cyd account"));
 
       expect(mockOpenURL).toHaveBeenCalledWith("https://dash.cyd.social");
       mockOpenURL.mockRestore();
@@ -266,7 +266,7 @@ describe("CydAccountBar", () => {
 
       fireEvent.press(screen.getByText("☰"));
 
-      expect(screen.getByText("Manage my account")).toBeTruthy();
+      expect(screen.getByText("Manage my Cyd account")).toBeTruthy();
       expect(screen.getByText("Sign out")).toBeTruthy();
     });
 

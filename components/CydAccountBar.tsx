@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import {
+  Alert,
   Linking,
   Modal,
   Pressable,
@@ -55,6 +56,15 @@ export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
     setMenuVisible(false);
     void signOut();
   }, [signOut]);
+
+  const handleImportBlueskyAccount = useCallback(() => {
+    setMenuVisible(false);
+    Alert.alert(
+      "Not Implemented",
+      "Import Bluesky account from file is not yet implemented.",
+      [{ text: "OK" }]
+    );
+  }, []);
 
   if (state.isLoading) {
     return null;
@@ -140,7 +150,22 @@ export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
                   ]}
                 >
                   <Text style={[styles.menuItemText, { color: palette.text }]}>
-                    Manage my account
+                    Manage my Cyd account
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleImportBlueskyAccount}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    {
+                      backgroundColor: pressed
+                        ? palette.icon + "15"
+                        : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.menuItemText, { color: palette.text }]}>
+                    Import Bluesky account from file
                   </Text>
                 </Pressable>
                 <Pressable
@@ -160,21 +185,38 @@ export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
                 </Pressable>
               </>
             ) : (
-              <Pressable
-                onPress={handleSignInPress}
-                style={({ pressed }) => [
-                  styles.menuItem,
-                  {
-                    backgroundColor: pressed
-                      ? palette.icon + "15"
-                      : "transparent",
-                  },
-                ]}
-              >
-                <Text style={[styles.menuItemText, { color: palette.text }]}>
-                  Sign in to Cyd to access premium features
-                </Text>
-              </Pressable>
+              <>
+                <Pressable
+                  onPress={handleSignInPress}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    {
+                      backgroundColor: pressed
+                        ? palette.icon + "15"
+                        : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.menuItemText, { color: palette.text }]}>
+                    Sign in to Cyd to access premium features
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleImportBlueskyAccount}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    {
+                      backgroundColor: pressed
+                        ? palette.icon + "15"
+                        : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.menuItemText, { color: palette.text }]}>
+                    Import Bluesky account from file
+                  </Text>
+                </Pressable>
+              </>
             )}
           </View>
         </Pressable>
