@@ -82,7 +82,11 @@ export class PostPersistence {
     const isQuote = quotedPostUri ? 1 : 0;
 
     const isRepost = recordInfo.kind === "repost" ? 1 : 0;
-    const repostUri = isRepost ? postView.uri : null;
+    // repostUri can come from either:
+    // 1. This IS a repost record in the feed (isRepost = 1) - use the post URI
+    // 2. The viewer has reposted this post (viewerReposted = 1) - use viewer.repost
+    const viewerRepostUri = postView.viewer?.repost ?? null;
+    const repostUri = isRepost ? postView.uri : viewerRepostUri;
     const repostCid = isRepost ? postView.cid : null;
     const originalPostUri = repostRecord ? repostRecord.subject.uri : null;
 

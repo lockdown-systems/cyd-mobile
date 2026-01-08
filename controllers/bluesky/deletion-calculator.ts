@@ -506,6 +506,7 @@ export function calculateRepostsToDelete(
   let whereClause = `
     viewerReposted = 1
     AND deletedRepostAt IS NULL
+    AND repostUri IS NOT NULL
   `;
   const params: (string | number)[] = [];
 
