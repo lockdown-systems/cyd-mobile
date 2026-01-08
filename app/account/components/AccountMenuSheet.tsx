@@ -3,7 +3,7 @@ import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Colors } from "@/constants/theme";
 
-export type AccountSettingsSheetProps = {
+export type AccountMenuSheetProps = {
   handle: string;
   palette: typeof Colors.light;
   visible: boolean;
@@ -30,7 +30,7 @@ type SettingsItem =
 
 type SettingsActionItem = Extract<SettingsItem, { type: "action" }>;
 
-export function AccountSettingsSheet({
+export function AccountMenuSheet({
   handle,
   palette,
   visible,
@@ -40,27 +40,21 @@ export function AccountSettingsSheet({
   onReauthenticate,
   onRemoveAccount,
   authStatus,
-}: AccountSettingsSheetProps) {
+}: AccountMenuSheetProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const items = useMemo<SettingsItem[]>(
     () => [
       {
         type: "action",
         key: "schedule",
-        label: "Schedule Backing Up and Deleting",
+        label: "Schedule backing up and deleting",
         log: `Schedule saving and deleting tapped for ${handle}`,
       },
       {
         type: "action",
         key: "export-archive",
-        label: "Export Bluesky Archive",
+        label: "Export Bluesky archive",
         log: `Export archive tapped for ${handle}`,
-      },
-      {
-        type: "action",
-        key: "import-archive",
-        label: "Import Bluesky Archive",
-        log: `Import archive tapped for ${handle}`,
       },
       { type: "separator", key: "sep-1" },
       ...(authStatus !== "authenticated"
@@ -111,12 +105,6 @@ export function AccountSettingsSheet({
 
       if (item.key === "export-archive") {
         Alert.alert("TODO: Export Bluesky Archive is not implemented yet.");
-        onClose();
-        return;
-      }
-
-      if (item.key === "import-archive") {
-        Alert.alert("TODO: Import Bluesky Archive is not implemented yet.");
         onClose();
         return;
       }
@@ -248,9 +236,6 @@ export function AccountSettingsSheet({
           <View
             style={[styles.grabber, { backgroundColor: palette.icon + "44" }]}
           />
-          <Text style={[styles.sheetTitle, { color: palette.text }]}>
-            Account Settings
-          </Text>
           {items.map((item) => {
             if (item.type === "separator") {
               return (
@@ -348,4 +333,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AccountSettingsSheet;
+export default AccountMenuSheet;

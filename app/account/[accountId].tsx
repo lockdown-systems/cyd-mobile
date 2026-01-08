@@ -27,7 +27,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import { AccountSettingsSheet } from "@/app/account/components/AccountSettingsSheet";
+import { AccountMenuSheet } from "@/app/account/components/AccountMenuSheet";
 
 import { Colors } from "@/constants/theme";
 import {
@@ -428,9 +428,9 @@ export default function AccountPlaceholderScreen() {
                   },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Account settings"
+                accessibilityLabel="Account menu"
               >
-                <MaterialIcons name="settings" size={20} color={palette.text} />
+                <MaterialIcons name="menu" size={20} color={palette.text} />
               </Pressable>
             ),
           }}
@@ -506,7 +506,7 @@ export default function AccountPlaceholderScreen() {
           </View>
         </View>
       </SafeAreaView>
-      <AccountSettingsSheet
+      <AccountMenuSheet
         handle={canonicalHandle}
         palette={palette}
         visible={settingsVisible}

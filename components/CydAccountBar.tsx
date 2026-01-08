@@ -61,7 +61,7 @@ export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
     setMenuVisible(false);
     Alert.alert(
       "Not Implemented",
-      "Import Bluesky account from file is not yet implemented.",
+      "Import Bluesky archive is not yet implemented.",
       [{ text: "OK" }]
     );
   }, []);
@@ -107,79 +107,99 @@ export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
         </View>
       </View>
 
-      {/* Menu Modal */}
+      {/* Menu Modal - Bottom Sheet Style */}
       <Modal
         visible={menuVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="overFullScreen"
         onRequestClose={handleCloseMenu}
+        statusBarTranslucent
       >
-        <Pressable style={styles.modalOverlay} onPress={handleCloseMenu}>
+        <View style={styles.sheetOverlay}>
+          <Pressable
+            style={styles.sheetDismissArea}
+            onPress={handleCloseMenu}
+            accessibilityRole="button"
+            accessibilityLabel="Close menu"
+          />
           <View
             style={[
-              styles.menuContainer,
+              styles.sheet,
               {
                 backgroundColor: palette.card,
-                borderColor: palette.icon + "22",
+                paddingBottom: bottomInset + 16,
               },
             ]}
           >
+            <View
+              style={[styles.grabber, { backgroundColor: palette.icon + "44" }]}
+            />
             {state.isSignedIn ? (
               <>
                 <Text
-                  style={[styles.menuEmailText, { color: palette.text }]}
+                  style={[styles.sheetEmailText, { color: palette.icon }]}
                   numberOfLines={1}
                 >
                   {state.userEmail}
                 </Text>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: palette.icon + "22" },
-                  ]}
-                />
                 <Pressable
                   onPress={handleManageAccount}
                   style={({ pressed }) => [
-                    styles.menuItem,
+                    styles.sheetActionButton,
                     {
-                      backgroundColor: pressed
-                        ? palette.icon + "15"
-                        : "transparent",
+                      borderColor: palette.icon + "22",
+                      backgroundColor: palette.background,
+                      opacity: pressed ? 0.9 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
                 >
-                  <Text style={[styles.menuItemText, { color: palette.text }]}>
+                  <Text
+                    style={[styles.sheetActionText, { color: palette.text }]}
+                  >
                     Manage my Cyd account
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleImportBlueskyAccount}
                   style={({ pressed }) => [
-                    styles.menuItem,
+                    styles.sheetActionButton,
                     {
-                      backgroundColor: pressed
-                        ? palette.icon + "15"
-                        : "transparent",
+                      borderColor: palette.icon + "22",
+                      backgroundColor: palette.background,
+                      opacity: pressed ? 0.9 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
                 >
-                  <Text style={[styles.menuItemText, { color: palette.text }]}>
-                    Import Bluesky account from file
+                  <Text
+                    style={[styles.sheetActionText, { color: palette.text }]}
+                  >
+                    Import Bluesky archive
                   </Text>
                 </Pressable>
+                <View
+                  style={[
+                    styles.sheetSeparator,
+                    { borderColor: palette.icon + "22" },
+                  ]}
+                />
                 <Pressable
                   onPress={handleSignOut}
                   style={({ pressed }) => [
-                    styles.menuItem,
+                    styles.sheetActionButton,
                     {
-                      backgroundColor: pressed
-                        ? palette.icon + "15"
-                        : "transparent",
+                      borderColor: palette.icon + "22",
+                      backgroundColor: palette.background,
+                      opacity: pressed ? 0.9 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
                 >
-                  <Text style={[styles.menuItemText, { color: palette.text }]}>
+                  <Text
+                    style={[styles.sheetActionText, { color: palette.text }]}
+                  >
                     Sign out
                   </Text>
                 </Pressable>
@@ -189,37 +209,43 @@ export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
                 <Pressable
                   onPress={handleSignInPress}
                   style={({ pressed }) => [
-                    styles.menuItem,
+                    styles.sheetActionButton,
                     {
-                      backgroundColor: pressed
-                        ? palette.icon + "15"
-                        : "transparent",
+                      borderColor: palette.icon + "22",
+                      backgroundColor: palette.background,
+                      opacity: pressed ? 0.9 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
                 >
-                  <Text style={[styles.menuItemText, { color: palette.text }]}>
+                  <Text
+                    style={[styles.sheetActionText, { color: palette.text }]}
+                  >
                     Sign in to Cyd to access premium features
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleImportBlueskyAccount}
                   style={({ pressed }) => [
-                    styles.menuItem,
+                    styles.sheetActionButton,
                     {
-                      backgroundColor: pressed
-                        ? palette.icon + "15"
-                        : "transparent",
+                      borderColor: palette.icon + "22",
+                      backgroundColor: palette.background,
+                      opacity: pressed ? 0.9 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
                 >
-                  <Text style={[styles.menuItemText, { color: palette.text }]}>
-                    Import Bluesky account from file
+                  <Text
+                    style={[styles.sheetActionText, { color: palette.text }]}
+                  >
+                    Import Bluesky archive
                   </Text>
                 </Pressable>
               </>
             )}
           </View>
-        </Pressable>
+        </View>
       </Modal>
 
       {/* Sign In Modal */}
@@ -254,34 +280,45 @@ const styles = StyleSheet.create({
   menuIcon: {
     fontSize: 18,
   },
-  modalOverlay: {
+  sheetOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "flex-end",
-    alignItems: "center",
-    paddingBottom: 100,
+    backgroundColor: "rgba(0,0,0,0.35)",
   },
-  menuContainer: {
-    width: "90%",
-    maxWidth: 320,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
+  sheetDismissArea: {
+    flex: 1,
   },
-  menuEmailText: {
+  sheet: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 12,
+  },
+  grabber: {
+    width: 48,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+  },
+  sheetEmailText: {
     fontSize: 13,
-    fontWeight: "500",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    textAlign: "center",
+    marginBottom: 4,
   },
-  menuDivider: {
-    height: StyleSheet.hairlineWidth,
-  },
-  menuItem: {
-    paddingHorizontal: 16,
+  sheetActionButton: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  menuItemText: {
-    fontSize: 15,
+  sheetActionText: {
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  sheetSeparator: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginVertical: 4,
   },
 });
