@@ -340,7 +340,7 @@ export function buildFirstPageQuery(
         LIMIT ?;`;
     case "reposts":
       return `${baseSelect}
-        WHERE p.authorDid = ? AND p.isRepost = 1${deletedClause}
+        WHERE p.viewerReposted = 1${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "likes":
@@ -381,7 +381,7 @@ export function buildLoadMoreQuery(
         LIMIT ?;`;
     case "reposts":
       return `${baseSelect}
-        WHERE p.authorDid = ? AND p.isRepost = 1 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
+        WHERE p.viewerReposted = 1 AND (p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))${deletedClause}
         ORDER BY p.createdAt DESC, p.id DESC
         LIMIT ?;`;
     case "likes":
@@ -403,8 +403,8 @@ export function getFirstPageParams(
 ): (string | number)[] {
   switch (type) {
     case "posts":
-    case "reposts":
       return [did, PAGE_SIZE];
+    case "reposts":
     case "likes":
     case "bookmarks":
       return [PAGE_SIZE];
@@ -418,8 +418,8 @@ export function getLoadMoreParams(
 ): (string | number)[] {
   switch (type) {
     case "posts":
-    case "reposts":
       return [did, cursor.createdAt, cursor.createdAt, cursor.id, PAGE_SIZE];
+    case "reposts":
     case "likes":
     case "bookmarks":
       return [cursor.createdAt, cursor.createdAt, cursor.id, PAGE_SIZE];
@@ -447,7 +447,7 @@ export function buildTotalCountQuery(type: BrowseType): string {
     case "posts":
       return `SELECT COUNT(*) as count FROM post WHERE authorDid = ? AND isRepost = 0;`;
     case "reposts":
-      return `SELECT COUNT(*) as count FROM post WHERE authorDid = ? AND isRepost = 1;`;
+      return `SELECT COUNT(*) as count FROM post WHERE viewerReposted = 1;`;
     case "likes":
       return `SELECT COUNT(*) as count FROM post WHERE viewerLiked = 1;`;
     case "bookmarks":
@@ -461,8 +461,8 @@ export function getTotalCountParams(
 ): (string | number)[] {
   switch (type) {
     case "posts":
-    case "reposts":
       return [did];
+    case "reposts":
     case "likes":
     case "bookmarks":
       return [];

@@ -496,7 +496,7 @@ function findPreservedThreadRoots(
  */
 export function calculateRepostsToDelete(
   db: SQLiteDatabase,
-  userDid: string,
+  _userDid: string,
   settings: AccountDeleteSettings
 ): RepostToDelete[] {
   if (!settings.deleteReposts) {
@@ -504,11 +504,10 @@ export function calculateRepostsToDelete(
   }
 
   let whereClause = `
-    isRepost = 1
+    viewerReposted = 1
     AND deletedRepostAt IS NULL
-    AND authorDid = ?
   `;
-  const params: (string | number)[] = [userDid];
+  const params: (string | number)[] = [];
 
   if (settings.deleteRepostsDaysOldEnabled) {
     const daysOldTimestamp = getTimestampDaysAgo(settings.deleteRepostsDaysOld);

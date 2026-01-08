@@ -38,7 +38,7 @@ function createMockDb(data: Record<string, unknown[]> = {}): MockDb {
     if (sql.includes("FROM post") && sql.includes("isRepost = 0")) {
       return data.posts ?? [];
     }
-    if (sql.includes("FROM post") && sql.includes("isRepost = 1")) {
+    if (sql.includes("FROM post") && sql.includes("viewerReposted = 1")) {
       return data.reposts ?? [];
     }
     if (sql.includes("FROM post") && sql.includes("viewerLiked = 1")) {
