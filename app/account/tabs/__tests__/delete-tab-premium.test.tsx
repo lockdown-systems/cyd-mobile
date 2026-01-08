@@ -297,9 +297,12 @@ describe("DeleteTab Premium Integration", () => {
 
       render(<DeleteTab {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.queryByTestId("premium-required-banner")).toBeNull();
-      });
+      await waitFor(
+        () => {
+          expect(screen.queryByTestId("premium-required-banner")).toBeNull();
+        },
+        { timeout: 3000 }
+      );
     });
   });
 

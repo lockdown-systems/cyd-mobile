@@ -698,50 +698,6 @@ describe("BlueskyAccountController", () => {
     });
   });
 
-  describe("unimplemented delete operations", () => {
-    it("deletePosts should throw not implemented", async () => {
-      const controller = new BlueskyAccountController(1);
-      await expect(controller.deletePosts({})).rejects.toThrow(
-        "Not implemented yet"
-      );
-    });
-
-    it("deleteReposts should throw not implemented", async () => {
-      const controller = new BlueskyAccountController(1);
-      await expect(controller.deleteReposts({})).rejects.toThrow(
-        "Not implemented yet"
-      );
-    });
-
-    it("deleteLikes should throw not implemented", async () => {
-      const controller = new BlueskyAccountController(1);
-      await expect(controller.deleteLikes({})).rejects.toThrow(
-        "Not implemented yet"
-      );
-    });
-
-    it("deleteBookmarks should throw not implemented", async () => {
-      const controller = new BlueskyAccountController(1);
-      await expect(controller.deleteBookmarks()).rejects.toThrow(
-        "Not implemented yet"
-      );
-    });
-
-    it("deleteMessages should throw not implemented", async () => {
-      const controller = new BlueskyAccountController(1);
-      await expect(controller.deleteMessages({})).rejects.toThrow(
-        "Not implemented yet"
-      );
-    });
-
-    it("unfollowAll should throw not implemented", async () => {
-      const controller = new BlueskyAccountController(1);
-      await expect(controller.unfollowAll()).rejects.toThrow(
-        "Not implemented yet"
-      );
-    });
-  });
-
   describe("media operations", () => {
     it("should skip download when file already exists", async () => {
       const controller = new BlueskyAccountController(1);
