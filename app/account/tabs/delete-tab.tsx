@@ -19,7 +19,9 @@ import {
 import { DeleteAutomationModal } from "@/app/account/components/DeleteAutomationModal";
 import { PostsToDeleteReviewModal } from "@/components/PostsToDeleteReviewModal";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
+import { PremiumRequiredModal } from "@/components/PremiumRequiredModal";
 import { SaveStatusBanner } from "@/components/SaveStatusBanner";
+import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { BlueskyAccountController } from "@/controllers";
 import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
@@ -177,6 +179,51 @@ export function DeleteTab({
     setAutomationCounts(null);
   }, []);
 
+  // Premium modal state
+  const [premiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [pendingDeleteSettings, setPendingDeleteSettings] =
+    useState<AccountDeleteSettings | null>(null);
+  const [pendingDeleteCounts, setPendingDeleteCounts] =
+    useState<DeletionPreviewCounts | null>(null);
+
+  const handlePremiumRequired = useCallback(
+    (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
+      setPendingDeleteSettings(settings);
+      setPendingDeleteCounts(counts);
+      setPremiumModalVisible(true);
+    },
+    []
+  );
+
+  const handlePremiumDismiss = useCallback(() => {
+    setPremiumModalVisible(false);
+    setPendingDeleteSettings(null);
+    setPendingDeleteCounts(null);
+    // Reset to the form screen
+    resetToForm();
+  }, [resetToForm]);
+
+  const handlePremiumConfirmed = useCallback(() => {
+    setPremiumModalVisible(false);
+    // Start deletion with the pending settings and counts
+    if (pendingDeleteSettings && pendingDeleteCounts) {
+      automationCancelledRef.current = false;
+      setAutomationSettings(pendingDeleteSettings);
+      setAutomationCounts({
+        posts: pendingDeleteCounts.posts,
+        reposts: pendingDeleteCounts.reposts,
+        likes: pendingDeleteCounts.likes,
+        bookmarks: pendingDeleteCounts.bookmarks,
+        messages: pendingDeleteCounts.messages,
+        follows: pendingDeleteCounts.follows,
+      });
+      setAutomationKey((prev) => prev + 1);
+      setAutomationVisible(true);
+    }
+    setPendingDeleteSettings(null);
+    setPendingDeleteCounts(null);
+  }, [pendingDeleteSettings, pendingDeleteCounts]);
+
   const handleStartDelete = useCallback(
     (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
       automationCancelledRef.current = false;
@@ -245,6 +292,7 @@ export function DeleteTab({
           selections={state}
           onBack={popScreen}
           onConfirm={handleStartDelete}
+          onPremiumRequired={handlePremiumRequired}
           refreshKey={refreshKey}
         />
       )}
@@ -262,6 +310,12 @@ export function DeleteTab({
           onRestart={handleAutomationRestart}
         />
       )}
+      <PremiumRequiredModal
+        visible={premiumModalVisible}
+        palette={palette}
+        onDismiss={handlePremiumDismiss}
+        onPremiumConfirmed={handlePremiumConfirmed}
+      />
     </View>
   );
 }
@@ -634,6 +688,10 @@ type DeleteReviewScreenProps = {
     settings: AccountDeleteSettings,
     counts: DeletionPreviewCounts
   ) => void;
+  onPremiumRequired: (
+    settings: AccountDeleteSettings,
+    counts: DeletionPreviewCounts
+  ) => void;
   refreshKey: number;
 };
 
@@ -644,12 +702,15 @@ function DeleteReviewScreen({
   selections,
   onBack,
   onConfirm,
+  onPremiumRequired,
   refreshKey: externalRefreshKey,
 }: DeleteReviewScreenProps) {
+  const { state: cydState, apiClient } = useCydAccount();
   const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
   const [countsLoading, setCountsLoading] = useState(true);
   const [countsError, setCountsError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [checkingPremium, setCheckingPremium] = useState(false);
 
   // Refresh when external key changes (e.g., after automation completes)
   useEffect(() => {
@@ -704,6 +765,42 @@ function DeleteReviewScreen({
     // Trigger a refresh of the counts
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  // Handle Delete My Data button - check premium first
+  const handleDeletePress = useCallback(async () => {
+    if (!counts) return;
+
+    // If not signed in, show premium modal
+    if (!cydState.isSignedIn) {
+      onPremiumRequired(selections, counts);
+      return;
+    }
+
+    // Check if user has premium
+    setCheckingPremium(true);
+    try {
+      const response = await apiClient.getUserPremium();
+      if ("error" in response || !response.premium_access) {
+        // No premium, show the modal
+        onPremiumRequired(selections, counts);
+      } else {
+        // Has premium, proceed with deletion
+        onConfirm(selections, counts);
+      }
+    } catch {
+      // Error checking premium, show the modal to be safe
+      onPremiumRequired(selections, counts);
+    } finally {
+      setCheckingPremium(false);
+    }
+  }, [
+    counts,
+    cydState.isSignedIn,
+    apiClient,
+    selections,
+    onConfirm,
+    onPremiumRequired,
+  ]);
 
   type DeletionItem = {
     label: string;
@@ -921,13 +1018,9 @@ function DeleteReviewScreen({
           palette={palette}
         />
         <PrimaryButton
-          label="Delete My Data"
-          onPress={() => {
-            if (counts) {
-              onConfirm(selections, counts);
-            }
-          }}
-          disabled={chosen.length === 0 || !counts}
+          label={checkingPremium ? "Checking..." : "Delete My Data"}
+          onPress={handleDeletePress}
+          disabled={chosen.length === 0 || !counts || checkingPremium}
           palette={palette}
         />
       </View>
