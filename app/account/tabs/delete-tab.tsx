@@ -17,6 +17,7 @@ import {
 } from "react-native";
 
 import { DeleteAutomationModal } from "@/app/account/components/DeleteAutomationModal";
+import { FinishedModal } from "@/app/account/components/FinishedModal";
 import { PostsToDeleteReviewModal } from "@/components/PostsToDeleteReviewModal";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { PremiumRequiredModal } from "@/components/PremiumRequiredModal";
@@ -69,6 +70,10 @@ export function DeleteTab({
   } | null>(null);
   const [automationKey, setAutomationKey] = useState(0);
   const automationCancelledRef = useRef(false);
+
+  // Finished modal state
+  const [finishedModalVisible, setFinishedModalVisible] = useState(false);
+  const [finishedJobs, setFinishedJobs] = useState<BlueskyJobRecord[]>([]);
 
   const currentScreen = screenStack[screenStack.length - 1];
 
@@ -243,15 +248,32 @@ export function DeleteTab({
   );
 
   const handleAutomationFinished = useCallback(
-    (result: "completed" | "failed", _jobs: BlueskyJobRecord[]) => {
-      if (result === "completed" && !automationCancelledRef.current) {
+    (result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
+      if (!automationCancelledRef.current) {
         setAutomationVisible(false);
-        // Optionally refresh the review screen counts
+        // Delay showing the FinishedModal to allow the DeleteAutomationModal to fully dismiss
+        setTimeout(() => {
+          setFinishedJobs(jobs);
+          setFinishedModalVisible(true);
+        }, 350);
+        // Refresh the review screen counts
         setRefreshKey((prev) => prev + 1);
       }
     },
     []
   );
+
+  const closeFinishedModal = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+    resetToForm();
+  }, [resetToForm]);
+
+  const handleFinishedBrowse = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+    onSelectTab?.("browse");
+  }, [onSelectTab]);
 
   const handleAutomationClose = useCallback(() => {
     automationCancelledRef.current = true;
@@ -315,6 +337,14 @@ export function DeleteTab({
         palette={palette}
         onDismiss={handlePremiumDismiss}
         onPremiumConfirmed={handlePremiumConfirmed}
+      />
+      <FinishedModal
+        visible={finishedModalVisible}
+        palette={palette}
+        jobs={finishedJobs}
+        mode="delete"
+        onClose={closeFinishedModal}
+        onViewBrowse={handleFinishedBrowse}
       />
     </View>
   );

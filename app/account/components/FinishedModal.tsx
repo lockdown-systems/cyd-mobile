@@ -12,10 +12,13 @@ import {
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
+export type FinishedModalMode = "save" | "delete";
+
 export type FinishedModalProps = {
   visible: boolean;
   palette: AccountTabPalette;
   jobs: BlueskyJobRecord[];
+  mode?: FinishedModalMode;
   onClose: () => void;
   onViewDashboard?: () => void;
   onViewBrowse?: () => void;
@@ -34,6 +37,18 @@ function jobLabel(jobType: BlueskyJobRecord["jobType"]): string {
       return "Save chat conversations";
     case "saveChatMessages":
       return "Save chat messages";
+    case "deletePosts":
+      return "Delete posts";
+    case "deleteReposts":
+      return "Delete reposts";
+    case "deleteLikes":
+      return "Delete likes";
+    case "deleteBookmarks":
+      return "Delete bookmarks";
+    case "deleteMessages":
+      return "Delete messages";
+    case "unfollowUsers":
+      return "Unfollow everyone";
     default:
       return jobType;
   }
@@ -64,6 +79,8 @@ type MaybeProgress = {
   bookmarksProgress?: { current?: number | null };
   conversationsProgress?: { current?: number | null };
   messagesProgress?: { current?: number | null };
+  currentItemIndex?: number | null;
+  totalItems?: number | null;
 };
 
 function extractSavedCount(job: BlueskyJobRecord): number | null {
@@ -81,6 +98,13 @@ function extractSavedCount(job: BlueskyJobRecord): number | null {
       return progress.conversationsProgress?.current ?? null;
     case "saveChatMessages":
       return progress.messagesProgress?.current ?? null;
+    case "deletePosts":
+    case "deleteReposts":
+    case "deleteLikes":
+    case "deleteBookmarks":
+    case "deleteMessages":
+    case "unfollowUsers":
+      return progress.currentItemIndex ?? null;
     default:
       return null;
   }
@@ -101,6 +125,18 @@ function formattedSavedCount(job: BlueskyJobRecord): string | null {
       return `Saved ${count.toLocaleString()} conversations`;
     case "saveChatMessages":
       return `Saved ${count.toLocaleString()} messages`;
+    case "deletePosts":
+      return `Deleted ${count.toLocaleString()} posts`;
+    case "deleteReposts":
+      return `Deleted ${count.toLocaleString()} reposts`;
+    case "deleteLikes":
+      return `Deleted ${count.toLocaleString()} likes`;
+    case "deleteBookmarks":
+      return `Deleted ${count.toLocaleString()} bookmarks`;
+    case "deleteMessages":
+      return `Deleted ${count.toLocaleString()} messages`;
+    case "unfollowUsers":
+      return `Unfollowed ${count.toLocaleString()} accounts`;
     default:
       return null;
   }
@@ -121,6 +157,7 @@ export function FinishedModal({
   visible,
   palette,
   jobs,
+  mode = "save",
   onClose,
   onViewDashboard,
   onViewBrowse,
@@ -169,7 +206,9 @@ export function FinishedModal({
       <View style={[styles.container, { backgroundColor: palette.background }]}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text }]}>
-            Finished saving Bluesky data
+            {mode === "delete"
+              ? "Finished deleting Bluesky data"
+              : "Finished saving Bluesky data"}
           </Text>
         </View>
         <View
@@ -253,7 +292,9 @@ export function FinishedModal({
         <View style={styles.buttonRow}>
           <Pressable
             onPress={() => {
-              if (onViewDashboard) {
+              if (mode === "delete") {
+                onClose();
+              } else if (onViewDashboard) {
                 onViewDashboard();
               } else {
                 onClose();
@@ -273,7 +314,7 @@ export function FinishedModal({
               Close
             </Text>
           </Pressable>
-          {onViewDelete ? (
+          {mode === "save" && onViewDelete ? (
             <Pressable
               onPress={() => {
                 onViewDelete();
