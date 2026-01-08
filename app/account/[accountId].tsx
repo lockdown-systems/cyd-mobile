@@ -422,9 +422,7 @@ export default function AccountPlaceholderScreen() {
                 style={({ pressed }) => [
                   styles.headerActionButton,
                   {
-                    borderColor: palette.icon + "33",
-                    backgroundColor: palette.card,
-                    opacity: pressed ? 0.8 : 1,
+                    opacity: pressed ? 0.5 : 1,
                   },
                 ]}
                 accessibilityRole="button"
@@ -664,7 +662,5 @@ const styles = StyleSheet.create({
   },
   headerActionButton: {
     padding: 8,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
   },
 });
