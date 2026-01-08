@@ -8,8 +8,8 @@ export async function runUnfollowUsersJob(
 ): Promise<void> {
   emit({
     speechText: "I'm unfollowing users for you",
-    progressMessage: "Preparing to unfollow users…",
-    unknownTotal: false,
+    progressMessage: "Fetching list of accounts you follow…",
+    unknownTotal: true,
     progressPercent: 0,
   });
 
@@ -17,14 +17,18 @@ export async function runUnfollowUsersJob(
     await controller.initAgent();
   }
 
-  // Get the delete settings
-  const settings = controller.getDeleteSettings();
-  if (!settings) {
-    throw new Error("Delete settings not found");
-  }
+  // Fetch follows from the API since we don't save them locally
+  // This shows an indeterminate progress while fetching
+  let fetchedCount = 0;
+  const followsToUnfollow = await controller.fetchFollowsFromApi((count) => {
+    fetchedCount = count;
+    emit({
+      progressMessage: `Found ${count.toLocaleString()} accounts to unfollow…`,
+      unknownTotal: true,
+      progressPercent: 0,
+    });
+  });
 
-  // Get follows to unfollow
-  const followsToUnfollow = controller.getFollowsToUnfollow(settings);
   const total = followsToUnfollow.length;
 
   if (total === 0) {
@@ -35,6 +39,14 @@ export async function runUnfollowUsersJob(
     });
     return;
   }
+
+  // Now we know the total, show a real progress bar
+  emit({
+    progressMessage: `Ready to unfollow ${total.toLocaleString()} accounts`,
+    progressPercent: 0,
+    unknownTotal: false,
+    progress: { currentItemIndex: 0, totalItems: total },
+  });
 
   let unfollowed = 0;
   let errors = 0;

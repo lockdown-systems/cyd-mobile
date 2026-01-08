@@ -919,9 +919,11 @@ function DeleteReviewScreen({
   }
 
   if (selections.deleteUnfollowEveryone) {
+    // Note: We don't show item count for "Unfollow everyone" because we don't save
+    // the following list locally. The count will be determined from the API at runtime.
     chosen.push({
       label: "Unfollow everyone",
-      count: counts?.follows ?? null,
+      count: null,
     });
   }
 

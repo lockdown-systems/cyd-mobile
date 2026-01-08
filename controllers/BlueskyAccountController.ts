@@ -45,10 +45,6 @@ import { BlueskyRateLimiter, type ApiRequestFn } from "./bluesky/rate-limiter";
 import type {
   BlueskyDatabaseStats,
   BlueskyProgress,
-  DeleteLikesOptions,
-  DeleteMessagesOptions,
-  DeletePostsOptions,
-  DeleteRepostsOptions,
   RateLimitInfo,
 } from "./bluesky/types";
 import { createInitialProgress } from "./bluesky/types";
@@ -531,7 +527,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       jobTypes.push("deleteMessages");
     }
 
-    if (settings.deleteUnfollowEveryone && counts.follows > 0) {
+    // Note: For "Unfollow everyone", we don't check counts.follows because
+    // we don't save the following list locally. The job will fetch follows
+    // from the API at runtime.
+    if (settings.deleteUnfollowEveryone) {
       jobTypes.push("unfollowUsers");
     }
 
@@ -1076,6 +1075,105 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
+   * Fetch all follows from the Bluesky API (paginated).
+   * Returns an array of follow records with URI and subject info.
+   * Used for unfollowing everyone since we don't save follows locally.
+   */
+  async fetchFollowsFromApi(onProgress?: (current: number) => void): Promise<
+    {
+      uri: string;
+      subjectDid: string;
+      handle: string;
+      displayName: string | null;
+    }[]
+  > {
+    const agent = this.requireAgent();
+    const did = this.did;
+    if (!did) throw new Error("DID not available");
+
+    const follows: {
+      uri: string;
+      subjectDid: string;
+      handle: string;
+      displayName: string | null;
+    }[] = [];
+
+    let cursor: string | undefined;
+    const pageSize = 100;
+
+    while (true) {
+      const response = await this.makeApiRequest(() =>
+        agent.app.bsky.graph.getFollows({
+          actor: did,
+          cursor,
+          limit: pageSize,
+        })
+      );
+
+      const pageFollows = response.follows ?? [];
+
+      for (const profile of pageFollows) {
+        // We need to get the follow URI by listing the follow records
+        // The getFollows API only returns ProfileView without the follow record URI
+        // So we'll need to look up the follow record for each profile
+        follows.push({
+          uri: "", // Will be filled in below
+          subjectDid: profile.did,
+          handle: profile.handle,
+          displayName: profile.displayName ?? null,
+        });
+      }
+
+      if (onProgress) {
+        onProgress(follows.length);
+      }
+
+      if (pageFollows.length === 0 || !response.cursor) {
+        break;
+      }
+
+      cursor = response.cursor;
+    }
+
+    // Now we need to get the actual follow record URIs by listing our follow records
+    // This is needed because unfollowing requires the follow record URI
+    const followsBySubject = new Map(follows.map((f) => [f.subjectDid, f]));
+
+    cursor = undefined;
+    while (true) {
+      const response = await this.makeApiRequest(() =>
+        agent.api.com.atproto.repo.listRecords({
+          repo: did,
+          collection: "app.bsky.graph.follow",
+          cursor,
+          limit: pageSize,
+        })
+      );
+
+      const records = response.records ?? [];
+
+      for (const record of records) {
+        const subjectDid = (record.value as { subject?: string })?.subject;
+        if (subjectDid && followsBySubject.has(subjectDid)) {
+          const follow = followsBySubject.get(subjectDid);
+          if (follow) {
+            follow.uri = record.uri;
+          }
+        }
+      }
+
+      if (records.length === 0 || !response.cursor) {
+        break;
+      }
+
+      cursor = response.cursor;
+    }
+
+    // Filter out any follows where we couldn't get the URI (shouldn't happen normally)
+    return follows.filter((f) => f.uri !== "");
+  }
+
+  /**
    * Unfollow a single user by the follow record AT-URI
    */
   async unfollowUser(followUri: string): Promise<void> {
@@ -1098,54 +1196,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       new Date().toISOString(),
       followUri,
     ]);
-  }
-
-  /**
-   * Delete posts matching the given options
-   */
-  async deletePosts(_options: DeletePostsOptions): Promise<void> {
-    // TODO: Implement in Phase 6
-    throw new Error("Not implemented yet");
-  }
-
-  /**
-   * Delete reposts matching the given options
-   */
-  async deleteReposts(_options: DeleteRepostsOptions): Promise<void> {
-    // TODO: Implement in Phase 6
-    throw new Error("Not implemented yet");
-  }
-
-  /**
-   * Delete likes matching the given options
-   */
-  async deleteLikes(_options: DeleteLikesOptions): Promise<void> {
-    // TODO: Implement in Phase 6
-    throw new Error("Not implemented yet");
-  }
-
-  /**
-   * Delete all bookmarks
-   */
-  async deleteBookmarks(): Promise<void> {
-    // TODO: Implement in Phase 6
-    throw new Error("Not implemented yet");
-  }
-
-  /**
-   * Delete messages matching the given options
-   */
-  async deleteMessages(_options: DeleteMessagesOptions): Promise<void> {
-    // TODO: Implement in Phase 6
-    throw new Error("Not implemented yet");
-  }
-
-  /**
-   * Unfollow all accounts
-   */
-  async unfollowAll(): Promise<void> {
-    // TODO: Implement in Phase 6
-    throw new Error("Not implemented yet");
   }
 
   // ==================== Post Preservation ====================

@@ -78,7 +78,7 @@ function createMockController(overrides?: Partial<BlueskyAccountController>) {
     getMessagesToDelete: jest.fn().mockReturnValue([]),
     deleteMessage: jest.fn().mockResolvedValue(undefined),
     // Follow-related
-    getFollowsToUnfollow: jest.fn().mockReturnValue([]),
+    fetchFollowsFromApi: jest.fn().mockResolvedValue([]),
     unfollowUser: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as BlueskyAccountController;
@@ -539,7 +539,7 @@ describe("Delete Job Runners", () => {
   });
 
   describe("runUnfollowUsersJob", () => {
-    it("should emit initial speech and progress", async () => {
+    it("should emit initial progress for fetching follows", async () => {
       const controller = createMockController();
       const { emit, calls } = createMockEmit();
 
@@ -551,14 +551,15 @@ describe("Delete Job Runners", () => {
 
       expect(calls[0]).toMatchObject({
         speechText: "I'm unfollowing users for you",
-        progressMessage: "Preparing to unfollow users…",
+        progressMessage: "Fetching list of accounts you follow…",
+        unknownTotal: true,
         progressPercent: 0,
       });
     });
 
     it("should handle empty follows list", async () => {
       const controller = createMockController({
-        getFollowsToUnfollow: jest.fn().mockReturnValue([]),
+        fetchFollowsFromApi: jest.fn().mockResolvedValue([]),
       });
       const { emit, calls } = createMockEmit();
 
@@ -573,11 +574,9 @@ describe("Delete Job Runners", () => {
     });
 
     it("should unfollow users and emit progress with profile preview", async () => {
-      // Uses FollowToUnfollow type from deletion-calculator
       const mockFollows = [
         {
           uri: "at://did:plc:me/app.bsky.graph.follow/1",
-          cid: "cid1",
           subjectDid: "did:plc:user1",
           handle: "user1.bsky.social",
           displayName: "User One",
@@ -585,7 +584,7 @@ describe("Delete Job Runners", () => {
       ];
 
       const controller = createMockController({
-        getFollowsToUnfollow: jest.fn().mockReturnValue(mockFollows),
+        fetchFollowsFromApi: jest.fn().mockResolvedValue(mockFollows),
       });
       const { emit, calls } = createMockEmit();
 
@@ -613,18 +612,15 @@ describe("Delete Job Runners", () => {
     });
 
     it("should continue on unfollow errors and report count", async () => {
-      // Uses FollowToUnfollow type from deletion-calculator
       const mockFollows = [
         {
           uri: "at://did:plc:me/app.bsky.graph.follow/1",
-          cid: "cid1",
           subjectDid: "did:plc:user1",
           handle: "user1.bsky.social",
           displayName: "User One",
         },
         {
           uri: "at://did:plc:me/app.bsky.graph.follow/2",
-          cid: "cid2",
           subjectDid: "did:plc:user2",
           handle: "user2.bsky.social",
           displayName: "User Two",
@@ -637,7 +633,7 @@ describe("Delete Job Runners", () => {
         .mockRejectedValueOnce(new Error("Unfollow failed"));
 
       const controller = createMockController({
-        getFollowsToUnfollow: jest.fn().mockReturnValue(mockFollows),
+        fetchFollowsFromApi: jest.fn().mockResolvedValue(mockFollows),
         unfollowUser,
       });
       const { emit, calls } = createMockEmit();
@@ -650,6 +646,42 @@ describe("Delete Job Runners", () => {
 
       const lastCall = calls[calls.length - 1];
       expect(lastCall.progressMessage).toBe("Unfollowed 1 users (1 failed)");
+    });
+
+    it("should show determinate progress bar after fetching follows", async () => {
+      const mockFollows = [
+        {
+          uri: "at://did:plc:me/app.bsky.graph.follow/1",
+          subjectDid: "did:plc:user1",
+          handle: "user1.bsky.social",
+          displayName: "User One",
+        },
+        {
+          uri: "at://did:plc:me/app.bsky.graph.follow/2",
+          subjectDid: "did:plc:user2",
+          handle: "user2.bsky.social",
+          displayName: "User Two",
+        },
+      ];
+
+      const controller = createMockController({
+        fetchFollowsFromApi: jest.fn().mockResolvedValue(mockFollows),
+      });
+      const { emit, calls } = createMockEmit();
+
+      await runUnfollowUsersJob(
+        controller,
+        { ...mockJob, jobType: "unfollowUsers" },
+        emit
+      );
+
+      // After fetching, we should have a determinate progress bar
+      const readyCall = calls.find((call) =>
+        call.progressMessage?.includes("Ready to unfollow")
+      );
+      expect(readyCall).toBeDefined();
+      expect(readyCall?.unknownTotal).toBe(false);
+      expect(readyCall?.progress?.totalItems).toBe(2);
     });
   });
 });
