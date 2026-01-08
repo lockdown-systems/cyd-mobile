@@ -1014,24 +1014,20 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   async deleteBookmark(bookmarkId: number): Promise<void> {
     const agent = this.requireAgent();
     const db = this.requireDb();
-    const did = this.did;
-    if (!did) throw new Error("DID not available");
 
-    // Get the bookmark record first
-    const bookmark = db.getFirstSync<{ recordUri: string | null }>(
-      `SELECT recordUri FROM bookmark WHERE id = ?;`,
+    // Get the subject URI (the URI of the bookmarked post)
+    const bookmark = db.getFirstSync<{ subjectUri: string }>(
+      `SELECT subjectUri FROM bookmark WHERE id = ?;`,
       [bookmarkId]
     );
 
-    if (bookmark?.recordUri) {
-      // Delete from Bluesky
-      await this.makeApiRequest(() =>
-        agent.api.com.atproto.repo.deleteRecord({
-          repo: did,
-          collection: "blue.bookmark.record",
-          rkey: bookmark.recordUri!.split("/").pop() ?? "",
-        })
-      );
+    if (bookmark?.subjectUri) {
+      // Delete from Bluesky using the bookmark API
+      // Note: This API returns { success, headers } instead of { data, headers }
+      // so we call it directly instead of using makeApiRequest
+      await agent.api.app.bsky.bookmark.deleteBookmark({
+        uri: bookmark.subjectUri,
+      });
     }
 
     // Mark as deleted in local DB
