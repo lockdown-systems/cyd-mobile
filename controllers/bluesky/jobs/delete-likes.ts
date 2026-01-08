@@ -63,11 +63,22 @@ export async function runDeleteLikesJob(
       progress: { currentItemIndex: deleted, totalItems: total },
     });
 
+    // Skip if we don't have the like URI (shouldn't happen after re-indexing)
+    if (!like.likeUri) {
+      console.warn("[DeleteLikesJob] No likeUri for post:", like.uri);
+      errors++;
+      continue;
+    }
+
     try {
-      await controller.deleteLike(like.uri);
+      await controller.deleteLike(like.likeUri, like.uri);
       deleted++;
     } catch (err) {
-      console.warn("[DeleteLikesJob] Failed to delete like:", like.uri, err);
+      console.warn(
+        "[DeleteLikesJob] Failed to delete like:",
+        like.likeUri,
+        err
+      );
       errors++;
       // Continue with next like despite error
     }

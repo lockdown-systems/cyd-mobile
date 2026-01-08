@@ -983,8 +983,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
   /**
    * Delete a single like by its AT-URI
+   * @param likeUri - The AT-URI of the like record (at://did/app.bsky.feed.like/rkey)
+   * @param postUri - The AT-URI of the liked post (for updating local DB)
    */
-  async deleteLike(likeUri: string): Promise<void> {
+  async deleteLike(likeUri: string, postUri: string): Promise<void> {
     const agent = this.requireAgent();
     const db = this.requireDb();
     const did = this.did;
@@ -999,10 +1001,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       })
     );
 
-    // Mark as deleted in local DB
-    db.runSync(`UPDATE post_like SET deletedAt = ? WHERE uri = ?;`, [
-      new Date().toISOString(),
-      likeUri,
+    // Mark as deleted in local DB (update the post record's deletedLikeAt)
+    db.runSync(`UPDATE post SET deletedLikeAt = ? WHERE uri = ?;`, [
+      Date.now(),
+      postUri,
     ]);
   }
 
@@ -1046,12 +1048,20 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     const agent = this.requireAgent();
     const db = this.requireDb();
 
-    // Delete from Bluesky using chat API
+    // Headers required for the Bluesky Chat DM service proxy
+    const DM_SERVICE_HEADERS = {
+      "atproto-proxy": "did:web:api.bsky.chat#bsky_chat",
+    };
+
+    // Delete from Bluesky using chat API with proper proxy headers
     await this.makeApiRequest(() =>
-      agent.api.chat.bsky.convo.deleteMessageForSelf({
-        convoId,
-        messageId,
-      })
+      agent.api.chat.bsky.convo.deleteMessageForSelf(
+        {
+          convoId,
+          messageId,
+        },
+        { encoding: "application/json", headers: DM_SERVICE_HEADERS }
+      )
     );
 
     // Mark as deleted in local DB

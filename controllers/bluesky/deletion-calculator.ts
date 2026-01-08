@@ -50,6 +50,7 @@ export interface RepostToDelete {
 
 export interface LikeToDelete {
   uri: string;
+  likeUri: string | null;
   createdAt: string;
   text: string;
   authorHandle: string;
@@ -535,7 +536,7 @@ export function calculateLikesToDelete(
   }
 
   return db.getAllSync<LikeToDelete>(
-    `SELECT p.uri, p.createdAt, p.text, pr.handle as authorHandle
+    `SELECT p.uri, p.likeUri, p.createdAt, p.text, pr.handle as authorHandle
      FROM post p
      LEFT JOIN profile pr ON p.authorDid = pr.did
      WHERE ${whereClause}

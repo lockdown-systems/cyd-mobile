@@ -261,6 +261,11 @@ export const blueskyAccountMigrations: AccountMigration[] = [
       `CREATE INDEX IF NOT EXISTS idx_post_preserve ON post(preserve);`,
     ],
   },
+  {
+    version: 3,
+    name: "add likeUri column for deletion tracking",
+    statements: [`ALTER TABLE post ADD COLUMN likeUri TEXT;`],
+  },
 ];
 
 /**

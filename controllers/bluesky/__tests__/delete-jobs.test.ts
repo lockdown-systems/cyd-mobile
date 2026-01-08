@@ -352,6 +352,7 @@ describe("Delete Job Runners", () => {
       const mockLikes = [
         {
           uri: "at://did:plc:author/app.bsky.feed.post/1",
+          likeUri: "at://did:plc:test/app.bsky.feed.like/1",
           createdAt: "2024-01-01T00:00:00Z",
           text: "Liked post",
           authorHandle: "author.bsky.social",
@@ -369,10 +370,41 @@ describe("Delete Job Runners", () => {
         emit
       );
 
-      expect(controller.deleteLike).toHaveBeenCalledWith(mockLikes[0].uri);
+      expect(controller.deleteLike).toHaveBeenCalledWith(
+        mockLikes[0].likeUri,
+        mockLikes[0].uri
+      );
 
       const lastCall = calls[calls.length - 1];
       expect(lastCall.progressMessage).toBe("Deleted 1 likes");
+    });
+
+    it("should skip likes without likeUri and count as error", async () => {
+      const mockLikes = [
+        {
+          uri: "at://did:plc:author/app.bsky.feed.post/1",
+          likeUri: null,
+          createdAt: "2024-01-01T00:00:00Z",
+          text: "Liked post without likeUri",
+          authorHandle: "author.bsky.social",
+        },
+      ];
+
+      const controller = createMockController({
+        getLikesToDelete: jest.fn().mockReturnValue(mockLikes),
+      });
+      const { emit, calls } = createMockEmit();
+
+      await runDeleteLikesJob(
+        controller,
+        { ...mockJob, jobType: "deleteLikes" },
+        emit
+      );
+
+      expect(controller.deleteLike).not.toHaveBeenCalled();
+
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall.progressMessage).toBe("Deleted 0 likes (1 failed)");
     });
   });
 

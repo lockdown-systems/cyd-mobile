@@ -657,7 +657,7 @@ describe("BlueskyAccountController", () => {
       );
       expect(postInsertCalls).toHaveLength(2);
       const firstArgs = (postInsertCalls[0] as unknown[])?.[1] as unknown[];
-      expect(firstArgs?.[23]).toBe(1); // viewerBookmarked
+      expect(firstArgs?.[24]).toBe(1); // viewerBookmarked
 
       expect(controller.progress.bookmarksProgress.current).toBe(2);
       expect(controller.progress.isRunning).toBe(false);

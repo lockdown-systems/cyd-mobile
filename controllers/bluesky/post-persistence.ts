@@ -87,6 +87,7 @@ export class PostPersistence {
     const originalPostUri = repostRecord ? repostRecord.subject.uri : null;
 
     const viewerLiked = options?.viewerLiked ?? (postView.viewer?.like ? 1 : 0);
+    const likeUri = postView.viewer?.like ?? null;
     const viewerReposted =
       options?.viewerReposted ?? (postView.viewer?.repost ? 1 : 0);
     const viewerBookmarked =
@@ -108,9 +109,9 @@ export class PostPersistence {
         isQuote, quotedPostUri,
         isRepost, repostUri, repostCid, originalPostUri,
         likeCount, repostCount, replyCount, quoteCount,
-        viewerLiked, viewerReposted, viewerBookmarked,
+        viewerLiked, likeUri, viewerReposted, viewerBookmarked,
         createdAt, savedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(uri) DO UPDATE SET
         cid = excluded.cid,
         authorDid = excluded.authorDid,
@@ -133,6 +134,7 @@ export class PostPersistence {
         replyCount = excluded.replyCount,
         quoteCount = excluded.quoteCount,
         viewerLiked = excluded.viewerLiked,
+        likeUri = excluded.likeUri,
         viewerReposted = excluded.viewerReposted,
         viewerBookmarked = excluded.viewerBookmarked,
         createdAt = excluded.createdAt,
@@ -160,6 +162,7 @@ export class PostPersistence {
         postView.replyCount ?? 0,
         postView.quoteCount ?? 0,
         viewerLiked,
+        likeUri,
         viewerReposted,
         viewerBookmarked,
         createdAt,
