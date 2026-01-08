@@ -776,7 +776,7 @@ export function BrowseList({
               borderColor: palette.icon,
             },
           ]}
-          placeholder="Filter posts..."
+          placeholder={`Filter ${type}...`}
           placeholderTextColor={palette.icon}
           value={filterText}
           onChangeText={setFilterText}
