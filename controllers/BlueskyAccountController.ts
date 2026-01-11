@@ -1266,7 +1266,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     return this.downloadToAccountMedia({
-      did,
       filename: blobCid,
       url: `https://cdn.bsky.app/blob/${encodeURIComponent(did)}/${encodeURIComponent(blobCid)}`,
     });
@@ -1278,18 +1277,16 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     return this.downloadToAccountMedia({
-      did,
       filename: url,
       url,
     });
   }
 
   private async downloadToAccountMedia(options: {
-    did: string;
     filename: string;
     url: string;
   }): Promise<string> {
-    const { did, filename, url } = options;
+    const { filename, url } = options;
     if (!this.agent) {
       throw new Error("Agent not initialized");
     }
@@ -1299,9 +1296,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       this.getAccountType(),
       this.getAccountUUID()
     );
-    const safeDid = encodeURIComponent(did);
     const safeName = encodeURIComponent(filename);
-    const mediaDir = new Directory(accountPaths.mediaDir, safeDid);
+    const mediaDir = new Directory(accountPaths.mediaDir);
 
     if (!mediaDir.exists) {
       mediaDir.create({ intermediates: true, idempotent: true });

@@ -25,8 +25,6 @@ export function buildAccountPaths(accountType: string, accountUUID: string) {
     // Relative path so SQLite writes to Documents/accounts/... instead of Documents/SQLite/
     dbPathForSQLite: `../accounts/${accountType}-${accountUUID}/data.db`,
     mediaDir: `${accountDir}media/`,
-    mediaDirForDid: (did: string) =>
-      `${accountDir}media/${encodeURIComponent(did)}/`,
   } as const;
 }
 

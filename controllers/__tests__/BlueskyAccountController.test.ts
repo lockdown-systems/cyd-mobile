@@ -713,12 +713,11 @@ describe("BlueskyAccountController", () => {
         }
       );
       const infoMap = fsMock.__mockState.infoMap;
-      const safeDid = encodeURIComponent("did:plc:123");
-      const targetPath = `${paths.mediaDir}${safeDid}/blob-cid`;
+      const targetPath = `${paths.mediaDir}blob-cid`;
 
       infoMap.set(paths.accountsDir, { exists: true, isDirectory: true });
       infoMap.set(paths.accountDir, { exists: true, isDirectory: true });
-      infoMap.set(`${paths.mediaDir}${safeDid}/`, {
+      infoMap.set(paths.mediaDir, {
         exists: true,
         isDirectory: true,
       });
@@ -746,10 +745,8 @@ describe("BlueskyAccountController", () => {
         }
       );
       const infoMap = fsMock.__mockState.infoMap;
-      const safeDid = encodeURIComponent("did:plc:123");
       const safeName = encodeURIComponent("bafy/test");
-      const mediaDir = `${paths.mediaDir}${safeDid}`;
-      const targetPath = `${mediaDir}/${safeName}`;
+      const targetPath = `${paths.mediaDir}${safeName}`;
 
       infoMap.set(paths.accountsDir, { exists: true, isDirectory: true });
       infoMap.set(paths.accountDir, { exists: true, isDirectory: true });
