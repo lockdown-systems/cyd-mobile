@@ -32,6 +32,7 @@ import {
   updateAccountDeleteSettings,
   type AccountDeleteSettings,
 } from "@/database/delete-settings";
+import { submitBlueskyProgress } from "@/services/submit-bluesky-progress";
 import type {
   AccountTabKey,
   AccountTabPalette,
@@ -48,6 +49,7 @@ export function DeleteTab({
   palette,
   onSelectTab,
 }: AccountTabProps) {
+  const { apiClient } = useCydAccount();
   const [screenStack, setScreenStack] = useState<DeleteFlowScreen[]>(["form"]);
   const [state, setState] = useState<AccountDeleteSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -249,6 +251,9 @@ export function DeleteTab({
 
   const handleAutomationFinished = useCallback(
     (result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
+      // Submit progress to the server regardless of success/failure
+      void submitBlueskyProgress(apiClient, accountId, accountUUID);
+
       if (!automationCancelledRef.current) {
         setAutomationVisible(false);
         // Delay showing the FinishedModal to allow the DeleteAutomationModal to fully dismiss
@@ -260,7 +265,7 @@ export function DeleteTab({
         setRefreshKey((prev) => prev + 1);
       }
     },
-    []
+    [apiClient, accountId, accountUUID]
   );
 
   const closeFinishedModal = useCallback(() => {

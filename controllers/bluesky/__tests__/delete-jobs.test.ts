@@ -594,7 +594,11 @@ describe("Delete Job Runners", () => {
         emit
       );
 
-      expect(controller.unfollowUser).toHaveBeenCalledWith(mockFollows[0].uri);
+      expect(controller.unfollowUser).toHaveBeenCalledWith(mockFollows[0].uri, {
+        subjectDid: mockFollows[0].subjectDid,
+        handle: mockFollows[0].handle,
+        displayName: mockFollows[0].displayName,
+      });
 
       // Check that profile preview was emitted
       const previewCall = calls.find(

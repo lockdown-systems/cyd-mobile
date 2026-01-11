@@ -68,6 +68,24 @@ export type PostNewsletterAPIRequest = {
   email: string;
 };
 
+// API models for POST /bluesky-progress
+export type PostBlueskyProgressAPIRequest = {
+  account_uuid: string;
+  total_posts_saved: number;
+  total_reposts_saved: number;
+  total_likes_saved: number;
+  total_bookmarks_saved: number;
+  total_follows_saved: number;
+  total_conversations_saved: number;
+  total_messages_saved: number;
+  total_posts_deleted: number;
+  total_reposts_deleted: number;
+  total_likes_deleted: number;
+  total_bookmarks_deleted: number;
+  total_messages_deleted: number;
+  total_accounts_unfollowed: number;
+};
+
 // The API client
 export default class CydAPIClient {
   public apiURL: string;
@@ -450,5 +468,53 @@ export default class CydAPIClient {
       return `${this.dashURL}/#/native-login/${encodeURIComponent(this.userEmail)}/${encodeURIComponent(this.deviceToken)}/manage`;
     }
     return this.dashURL;
+  }
+
+  // Submit Bluesky progress
+
+  async postBlueskyProgress(
+    request: PostBlueskyProgressAPIRequest
+  ): Promise<boolean | APIErrorResponse> {
+    console.log("POST /bluesky-progress");
+    if (!(await this.validateAPIToken())) {
+      // Try without authentication if we can't get a token
+      try {
+        const response = await this.doFetch(
+          "POST",
+          `${this.apiURL}/bluesky-progress`,
+          request
+        );
+        if (response.status !== 200) {
+          return this.returnError(
+            "Failed to submit Bluesky progress.",
+            response.status
+          );
+        }
+        return true;
+      } catch {
+        return this.returnError(
+          "Failed to submit Bluesky progress. Maybe the server is down?"
+        );
+      }
+    }
+
+    try {
+      const response = await this.fetchAuthenticated(
+        "POST",
+        `${this.apiURL}/bluesky-progress`,
+        request
+      );
+      if (response.status !== 200) {
+        return this.returnError(
+          "Failed to submit Bluesky progress.",
+          response.status
+        );
+      }
+      return true;
+    } catch {
+      return this.returnError(
+        "Failed to submit Bluesky progress. Maybe the server is down?"
+      );
+    }
   }
 }

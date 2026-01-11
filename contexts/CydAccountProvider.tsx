@@ -14,6 +14,7 @@ import {
   setCydAccountCredentials,
 } from "@/database/cyd-account";
 import CydAPIClient from "@/services/cyd-api-client";
+import { submitBlueskyProgressForAllAccounts } from "@/services/submit-bluesky-progress";
 
 // Configuration for API environments
 const PROD_API_URL = "https://api.cyd.social";
@@ -209,6 +210,14 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
           await apiClient.postUserActivity();
         } catch (e) {
           console.log("Error updating user activity:", e);
+        }
+
+        // Submit Bluesky progress for all accounts now that we're authenticated
+        // This ensures any previously unauthenticated progress is associated with the user
+        try {
+          await submitBlueskyProgressForAllAccounts(apiClient);
+        } catch (e) {
+          console.log("Error submitting Bluesky progress:", e);
         }
 
         setState({

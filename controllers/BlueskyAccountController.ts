@@ -1178,8 +1178,17 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
   /**
    * Unfollow a single user by the follow record AT-URI
+   * @param followUri - The AT-URI of the follow record
+   * @param subjectInfo - Optional info about the followed user (for tracking in local DB)
    */
-  async unfollowUser(followUri: string): Promise<void> {
+  async unfollowUser(
+    followUri: string,
+    subjectInfo?: {
+      subjectDid: string;
+      handle: string;
+      displayName: string | null;
+    }
+  ): Promise<void> {
     const agent = this.requireAgent();
     const db = this.requireDb();
     const did = this.did;
@@ -1194,9 +1203,45 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       })
     );
 
-    // Mark as unfollowed in local DB
+    const now = new Date().toISOString();
+    const nowTs = Date.now();
+
+    // If we have subject info, ensure the follow record exists in the database
+    // This handles the case where follows were fetched from API but not saved locally
+    if (subjectInfo) {
+      // First, ensure the profile exists (required for foreign key constraint)
+      db.runSync(
+        `INSERT OR IGNORE INTO profile (did, handle, displayName, savedAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?);`,
+        [
+          subjectInfo.subjectDid,
+          subjectInfo.handle,
+          subjectInfo.displayName,
+          nowTs,
+          nowTs,
+        ]
+      );
+
+      // Now insert the follow record (cid is required but we use empty string as placeholder)
+      db.runSync(
+        `INSERT OR IGNORE INTO follow (uri, cid, subjectDid, handle, displayName, createdAt, savedAt, unfollowedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          followUri,
+          "", // cid placeholder - we don't have it when fetching from API
+          subjectInfo.subjectDid,
+          subjectInfo.handle,
+          subjectInfo.displayName,
+          now,
+          nowTs,
+          nowTs, // Mark as unfollowed immediately since we just unfollowed
+        ]
+      );
+    }
+
+    // Mark as unfollowed in local DB (for existing records or fallback)
     db.runSync(`UPDATE follow SET unfollowedAt = ? WHERE uri = ?;`, [
-      new Date().toISOString(),
+      nowTs,
       followUri,
     ]);
   }

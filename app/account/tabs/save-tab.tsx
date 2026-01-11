@@ -10,6 +10,7 @@ import {
 
 import { FinishedModal } from "@/app/account/components/FinishedModal";
 import { SaveAutomationModal } from "@/app/account/components/SaveAutomationModal";
+import { useCydAccount } from "@/contexts";
 import type {
   BlueskyJobRecord,
   SaveJobOptions,
@@ -20,6 +21,7 @@ import {
   getAccountSaveSettings,
   updateAccountSaveSettings,
 } from "@/database/save-settings";
+import { submitBlueskyProgress } from "@/services/submit-bluesky-progress";
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
 import { sharedTabStyles } from "./shared-tab-styles";
 
@@ -83,6 +85,7 @@ export function SaveTab({
   palette,
   onSelectTab,
 }: AccountTabProps) {
+  const { apiClient } = useCydAccount();
   const [screenStack, setScreenStack] = useState<SaveFlowScreen[]>(["form"]);
   const [state, setState] = useState<SaveOptionState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -275,6 +278,9 @@ export function SaveTab({
           automationOptions ?? state ?? DEFAULT_STATE
         )}
         onFinished={(result, jobs) => {
+          // Submit progress to the server regardless of success/failure
+          void submitBlueskyProgress(apiClient, accountId, accountUUID);
+
           if (result === "completed" && !automationCancelledRef.current) {
             setAutomationVisible(false);
             setFinishedJobs(jobs);

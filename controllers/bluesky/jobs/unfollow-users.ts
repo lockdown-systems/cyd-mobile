@@ -70,7 +70,11 @@ export async function runUnfollowUsersJob(
     });
 
     try {
-      await controller.unfollowUser(follow.uri);
+      await controller.unfollowUser(follow.uri, {
+        subjectDid: follow.subjectDid,
+        handle: follow.handle,
+        displayName: follow.displayName,
+      });
       unfollowed++;
     } catch (err) {
       console.warn(
