@@ -529,9 +529,7 @@ export function PostPreview({
       )}
 
       <View style={styles.headerRow}>
-        <Avatar
-          uri={post.author.avatarDataURI ?? post.author.avatarUrl ?? undefined}
-        />
+        <Avatar uri={post.author.avatarUrl ?? undefined} />
         <View style={styles.headerText}>
           <Text
             style={[styles.displayName, { color: palette.text }]}

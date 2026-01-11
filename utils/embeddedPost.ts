@@ -329,17 +329,13 @@ export function extractEmbeddedPost(
     cid: cid ?? "",
     text,
     createdAt,
+    savedAt: createdAt,
     author: {
       did: typeof author?.did === "string" ? author.did : "unknown",
       handle: typeof author?.handle === "string" ? author.handle : "unknown",
       displayName:
         typeof author?.displayName === "string" ? author.displayName : null,
       avatarUrl: typeof author?.avatar === "string" ? author.avatar : null,
-      avatarDataURI:
-        typeof (author as { avatarDataURI?: unknown })?.avatarDataURI ===
-        "string"
-          ? ((author as { avatarDataURI?: string }).avatarDataURI as string)
-          : null,
     },
     likeCount,
     repostCount,

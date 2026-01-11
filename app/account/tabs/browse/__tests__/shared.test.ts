@@ -95,7 +95,6 @@ describe("shared browse helpers", () => {
       handle: "author.bsky.social",
       displayName: "Test Author",
       avatarUrl: "https://cdn.bsky.app/avatar.jpg",
-      avatarDataURI: null,
     };
 
     it("should map basic post row to preview data", () => {
@@ -296,19 +295,15 @@ describe("shared browse helpers", () => {
       expect(result.quoteCount).toBeNull();
     });
 
-    it("should handle avatarDataURI", () => {
+    it("should handle null avatarUrl", () => {
       const row: PostRow = {
         ...baseRow,
         avatarUrl: null,
-        avatarDataURI: "data:image/png;base64,abc123...",
       };
 
       const result = mapRowToPreview(row, fallbackHandle);
 
       expect(result.author.avatarUrl).toBeUndefined();
-      expect(result.author.avatarDataURI).toBe(
-        "data:image/png;base64,abc123..."
-      );
     });
   });
 
@@ -527,7 +522,6 @@ describe("shared browse helpers", () => {
         expect(query).toContain("prof.handle");
         expect(query).toContain("prof.displayName");
         expect(query).toContain("prof.avatarUrl");
-        expect(query).toContain("prof.avatarDataURI");
       }
     });
   });

@@ -226,8 +226,6 @@ export class PostPersistence {
         handle: String(author.handle ?? ""),
         displayName: author.displayName ?? null,
         avatarUrl: author.avatar ?? null,
-        avatarDataURI:
-          (author as { avatarDataURI?: string | null }).avatarDataURI ?? null,
       },
       likeCount,
       repostCount,
@@ -258,8 +256,8 @@ export class PostPersistence {
 
     await db.runAsync(
       `INSERT INTO profile (
-        did, handle, displayName, avatarUrl, avatarLocalPath, avatarDataURI, description, savedAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        did, handle, displayName, avatarUrl, avatarLocalPath, description, savedAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(did) DO UPDATE SET
         handle = excluded.handle,
         displayName = excluded.displayName,
@@ -271,7 +269,6 @@ export class PostPersistence {
         profile.handle,
         profile.displayName ?? null,
         profile.avatar ?? null,
-        null,
         null,
         description,
         now,

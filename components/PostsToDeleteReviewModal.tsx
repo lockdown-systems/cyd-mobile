@@ -95,7 +95,6 @@ export function PostsToDeleteReviewModal({
           handle: post.authorHandle ?? "unknown",
           displayName: post.authorDisplayName,
           avatarUrl: post.avatarUrl,
-          avatarDataURI: post.avatarDataURI,
         },
         likeCount: post.likeCount,
         repostCount: post.repostCount,

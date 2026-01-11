@@ -97,7 +97,6 @@ export interface PostToDeletePreview {
   authorHandle: string | null;
   authorDisplayName: string | null;
   avatarUrl: string | null;
-  avatarDataURI: string | null;
   embedJSON: string | null;
   quotedPostUri: string | null;
   facetsJSON: string | null;
@@ -261,7 +260,6 @@ export function calculatePostsToDeleteWithPreview(
     authorHandle: string | null;
     authorDisplayName: string | null;
     avatarUrl: string | null;
-    avatarDataURI: string | null;
     embedJSON: string | null;
     quotedPostUri: string | null;
     facetsJSON: string | null;
@@ -271,7 +269,7 @@ export function calculatePostsToDeleteWithPreview(
             p.isReply, p.preserve, p.replyRootUri, p.authorDid,
             p.embedJSON, p.quotedPostUri, p.facetsJSON,
             prof.handle as authorHandle, prof.displayName as authorDisplayName,
-            prof.avatarUrl, prof.avatarDataURI
+            prof.avatarUrl
      FROM post p
      LEFT JOIN profile prof ON prof.did = p.authorDid
      WHERE ${whereClause}
@@ -295,7 +293,6 @@ export function calculatePostsToDeleteWithPreview(
     authorHandle: post.authorHandle,
     authorDisplayName: post.authorDisplayName,
     avatarUrl: post.avatarUrl,
-    avatarDataURI: post.avatarDataURI,
     embedJSON: post.embedJSON,
     quotedPostUri: post.quotedPostUri,
     facetsJSON: post.facetsJSON,
@@ -379,7 +376,6 @@ export function calculatePostsForDeletionReview(
     authorHandle: string | null;
     authorDisplayName: string | null;
     avatarUrl: string | null;
-    avatarDataURI: string | null;
     embedJSON: string | null;
     quotedPostUri: string | null;
     facetsJSON: string | null;
@@ -389,7 +385,7 @@ export function calculatePostsForDeletionReview(
             p.isReply, p.preserve, p.replyRootUri, p.authorDid,
             p.embedJSON, p.quotedPostUri, p.facetsJSON,
             prof.handle as authorHandle, prof.displayName as authorDisplayName,
-            prof.avatarUrl, prof.avatarDataURI
+            prof.avatarUrl
      FROM post p
      LEFT JOIN profile prof ON prof.did = p.authorDid
      WHERE ${whereClause}
@@ -413,7 +409,6 @@ export function calculatePostsForDeletionReview(
     authorHandle: post.authorHandle,
     authorDisplayName: post.authorDisplayName,
     avatarUrl: post.avatarUrl,
-    avatarDataURI: post.avatarDataURI,
     embedJSON: post.embedJSON,
     quotedPostUri: post.quotedPostUri,
     facetsJSON: post.facetsJSON,

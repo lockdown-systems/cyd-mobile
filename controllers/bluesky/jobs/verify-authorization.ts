@@ -14,7 +14,7 @@ async function loadAccount(
   const row = await db.getFirstAsync<
     AccountListItem & { bskyAccountID: number }
   >(
-    `SELECT a.id, a.uuid, a.sortOrder, a.type, a.bskyAccountID, b.handle, b.displayName, b.avatarDataURI, b.did
+    `SELECT a.id, a.uuid, a.sortOrder, a.type, a.bskyAccountID, b.handle, b.displayName, b.avatarUrl, b.did
        FROM account a
        INNER JOIN bsky_account b ON b.id = a.bskyAccountID
       WHERE a.id = ?
@@ -33,7 +33,7 @@ async function loadAccount(
     type: "bluesky",
     handle: row.handle,
     displayName: row.displayName,
-    avatarDataURI: row.avatarDataURI ?? null,
+    avatarUrl: row.avatarUrl ?? null,
     did: row.did ?? null,
   } satisfies AccountListItem;
 }

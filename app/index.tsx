@@ -307,7 +307,7 @@ function AccountCard({
   disabled,
   busy,
 }: AccountCardProps) {
-  const avatarUri = account.avatarDataURI || null;
+  const avatarUri = account.avatarUrl || null;
   const username = account.handle.startsWith("@")
     ? account.handle
     : `@${account.handle}`;

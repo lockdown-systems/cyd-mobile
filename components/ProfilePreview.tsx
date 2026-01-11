@@ -39,7 +39,7 @@ export function ProfilePreview({
   palette,
   actionLabel,
 }: ProfilePreviewProps) {
-  const avatarUri = profile.avatarDataURI ?? profile.avatarUrl ?? null;
+  const avatarUri = profile.avatarUrl ?? null;
 
   return (
     <View

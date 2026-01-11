@@ -121,7 +121,6 @@ export type PostPreviewData = {
     handle: string;
     displayName?: string | null;
     avatarUrl?: string | null;
-    avatarDataURI?: string | null;
   };
   likeCount?: number | null;
   repostCount?: number | null;
@@ -144,7 +143,6 @@ export type ProfileData = {
   handle: string;
   displayName?: string | null;
   avatarUrl?: string | null;
-  avatarDataURI?: string | null;
 };
 
 /**

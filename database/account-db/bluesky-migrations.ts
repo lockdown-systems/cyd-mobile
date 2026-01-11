@@ -41,7 +41,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         displayName TEXT,
         avatarUrl TEXT,
         avatarLocalPath TEXT,
-        avatarDataURI TEXT,
         description TEXT,
         savedAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL
@@ -184,7 +183,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         displayName TEXT,
         avatarUrl TEXT,
         avatarLocalPath TEXT,
-        avatarDataURI TEXT,
 
         createdAt TEXT NOT NULL,
         savedAt INTEGER NOT NULL,

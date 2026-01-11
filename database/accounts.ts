@@ -11,7 +11,7 @@ export type AccountListItem = {
   type: "bluesky";
   handle: string;
   displayName: string | null;
-  avatarDataURI: string | null;
+  avatarUrl: string | null;
   did: string | null;
 };
 
@@ -22,7 +22,7 @@ type CreateBlueskyAccountParams = {
   handle: string;
   displayName?: string | null;
   postsCount?: number;
-  avatarDataURI?: string | null;
+  avatarUrl?: string | null;
   accessJwt?: string | null;
   refreshJwt?: string | null;
   sessionJson?: string | null;
@@ -33,7 +33,7 @@ export async function listAccounts(): Promise<AccountListItem[]> {
   const rows = await db.getAllAsync<
     AccountListItem & { bskyAccountID: number }
   >(
-    `SELECT a.id, a.uuid, a.sortOrder, a.type, a.bskyAccountID, b.handle, b.displayName, b.avatarDataURI, b.did
+    `SELECT a.id, a.uuid, a.sortOrder, a.type, a.bskyAccountID, b.handle, b.displayName, b.avatarUrl, b.did
      FROM account a
      INNER JOIN bsky_account b ON b.id = a.bskyAccountID
      ORDER BY a.sortOrder ASC, a.id ASC;`
@@ -46,7 +46,7 @@ export async function listAccounts(): Promise<AccountListItem[]> {
     type: "bluesky",
     handle: row.handle,
     displayName: row.displayName,
-    avatarDataURI: row.avatarDataURI ?? null,
+    avatarUrl: row.avatarUrl ?? null,
     did: row.did ?? null,
   }));
 }
@@ -75,7 +75,7 @@ async function createBlueskyAccountWithDb(
         handle,
         displayName,
         postsCount,
-        avatarDataURI,
+        avatarUrl,
         did,
         accessJwt,
         refreshJwt,
@@ -88,7 +88,7 @@ async function createBlueskyAccountWithDb(
         params.handle,
         params.displayName ?? null,
         postsCount,
-        params.avatarDataURI ?? null,
+        params.avatarUrl ?? null,
         params.did ?? null,
         params.accessJwt ?? null,
         params.refreshJwt ?? null,
@@ -113,7 +113,7 @@ async function createBlueskyAccountWithDb(
       type: "bluesky",
       handle: params.handle,
       displayName: params.displayName ?? null,
-      avatarDataURI: params.avatarDataURI ?? null,
+      avatarUrl: params.avatarUrl ?? null,
       did: params.did ?? null,
     };
   });
@@ -159,7 +159,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
         `UPDATE bsky_account
          SET handle = ?,
              displayName = ?,
-             avatarDataURI = ?,
+             avatarUrl = ?,
              updatedAt = ?,
              accessedAt = ?,
              postsCount = ?,
@@ -192,7 +192,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
           handle,
           displayName,
           postsCount,
-          avatarDataURI,
+          avatarUrl,
           did,
           accessJwt,
           refreshJwt,
@@ -232,7 +232,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
     const row = await db.getFirstAsync<
       AccountListItem & { bskyAccountID: number }
     >(
-      `SELECT a.id, a.uuid, a.sortOrder, a.type, a.bskyAccountID, b.handle, b.displayName, b.avatarDataURI, b.did
+      `SELECT a.id, a.uuid, a.sortOrder, a.type, a.bskyAccountID, b.handle, b.displayName, b.avatarUrl, b.did
        FROM account a
        INNER JOIN bsky_account b ON b.id = a.bskyAccountID
        WHERE b.id = ?
@@ -251,7 +251,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
       type: "bluesky",
       handle: row.handle,
       displayName: row.displayName,
-      avatarDataURI: row.avatarDataURI ?? null,
+      avatarUrl: row.avatarUrl ?? null,
       did: row.did ?? null,
     };
   });

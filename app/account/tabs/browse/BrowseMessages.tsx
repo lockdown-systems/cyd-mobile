@@ -56,7 +56,6 @@ type ProfileRow = {
   handle: string;
   displayName: string | null;
   avatarUrl: string | null;
-  avatarDataURI: string | null;
 };
 
 type MessageRow = {
@@ -70,7 +69,6 @@ type MessageRow = {
   handle: string | null;
   displayName: string | null;
   avatarUrl: string | null;
-  avatarDataURI: string | null;
   embedJSON: string | null;
   reactionsJSON: string | null;
   facetsJSON: string | null;
@@ -153,7 +151,7 @@ export function BrowseMessages({
           .map(() => "?")
           .join(",");
         const profileRows = await db.getAllAsync<ProfileRow>(
-          `SELECT did, handle, displayName, avatarUrl, avatarDataURI
+          `SELECT did, handle, displayName, avatarUrl
            FROM profile
            WHERE did IN (${placeholders});`,
           Array.from(allDids)
@@ -176,8 +174,7 @@ export function BrowseMessages({
             did,
             handle: prof?.handle ?? "unknown",
             displayName: prof?.displayName ?? null,
-            avatarUrl: prof?.avatarUrl ?? prof?.avatarDataURI ?? null,
-            avatarDataURI: prof?.avatarDataURI ?? undefined,
+            avatarUrl: prof?.avatarUrl ?? null,
           };
         });
 
@@ -218,7 +215,7 @@ export function BrowseMessages({
       const rows = await db.getAllAsync<MessageRow>(
         `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.savedAt, m.deletedAt, m.senderDid,
           m.embedJSON, m.reactionsJSON, m.facetsJSON, m.embeddedPostUri,
-                p.handle, p.displayName, p.avatarUrl, p.avatarDataURI
+                p.handle, p.displayName, p.avatarUrl
          FROM message m
          LEFT JOIN profile p ON p.did = m.senderDid
          WHERE m.convoId = ?${deletedClause}
@@ -259,7 +256,6 @@ export function BrowseMessages({
           handle: string | null;
           displayName: string | null;
           avatarUrl: string | null;
-          avatarDataURI: string | null;
         };
 
         const postRows = await db.getAllAsync<EmbeddedPostRow>(
@@ -268,7 +264,7 @@ export function BrowseMessages({
               p.authorDid,
               p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
                   p.embedJSON, p.quotedPostUri,
-                  prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
+                  prof.handle, prof.displayName, prof.avatarUrl
            FROM post p
            LEFT JOIN profile prof ON prof.did = p.authorDid
            WHERE p.uri IN (${placeholders});`,
@@ -336,7 +332,6 @@ export function BrowseMessages({
               handle: p.handle ?? "unknown",
               displayName: p.displayName,
               avatarUrl: p.avatarUrl ?? undefined,
-              avatarDataURI: p.avatarDataURI ?? undefined,
             },
             likeCount: p.likeCount,
             repostCount: p.repostCount,
@@ -392,8 +387,7 @@ export function BrowseMessages({
             did: row.senderDid,
             handle: row.handle ?? "unknown",
             displayName: row.displayName,
-            avatarUrl: row.avatarUrl ?? row.avatarDataURI ?? undefined,
-            avatarDataURI: row.avatarDataURI ?? undefined,
+            avatarUrl: row.avatarUrl ?? undefined,
           },
           embed: parseEmbed(row.embedJSON),
           reactions: parseUnknownArray(row.reactionsJSON),

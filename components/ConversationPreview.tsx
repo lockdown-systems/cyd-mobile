@@ -44,7 +44,7 @@ export function ConversationPreview({
   const displayName =
     primaryMember?.displayName || primaryMember?.handle || "Unknown";
   const handle = primaryMember?.handle || "";
-  const avatarUrl = primaryMember?.avatarUrl || primaryMember?.avatarDataURI;
+  const avatarUrl = primaryMember?.avatarUrl;
 
   return (
     <View style={[styles.container, { backgroundColor: palette.card }]}>

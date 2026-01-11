@@ -40,7 +40,7 @@ describe("Account Database Operations", () => {
 
       expect(accounts).toEqual([]);
       expect(mockDb.getAllAsync).toHaveBeenCalledWith(
-        expect.stringContaining("SELECT a.id, a.uuid"),
+        expect.stringContaining("SELECT a.id, a.uuid")
       );
     });
 
@@ -54,7 +54,7 @@ describe("Account Database Operations", () => {
           bskyAccountID: 10,
           handle: "alice.bsky.social",
           displayName: "Alice",
-          avatarDataURI: "data:image/png;base64,xyz",
+          avatarUrl: "data:image/png;base64,xyz",
           did: "did:plc:alice123",
         },
         {
@@ -65,7 +65,7 @@ describe("Account Database Operations", () => {
           bskyAccountID: 11,
           handle: "bob.bsky.social",
           displayName: "Bob",
-          avatarDataURI: null,
+          avatarUrl: null,
           did: "did:plc:bob456",
         },
       ];
@@ -81,7 +81,7 @@ describe("Account Database Operations", () => {
         type: "bluesky",
         handle: "alice.bsky.social",
         displayName: "Alice",
-        avatarDataURI: "data:image/png;base64,xyz",
+        avatarUrl: "data:image/png;base64,xyz",
         did: "did:plc:alice123",
       });
       expect(accounts[1].handle).toBe("bob.bsky.social");
@@ -97,7 +97,7 @@ describe("Account Database Operations", () => {
           bskyAccountID: 10,
           handle: "test.bsky.social",
           displayName: null,
-          avatarDataURI: null,
+          avatarUrl: null,
           did: null,
         },
       ];
@@ -106,7 +106,7 @@ describe("Account Database Operations", () => {
       const accounts = await listAccounts();
 
       expect(accounts[0].displayName).toBeNull();
-      expect(accounts[0].avatarDataURI).toBeNull();
+      expect(accounts[0].avatarUrl).toBeNull();
       expect(accounts[0].did).toBeNull();
     });
   });
@@ -140,12 +140,12 @@ describe("Account Database Operations", () => {
           "newuser.bsky.social",
           null, // displayName
           0, // postsCount
-          null, // avatarDataURI
+          null, // avatarUrl
           null, // did
           null, // accessJwt
           null, // refreshJwt
           null, // sessionJson
-        ]),
+        ])
       );
 
       // Second call: insert into account
@@ -156,7 +156,7 @@ describe("Account Database Operations", () => {
           expect.any(String), // uuid (generated)
           0, // sortOrder
           100, // bskyAccountID
-        ],
+        ]
       );
     });
 
@@ -168,7 +168,7 @@ describe("Account Database Operations", () => {
         handle: "testuser.bsky.social",
         displayName: "Test User",
         postsCount: 42,
-        avatarDataURI: "data:image/png;base64,abc",
+        avatarUrl: "data:image/png;base64,abc",
         accessJwt: "access-token",
         refreshJwt: "refresh-token",
         sessionJson: '{"test":"data"}',
@@ -190,12 +190,12 @@ describe("Account Database Operations", () => {
           "access-token",
           "refresh-token",
           '{"test":"data"}',
-        ]),
+        ])
       );
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO account"),
-        expect.arrayContaining(["custom-uuid", 5, 100]),
+        expect.arrayContaining(["custom-uuid", 5, 100])
       );
     });
 
@@ -208,12 +208,12 @@ describe("Account Database Operations", () => {
 
       expect(account).toBeDefined();
       expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
-        expect.stringContaining("MAX(sortOrder)"),
+        expect.stringContaining("MAX(sortOrder)")
       );
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO account"),
-        expect.arrayContaining([expect.any(String), 3, 100]),
+        expect.arrayContaining([expect.any(String), 3, 100])
       );
     });
 
@@ -226,7 +226,7 @@ describe("Account Database Operations", () => {
           expect.any(String), // UUID (generated, not necessarily starting with "uuid-")
           expect.any(Number), // sortOrder
           expect.any(Number), // bskyAccountID
-        ],
+        ]
       );
     });
   });
@@ -263,7 +263,7 @@ describe("Account Database Operations", () => {
           bskyAccountID: 200,
           handle: "alice.bsky.social",
           displayName: "Alice",
-          avatarDataURI: "https://example.com/avatar.jpg",
+          avatarUrl: "https://example.com/avatar.jpg",
           did: "did:plc:test123",
         });
 
@@ -295,13 +295,13 @@ describe("Account Database Operations", () => {
           null,
           null,
           expect.stringContaining('"did":"did:plc:test123"'),
-        ]),
+        ])
       );
 
       // Should have inserted into account
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO account"),
-        expect.any(Array),
+        expect.any(Array)
       );
     });
 
@@ -318,7 +318,7 @@ describe("Account Database Operations", () => {
           bskyAccountID: 50,
           handle: "alice.bsky.social",
           displayName: "Alice",
-          avatarDataURI: "https://example.com/avatar.jpg",
+          avatarUrl: "https://example.com/avatar.jpg",
           did: "did:plc:test123",
         });
 
@@ -344,13 +344,13 @@ describe("Account Database Operations", () => {
           null,
           expect.any(String),
           50,
-        ]),
+        ])
       );
 
       // Should NOT have inserted into account (already exists)
       expect(mockDb.runAsync).not.toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO account"),
-        expect.any(Array),
+        expect.any(Array)
       );
     });
 
@@ -373,7 +373,7 @@ describe("Account Database Operations", () => {
           bskyAccountID: 200,
           handle: "alice.bsky.social",
           displayName: "Alice",
-          avatarDataURI: null,
+          avatarUrl: null,
           did: "did:plc:test123",
         });
 
@@ -386,7 +386,7 @@ describe("Account Database Operations", () => {
         profile: profileNoAvatar,
       });
 
-      expect(account.avatarDataURI).toBeNull();
+      expect(account.avatarUrl).toBeNull();
     });
 
     it("should serialize session as JSON", async () => {
@@ -403,7 +403,7 @@ describe("Account Database Operations", () => {
           bskyAccountID: 200,
           handle: "alice.bsky.social",
           displayName: "Alice",
-          avatarDataURI: null,
+          avatarUrl: null,
           did: "did:plc:test123",
         });
 
@@ -420,7 +420,7 @@ describe("Account Database Operations", () => {
         expect.stringContaining("INSERT INTO bsky_account"),
         expect.arrayContaining([
           expect.stringContaining('"did":"did:plc:test123"'),
-        ]),
+        ])
       );
     });
   });

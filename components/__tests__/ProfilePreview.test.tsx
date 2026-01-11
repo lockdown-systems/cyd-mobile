@@ -75,11 +75,10 @@ describe("ProfilePreview", () => {
       expect(screen.getByText("Test User")).toBeTruthy();
     });
 
-    it("should prefer avatarDataURI over avatarUrl", () => {
+    it("should use avatarUrl for avatar", () => {
       const profile: ProfileData = {
         ...baseProfile,
         avatarUrl: "https://cdn.bsky.app/avatar/remote.jpg",
-        avatarDataURI: "data:image/jpeg;base64,/9j/4AAQ...",
       };
 
       render(<ProfilePreview profile={profile} palette={defaultPalette} />);

@@ -138,7 +138,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
   const { sender, reactions, embed, embeddedPost: persistedPost } = message;
   const displayName = sender?.displayName || sender?.handle || "Unknown";
   const handle = sender?.handle || "";
-  const avatarUrl = sender?.avatarUrl || sender?.avatarDataURI;
+  const avatarUrl = sender?.avatarUrl;
   const savedTimestamp: string = message.savedAt;
   const deletedTimestamp: string | null = message.deletedAt ?? null;
 
@@ -183,10 +183,6 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
             : null,
         avatarUrl:
           author && typeof author.avatar === "string" ? author.avatar : null,
-        avatarDataURI:
-          author && typeof author.avatarDataURI === "string"
-            ? author.avatarDataURI
-            : null,
       },
       media: media.length > 0 ? media : undefined,
     };

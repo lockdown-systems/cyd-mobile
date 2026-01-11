@@ -40,7 +40,7 @@ export const migrations: Migration[] = [
         settingDeleteChatsDaysOld INTEGER DEFAULT 14,
         settingDeleteBookmarks INTEGER DEFAULT 0,
         settingDeleteUnfollowEveryone INTEGER DEFAULT 0,
-        avatarDataURI TEXT
+        avatarUrl TEXT
       );`,
       `CREATE TABLE IF NOT EXISTS account (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

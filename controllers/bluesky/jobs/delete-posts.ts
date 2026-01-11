@@ -54,7 +54,6 @@ export async function runDeletePostsJob(
         handle: post.authorHandle ?? "unknown",
         displayName: post.authorDisplayName,
         avatarUrl: post.avatarUrl,
-        avatarDataURI: post.avatarDataURI,
       },
       likeCount: post.likeCount,
       repostCount: post.repostCount,

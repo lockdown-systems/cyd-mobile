@@ -12,7 +12,7 @@ jest.mock("@/database", () => ({
       bskyAccountID: 1,
       handle: "tester",
       displayName: null,
-      avatarDataURI: null,
+      avatarUrl: null,
       did: "did:plc:tester",
     })),
   })),

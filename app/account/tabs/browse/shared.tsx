@@ -63,7 +63,6 @@ export type PostRow = {
   handle: string | null;
   displayName: string | null;
   avatarUrl: string | null;
-  avatarDataURI: string | null;
 };
 
 export type MediaRow = {
@@ -178,7 +177,6 @@ export function mapRowToPreview(
       handle: row.handle ?? fallbackHandle,
       displayName: row.displayName,
       avatarUrl: row.avatarUrl ?? undefined,
-      avatarDataURI: row.avatarDataURI ?? undefined,
     },
     likeCount: row.likeCount,
     repostCount: row.repostCount,
@@ -326,7 +324,7 @@ export function buildFirstPageQuery(
       p.preserve,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
-      prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
+      prof.handle, prof.displayName, prof.avatarUrl
     FROM post p
     LEFT JOIN profile prof ON prof.did = p.authorDid`;
 
@@ -367,7 +365,7 @@ export function buildLoadMoreQuery(
       p.preserve,
       p.facetsJSON, p.embedJSON, p.quotedPostUri,
       p.likeCount, p.repostCount, p.replyCount, p.quoteCount, p.isRepost, p.isReply,
-      prof.handle, prof.displayName, prof.avatarUrl, prof.avatarDataURI
+      prof.handle, prof.displayName, prof.avatarUrl
     FROM post p
     LEFT JOIN profile prof ON prof.did = p.authorDid`;
 

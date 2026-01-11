@@ -1493,7 +1493,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           settingDeleteChatsDaysOld: number;
           settingDeleteBookmarks: number;
           settingDeleteUnfollowEveryone: number;
-          avatarDataURI: string | null;
+          avatarUrl: string | null;
           did: string | null;
           lastSavedAt: number | null;
         }>(
@@ -1508,7 +1508,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
             b.settingDeleteRepostsDaysOld, b.settingDeleteLikes, b.settingDeleteLikesDaysOldEnabled,
             b.settingDeleteLikesDaysOld, b.settingDeleteChats, b.settingDeleteChatsDaysOldEnabled,
             b.settingDeleteChatsDaysOld, b.settingDeleteBookmarks, b.settingDeleteUnfollowEveryone,
-            b.avatarDataURI, b.did, b.lastSavedAt
+            b.avatarUrl, b.did, b.lastSavedAt
           FROM account a
           INNER JOIN bsky_account b ON b.id = a.bskyAccountID
           WHERE a.id = ?;`,

@@ -39,7 +39,7 @@ export type ArchiveAccountData = {
   settingDeleteChatsDaysOld: number;
   settingDeleteBookmarks: number;
   settingDeleteUnfollowEveryone: number;
-  avatarDataURI: string | null;
+  avatarUrl: string | null;
   did: string | null;
   lastSavedAt: number | null;
 };
@@ -437,7 +437,7 @@ export async function importArchive(
         settingDeleteChatsDaysOld,
         settingDeleteBookmarks,
         settingDeleteUnfollowEveryone,
-        avatarDataURI,
+        avatarUrl,
         did,
         lastSavedAt
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -471,7 +471,7 @@ export async function importArchive(
         account.settingDeleteChatsDaysOld,
         account.settingDeleteBookmarks,
         account.settingDeleteUnfollowEveryone,
-        account.avatarDataURI,
+        account.avatarUrl,
         account.did,
         account.lastSavedAt,
       ]

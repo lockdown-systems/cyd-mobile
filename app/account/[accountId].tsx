@@ -285,7 +285,7 @@ export default function AccountPlaceholderScreen() {
     }, [account])
   );
 
-  const avatarUri = account?.avatarDataURI ?? null;
+  const avatarUri = account?.avatarUrl ?? null;
   const username = account?.handle
     ? account.handle.startsWith("@")
       ? account.handle
