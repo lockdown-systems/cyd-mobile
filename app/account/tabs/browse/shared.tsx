@@ -75,9 +75,6 @@ export type MediaRow = {
   thumbUrl: string | null;
   fullsizeUrl: string | null;
   playlistUrl: string | null;
-  localThumbPath: string | null;
-  localFullsizePath: string | null;
-  localVideoPath: string | null;
 };
 
 export type ExternalRow = {
@@ -201,9 +198,6 @@ function mapMediaRowToAttachment(row: MediaRow): MediaAttachment {
     thumbUrl: row.thumbUrl,
     fullsizeUrl: row.fullsizeUrl,
     playlistUrl: row.playlistUrl,
-    localThumbPath: row.localThumbPath,
-    localFullsizePath: row.localFullsizePath,
-    localVideoPath: row.localVideoPath,
   };
 }
 
@@ -218,7 +212,7 @@ export async function fetchMediaForPosts(
   const placeholders = postUris.map(() => "?").join(",");
   const mediaRows = await db.getAllAsync<MediaRow>(
     `SELECT postUri, position, mediaType, alt, width, height,
-            thumbUrl, fullsizeUrl, playlistUrl, localThumbPath, localFullsizePath, localVideoPath
+            thumbUrl, fullsizeUrl, playlistUrl
      FROM post_media
      WHERE postUri IN (${placeholders})
      ORDER BY postUri, position;`,

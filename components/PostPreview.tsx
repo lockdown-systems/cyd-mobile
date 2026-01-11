@@ -446,12 +446,7 @@ export function PostPreview({
     return post.media
       .filter((item) => item.type === "image")
       .map((item, index) => ({
-        uri:
-          item.localFullsizePath ??
-          item.fullsizeUrl ??
-          item.localThumbPath ??
-          item.thumbUrl ??
-          "",
+        uri: item.fullsizeUrl ?? item.thumbUrl ?? "",
         index,
       }))
       .filter((item) => item.uri !== "");
@@ -512,9 +507,7 @@ export function PostPreview({
         <VideoPlayerModal
           visible={videoVisible}
           videoUri={String(currentVideo.playlistUrl)}
-          posterUri={
-            currentVideo.localThumbPath ?? currentVideo.thumbUrl ?? undefined
-          }
+          posterUri={currentVideo.thumbUrl ?? undefined}
           onClose={closeVideo}
         />
       )}
@@ -570,7 +563,7 @@ export function PostPreview({
         <View style={styles.mediaGrid}>
           {post.media.map((item, index) => {
             const key = `${item.type}-${index}`;
-            const thumbUri = item.localThumbPath ?? item.thumbUrl ?? undefined;
+            const thumbUri = item.thumbUrl ?? undefined;
 
             if (item.type === "video") {
               const hasPlaylistUrl = !!item.playlistUrl;
@@ -628,11 +621,7 @@ export function PostPreview({
               );
             }
 
-            const uri =
-              thumbUri ??
-              item.localFullsizePath ??
-              item.fullsizeUrl ??
-              undefined;
+            const uri = thumbUri ?? item.fullsizeUrl ?? undefined;
 
             if (!uri) {
               return null;
@@ -642,12 +631,7 @@ export function PostPreview({
             if (browseMode) {
               // Find the gallery index for this image
               const galleryIdx = galleryImages.findIndex(
-                (g) =>
-                  g.uri ===
-                  (item.localFullsizePath ??
-                    item.fullsizeUrl ??
-                    item.localThumbPath ??
-                    item.thumbUrl)
+                (g) => g.uri === (item.fullsizeUrl ?? item.thumbUrl)
               );
 
               return (

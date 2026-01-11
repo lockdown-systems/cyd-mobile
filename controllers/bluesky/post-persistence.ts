@@ -251,26 +251,21 @@ export class PostPersistence {
     profile: AppBskyActorDefs.ProfileViewBasic
   ): Promise<void> {
     const now = Date.now();
-    const description =
-      (profile as { description?: string }).description ?? null;
 
     await db.runAsync(
       `INSERT INTO profile (
-        did, handle, displayName, avatarUrl, avatarLocalPath, description, savedAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        did, handle, displayName, avatarUrl, savedAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(did) DO UPDATE SET
         handle = excluded.handle,
         displayName = excluded.displayName,
         avatarUrl = excluded.avatarUrl,
-        description = excluded.description,
         updatedAt = excluded.updatedAt;`,
       [
         profile.did,
         profile.handle,
         profile.displayName ?? null,
         profile.avatar ?? null,
-        null,
-        description,
         now,
         now,
       ]
@@ -281,39 +276,18 @@ export class PostPersistence {
     db: SQLiteDatabase,
     postUri: string,
     media: ExtractedMedia[],
-    did: string
+    _did: string
   ): Promise<ExtractedMedia[]> {
     return await Promise.all(
       media.map(async (attachment, position) => {
         if (attachment.type === "image") {
-          let localThumbPath: string | null | undefined = null;
-          let localFullsizePath: string | null | undefined = null;
-          try {
-            if (attachment.thumbUrl) {
-              localThumbPath = await this.deps.downloadMediaFromUrl(
-                attachment.thumbUrl,
-                did
-              );
-            }
-            if (attachment.fullsizeUrl) {
-              localFullsizePath = await this.deps.downloadMediaFromUrl(
-                attachment.fullsizeUrl,
-                did
-              );
-            }
-          } catch (err) {
-            console.warn("[PostPersistence] Failed to download media", err);
-          }
-
           // Insert into post_media table
-          const downloadedAt =
-            localThumbPath || localFullsizePath ? Date.now() : null;
           await db.runAsync(
             `INSERT INTO post_media (
               postUri, position, mediaType, blobCid, mimeType, alt,
               width, height, aspectRatioWidth, aspectRatioHeight,
-              thumbUrl, fullsizeUrl, playlistUrl, localThumbPath, localFullsizePath, downloadedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              thumbUrl, fullsizeUrl, playlistUrl, downloadedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(postUri, position) DO UPDATE SET
               mediaType = excluded.mediaType,
               blobCid = excluded.blobCid,
@@ -326,8 +300,6 @@ export class PostPersistence {
               thumbUrl = excluded.thumbUrl,
               fullsizeUrl = excluded.fullsizeUrl,
               playlistUrl = excluded.playlistUrl,
-              localThumbPath = COALESCE(excluded.localThumbPath, post_media.localThumbPath),
-              localFullsizePath = COALESCE(excluded.localFullsizePath, post_media.localFullsizePath),
               downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt);`,
             [
               postUri,
@@ -343,44 +315,22 @@ export class PostPersistence {
               attachment.thumbUrl ?? null,
               attachment.fullsizeUrl ?? null,
               null, // playlistUrl - images don't have this
-              localThumbPath ?? null,
-              localFullsizePath ?? null,
-              downloadedAt,
+              null, // downloadedAt - not downloading media locally
             ]
           );
 
-          return {
-            ...attachment,
-            localThumbPath,
-            localFullsizePath,
-          };
+          return attachment;
         }
 
         // Handle video attachments
         if (attachment.type === "video") {
-          let localThumbPath: string | null | undefined = null;
-          try {
-            if (attachment.thumbUrl) {
-              localThumbPath = await this.deps.downloadMediaFromUrl(
-                attachment.thumbUrl,
-                did
-              );
-            }
-          } catch (err) {
-            console.warn(
-              "[PostPersistence] Failed to download video thumbnail",
-              err
-            );
-          }
-
           // Insert video into post_media table
-          const downloadedAt = localThumbPath ? Date.now() : null;
           await db.runAsync(
             `INSERT INTO post_media (
               postUri, position, mediaType, blobCid, mimeType, alt,
               width, height, aspectRatioWidth, aspectRatioHeight,
-              thumbUrl, fullsizeUrl, playlistUrl, localThumbPath, localFullsizePath, downloadedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              thumbUrl, fullsizeUrl, playlistUrl, downloadedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(postUri, position) DO UPDATE SET
               mediaType = excluded.mediaType,
               blobCid = excluded.blobCid,
@@ -393,8 +343,6 @@ export class PostPersistence {
               thumbUrl = excluded.thumbUrl,
               fullsizeUrl = excluded.fullsizeUrl,
               playlistUrl = excluded.playlistUrl,
-              localThumbPath = COALESCE(excluded.localThumbPath, post_media.localThumbPath),
-              localFullsizePath = COALESCE(excluded.localFullsizePath, post_media.localFullsizePath),
               downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt);`,
             [
               postUri,
@@ -410,16 +358,11 @@ export class PostPersistence {
               attachment.thumbUrl ?? null,
               null, // fullsizeUrl - videos use playlistUrl instead
               attachment.playlistUrl ?? null,
-              localThumbPath ?? null,
-              null, // localFullsizePath - not used for videos
-              downloadedAt,
+              null, // downloadedAt - not downloading media locally
             ]
           );
 
-          return {
-            ...attachment,
-            localThumbPath,
-          };
+          return attachment;
         }
 
         return attachment;

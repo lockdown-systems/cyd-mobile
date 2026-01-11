@@ -256,27 +256,6 @@ describe("BlueskyAccountController", () => {
       };
     };
 
-    const createFeedPostWithImage = (suffix: number): FeedViewPost => {
-      const base = createFeedPost(suffix);
-      return {
-        ...base,
-        post: {
-          ...base.post,
-          embed: {
-            $type: "app.bsky.embed.images#view",
-            images: [
-              {
-                thumb: `https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:test/bafyimage${suffix}@jpeg`,
-                fullsize: `https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:test/bafyimage${suffix}@jpeg`,
-                alt: `Alt ${suffix}`,
-                aspectRatio: { width: 800, height: 600 },
-              },
-            ],
-          },
-        },
-      };
-    };
-
     it("should fetch pages and store posts", async () => {
       const controller = new BlueskyAccountController(1);
       const mockDb = createMockDatabase();
@@ -333,54 +312,6 @@ describe("BlueskyAccountController", () => {
       expect(secondArgs?.slice(17, 21)).toEqual([12, 22, 32, 42]);
       expect(controller.progress.postsProgress.current).toBe(2);
       expect(controller.progress.isRunning).toBe(false);
-    });
-
-    it("should download media for embedded images", async () => {
-      const controller = new BlueskyAccountController(1);
-      const mockDb = createMockDatabase();
-      const getAuthorFeed = jest.fn();
-      const controllerState = controller as unknown as {
-        db: ReturnType<typeof createMockDatabase>;
-        agent: Agent | null;
-        did: string | null;
-        handle: string | null;
-      };
-      controllerState.db = mockDb;
-      controllerState.did = "did:plc:test";
-      controllerState.handle = "user.test";
-      controllerState.agent = {
-        app: {
-          bsky: {
-            feed: {
-              getAuthorFeed,
-            },
-          },
-        },
-      } as unknown as Agent;
-
-      const downloadSpy = jest
-        .spyOn(
-          controller as unknown as {
-            downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
-          },
-          "downloadMediaFromUrl"
-        )
-        .mockResolvedValue("file:///mock/media-thumb");
-
-      const feedWithImage = [createFeedPostWithImage(1)];
-      getAuthorFeed.mockResolvedValueOnce({ data: { feed: feedWithImage } });
-
-      await controller.indexPosts();
-
-      expect(downloadSpy).toHaveBeenCalledTimes(2);
-      expect(downloadSpy).toHaveBeenCalledWith(
-        "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:test/bafyimage1@jpeg",
-        "did:plc:test"
-      );
-      expect(downloadSpy).toHaveBeenCalledWith(
-        "https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:test/bafyimage1@jpeg",
-        "did:plc:test"
-      );
     });
 
     it("should upsert posts by uri to avoid duplicates", async () => {

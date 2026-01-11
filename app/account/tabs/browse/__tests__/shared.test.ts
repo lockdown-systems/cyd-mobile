@@ -334,9 +334,6 @@ describe("shared browse helpers", () => {
           thumbUrl: "https://cdn.bsky.app/thumb1.jpg",
           fullsizeUrl: "https://cdn.bsky.app/full1.jpg",
           playlistUrl: null,
-          localThumbPath: null,
-          localFullsizePath: null,
-          localVideoPath: null,
         },
         {
           postUri: "at://did/post/1",
@@ -348,9 +345,6 @@ describe("shared browse helpers", () => {
           thumbUrl: "https://cdn.bsky.app/thumb2.jpg",
           fullsizeUrl: "https://cdn.bsky.app/full2.jpg",
           playlistUrl: null,
-          localThumbPath: null,
-          localFullsizePath: null,
-          localVideoPath: null,
         },
         {
           postUri: "at://did/post/2",
@@ -362,9 +356,6 @@ describe("shared browse helpers", () => {
           thumbUrl: "https://cdn.bsky.app/video-thumb.jpg",
           fullsizeUrl: null,
           playlistUrl: "https://video.bsky.app/playlist.m3u8",
-          localThumbPath: null,
-          localFullsizePath: null,
-          localVideoPath: null,
         },
       ];
 

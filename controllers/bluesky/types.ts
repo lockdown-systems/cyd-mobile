@@ -92,9 +92,6 @@ export type MediaAttachment = {
   thumbUrl?: string | null;
   fullsizeUrl?: string | null;
   playlistUrl?: string | null;
-  localThumbPath?: string | null;
-  localFullsizePath?: string | null;
-  localVideoPath?: string | null;
   alt?: string | null;
   width?: number | null;
   height?: number | null;

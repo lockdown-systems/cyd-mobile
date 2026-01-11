@@ -24,19 +24,6 @@ type MessagePreviewProps = {
   palette: AccountTabPalette;
 };
 
-function isPostPreviewData(value: unknown): value is PostPreviewData {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.uri === "string" &&
-    typeof v.cid === "string" &&
-    typeof v.text === "string" &&
-    typeof v.createdAt === "string" &&
-    v.author != null &&
-    typeof (v.author as { did?: unknown }).did === "string"
-  );
-}
-
 function Avatar({ uri, size = 40 }: { uri?: string | null; size?: number }) {
   if (!uri) {
     return (
@@ -135,7 +122,7 @@ function extractMediaFromEmbed(
 }
 
 export function MessagePreview({ message, palette }: MessagePreviewProps) {
-  const { sender, reactions, embed, embeddedPost: persistedPost } = message;
+  const { sender, embed } = message;
   const displayName = sender?.displayName || sender?.handle || "Unknown";
   const handle = sender?.handle || "";
   const avatarUrl = sender?.avatarUrl;
@@ -143,9 +130,6 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
   const deletedTimestamp: string | null = message.deletedAt ?? null;
 
   const embeddedPost = useMemo<PostPreviewData | null>(() => {
-    if (isPostPreviewData(persistedPost)) {
-      return persistedPost;
-    }
     if (!embed || typeof embed !== "object") return null;
     const embedObj = embed;
     const record = embedObj.record as Record<string, unknown> | undefined;
@@ -188,7 +172,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
     };
 
     return post;
-  }, [embed, message.sentAt, persistedPost]);
+  }, [embed, message.sentAt]);
 
   const [postModalVisible, setPostModalVisible] = useState(false);
 
@@ -337,42 +321,6 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
               />
             )}
           </View>
-
-          {/* Display reactions if present */}
-          {reactions && Array.isArray(reactions) && reactions.length > 0 && (
-            <View style={styles.reactionsContainer}>
-              {reactions.map((reaction: unknown, index: number) => {
-                const reactionObj =
-                  reaction && typeof reaction === "object"
-                    ? (reaction as Record<string, unknown>)
-                    : {};
-                const sender = reactionObj.sender as
-                  | Record<string, unknown>
-                  | undefined;
-                const value =
-                  typeof reactionObj.value === "string"
-                    ? reactionObj.value
-                    : "";
-                const did =
-                  sender && typeof sender.did === "string" ? sender.did : index;
-
-                return (
-                  <View
-                    key={`${did}-${value || index}`}
-                    style={[
-                      styles.reactionBubble,
-                      {
-                        backgroundColor: palette.card,
-                        borderColor: palette.icon,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.reactionEmoji}>{value}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
         </View>
       </View>
 
@@ -483,22 +431,6 @@ const styles = StyleSheet.create({
   embeddedHint: {
     marginTop: 6,
     fontSize: 13,
-  },
-  reactionsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 6,
-    marginLeft: 14,
-  },
-  reactionBubble: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  reactionEmoji: {
-    fontSize: 16,
   },
   timestampFull: {
     fontSize: 13,
