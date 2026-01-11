@@ -388,10 +388,6 @@ export function DeleteAutomationModal({
           <Text style={[styles.progressMessage, { color: palette.text }]}>
             {progressMessage ?? "Awaiting progress…"}
           </Text>
-          <Text style={[styles.itemCount, { color: palette.icon }]}>
-            {currentItemIndex.toLocaleString()} / {totalItems.toLocaleString()}{" "}
-            items
-          </Text>
         </View>
 
         {/* Scrollable preview area */}

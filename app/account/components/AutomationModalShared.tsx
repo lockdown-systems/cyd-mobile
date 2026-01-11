@@ -337,10 +337,6 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: "center",
   },
-  itemCount: {
-    fontSize: 14,
-    textAlign: "center",
-  },
   errorCard: {
     flexDirection: "row",
     alignItems: "center",
