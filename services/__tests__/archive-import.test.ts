@@ -67,20 +67,18 @@ jest.mock("expo-file-system", () => {
             const data = mockDirInstances.get(fullPath);
             return data?.exists ?? false;
           },
-          list: () => {
+          list: (): unknown[] => {
             const data = mockDirInstances.get(fullPath);
             if (!data) return [];
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            const expoFs = jest.requireMock("expo-file-system");
             return data.items.map((item) => {
               if (item.type === "file") {
-                return new (jest.requireMock("expo-file-system").File)(
-                  fullPath,
-                  item.name
-                );
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                return new expoFs.File(fullPath, item.name) as unknown;
               } else {
-                return new (jest.requireMock("expo-file-system").Directory)(
-                  fullPath,
-                  item.name
-                );
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                return new expoFs.Directory(fullPath, item.name) as unknown;
               }
             });
           },
@@ -151,14 +149,22 @@ describe("archive-import", () => {
       expect(result).toBeNull();
     });
 
-    it("should return the file URI when a file is selected", async () => {
+    it("should return the file URI and filename when a file is selected", async () => {
       (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValue({
         canceled: false,
-        assets: [{ uri: "/path/to/archive.zip" }],
+        assets: [
+          {
+            uri: "/path/to/archive.zip",
+            name: "Cyd-archive_2026-01-10_Bluesky_test.zip",
+          },
+        ],
       });
 
       const result = await pickArchiveFile();
-      expect(result).toBe("/path/to/archive.zip");
+      expect(result).toEqual({
+        uri: "/path/to/archive.zip",
+        filename: "Cyd-archive_2026-01-10_Bluesky_test.zip",
+      });
     });
 
     it("should request zip files only", async () => {
@@ -179,7 +185,7 @@ describe("archive-import", () => {
   describe("validateArchiveFilename", () => {
     it("should accept valid filename with simple handle", () => {
       const result = validateArchiveFilename(
-        "/path/to/Cyd-archive_2026-01-10_Bluesky_test.bsky.social.zip"
+        "Cyd-archive_2026-01-10_Bluesky_test.bsky.social.zip"
       );
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -191,21 +197,21 @@ describe("archive-import", () => {
 
     it("should accept valid filename with complex handle", () => {
       const result = validateArchiveFilename(
-        "file:///cache/Cyd-archive_2025-12-31_Bluesky_my-user_name.bsky.social.zip"
+        "Cyd-archive_2025-12-31_Bluesky_my-user_name.bsky.social.zip"
       );
       expect(result.valid).toBe(true);
     });
 
-    it("should accept URL-encoded filename", () => {
+    it("should accept filename with hyphens and underscores in handle", () => {
       const result = validateArchiveFilename(
-        "file:///cache/Cyd-archive_2026-01-10_Bluesky_test.bsky.social.zip"
+        "Cyd-archive_2026-01-10_Bluesky_nexamind-cyd.bsky.social.zip"
       );
       expect(result.valid).toBe(true);
     });
 
     it("should reject filename without Cyd-archive prefix", () => {
       const result = validateArchiveFilename(
-        "/path/to/archive_2026-01-10_Bluesky_test.bsky.social.zip"
+        "archive_2026-01-10_Bluesky_test.bsky.social.zip"
       );
       expect(result.valid).toBe(false);
       if (!result.valid) {
@@ -215,38 +221,38 @@ describe("archive-import", () => {
 
     it("should reject filename with wrong date format", () => {
       const result = validateArchiveFilename(
-        "/path/to/Cyd-archive_01-10-2026_Bluesky_test.bsky.social.zip"
+        "Cyd-archive_01-10-2026_Bluesky_test.bsky.social.zip"
       );
       expect(result.valid).toBe(false);
     });
 
     it("should reject filename without Bluesky marker", () => {
       const result = validateArchiveFilename(
-        "/path/to/Cyd-archive_2026-01-10_Twitter_test.bsky.social.zip"
+        "Cyd-archive_2026-01-10_Twitter_test.bsky.social.zip"
       );
       expect(result.valid).toBe(false);
     });
 
     it("should reject filename without handle", () => {
       const result = validateArchiveFilename(
-        "/path/to/Cyd-archive_2026-01-10_Bluesky_.zip"
+        "Cyd-archive_2026-01-10_Bluesky_.zip"
       );
       expect(result.valid).toBe(false);
     });
 
     it("should reject filename without .zip extension", () => {
       const result = validateArchiveFilename(
-        "/path/to/Cyd-archive_2026-01-10_Bluesky_test.bsky.social"
+        "Cyd-archive_2026-01-10_Bluesky_test.bsky.social"
       );
       expect(result.valid).toBe(false);
     });
 
     it("should reject random zip filename", () => {
-      const result = validateArchiveFilename("/path/to/my-backup.zip");
+      const result = validateArchiveFilename("my-backup.zip");
       expect(result.valid).toBe(false);
     });
 
-    it("should return error when filename cannot be extracted", () => {
+    it("should return error when filename is empty", () => {
       const result = validateArchiveFilename("");
       expect(result.valid).toBe(false);
       if (!result.valid) {
@@ -630,12 +636,18 @@ describe("archive-import", () => {
 
       // Verify bsky_account was inserted with correct values
       expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
-      const bskyInsertCall = mockDb.runAsync.mock.calls[0];
+      const bskyInsertCall = mockDb.runAsync.mock.calls[0] as [
+        string,
+        unknown[],
+      ];
       expect(bskyInsertCall[0]).toContain("INSERT INTO bsky_account");
       expect(bskyInsertCall[1]).toContain(validMetadata.account.handle);
 
       // Verify account was inserted with correct values
-      const accountInsertCall = mockDb.runAsync.mock.calls[1];
+      const accountInsertCall = mockDb.runAsync.mock.calls[1] as [
+        string,
+        unknown[],
+      ];
       expect(accountInsertCall[0]).toContain("INSERT INTO account");
       expect(accountInsertCall[1]).toEqual([validMetadata.uuid, 0, 123]);
 
@@ -676,7 +688,12 @@ describe("archive-import", () => {
       expect(metadataWrite).toBeDefined();
 
       // Verify it only contains type and uuid (not account data)
-      const parsedMetadata = JSON.parse(metadataWrite!.content);
+      const parsedMetadata = JSON.parse(metadataWrite!.content) as {
+        type?: string;
+        uuid?: string;
+        account?: unknown;
+        exportTimestamp?: string;
+      };
       expect(parsedMetadata.type).toBe("bluesky");
       expect(parsedMetadata.uuid).toBe(validMetadata.uuid);
       expect(parsedMetadata.account).toBeUndefined();

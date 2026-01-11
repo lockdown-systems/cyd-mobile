@@ -118,11 +118,9 @@ const ARCHIVE_FILENAME_PATTERN =
 /**
  * Validate the filename of an archive
  */
-export function validateArchiveFilename(uri: string): FilenameValidationResult {
-  // Extract filename from URI (handle both file:// URIs and regular paths)
-  const decodedUri = decodeURIComponent(uri);
-  const filename = decodedUri.split("/").pop() ?? "";
-
+export function validateArchiveFilename(
+  filename: string
+): FilenameValidationResult {
   if (!filename) {
     return {
       valid: false,
@@ -142,9 +140,17 @@ export function validateArchiveFilename(uri: string): FilenameValidationResult {
 }
 
 /**
+ * Result from picking an archive file
+ */
+export type PickArchiveResult = {
+  uri: string;
+  filename: string;
+} | null;
+
+/**
  * Pick a zip file using the document picker
  */
-export async function pickArchiveFile(): Promise<string | null> {
+export async function pickArchiveFile(): Promise<PickArchiveResult> {
   const result = await DocumentPicker.getDocumentAsync({
     type: "application/zip",
     copyToCacheDirectory: true,
@@ -154,7 +160,11 @@ export async function pickArchiveFile(): Promise<string | null> {
     return null;
   }
 
-  return result.assets[0].uri;
+  const asset = result.assets[0];
+  return {
+    uri: asset.uri,
+    filename: asset.name ?? "",
+  };
 }
 
 /**

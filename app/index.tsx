@@ -62,13 +62,13 @@ export default function AccountSelectionScreen() {
 
     try {
       // Pick a zip file
-      const zipPath = await pickArchiveFile();
-      if (!zipPath) {
+      const pickedFile = await pickArchiveFile();
+      if (!pickedFile) {
         return; // User cancelled
       }
 
       // Validate the filename
-      const filenameValidation = validateArchiveFilename(zipPath);
+      const filenameValidation = validateArchiveFilename(pickedFile.filename);
       if (!filenameValidation.valid) {
         Alert.alert("Import Failed", filenameValidation.error);
         return;
@@ -77,7 +77,7 @@ export default function AccountSelectionScreen() {
       setIsImporting(true);
 
       // Validate the archive
-      const validation = await validateArchive(zipPath);
+      const validation = await validateArchive(pickedFile.uri);
 
       if (!validation.valid) {
         if (validation.tempDir) {

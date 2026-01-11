@@ -66,7 +66,7 @@ export function CydAccountBar({
       // Delay to allow the modal to fully close before opening the document picker
       setTimeout(() => {
         onImportArchive();
-      }, 350);
+      }, 50);
     }
   }, [onImportArchive]);
 
