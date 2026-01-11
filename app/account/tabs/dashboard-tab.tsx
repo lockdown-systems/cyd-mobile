@@ -9,9 +9,10 @@ import {
   type ImageSourcePropType,
 } from "react-native";
 
-import iconArchive from "@/assets/images/icon-archive.png";
-import iconDatabase from "@/assets/images/icon-database.png";
+import iconBrowse from "@/assets/images/icon-browse.png";
 import iconDelete from "@/assets/images/icon-delete.png";
+import iconSave from "@/assets/images/icon-save.png";
+import iconSchedule from "@/assets/images/icon-schedule.png";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { getLastSavedAt } from "@/database/accounts";
@@ -30,7 +31,7 @@ const CARDS: DashboardCard[] = [
     title: "Save My Data",
     description: (handle) =>
       "Make or update your local backup. You must do this before you delete anything.",
-    icon: iconDatabase,
+    icon: iconSave,
   },
   {
     key: "delete",
@@ -40,10 +41,17 @@ const CARDS: DashboardCard[] = [
     icon: iconDelete,
   },
   {
+    key: "schedule",
+    title: "Schedule Deletion",
+    description: (handle) =>
+      "Schedule deletion of your data based on your save and delete settings.",
+    icon: iconSchedule,
+  },
+  {
     key: "browse",
     title: "Browse Archive",
     description: (handle) => "Browse your local backup of Bluesky data.",
-    icon: iconArchive,
+    icon: iconBrowse,
   },
 ];
 
@@ -94,6 +102,9 @@ export function DashboardTab({
       return "startHere";
     }
     if (cardKey === "delete" && !hasPremium) {
+      return "premium";
+    }
+    if (cardKey === "schedule" && !hasPremium) {
       return "premium";
     }
     return null;

@@ -49,6 +49,7 @@ import { BrowseTab } from "./tabs/browse-tab";
 import { DashboardTab } from "./tabs/dashboard-tab";
 import { DeleteTab } from "./tabs/delete-tab";
 import { SaveTab } from "./tabs/save-tab";
+import { ScheduleTab } from "./tabs/schedule-tab";
 
 export default function AccountPlaceholderScreen() {
   const params = useLocalSearchParams<{ accountId: string | string[] }>();
@@ -540,9 +541,10 @@ type TabConfig = {
 };
 
 const TAB_CONFIG: TabConfig[] = [
-  { key: "dashboard", label: "Dashboard", icon: "home" },
+  { key: "dashboard", label: "Home", icon: "home" },
   { key: "save", label: "Save", icon: "download" },
   { key: "delete", label: "Delete", icon: "local-fire-department" },
+  { key: "schedule", label: "Schedule", icon: "schedule" },
   { key: "browse", label: "Browse", icon: "preview" },
 ];
 
@@ -550,6 +552,7 @@ const TAB_COMPONENTS: Record<AccountTabKey, ComponentType<AccountTabProps>> = {
   dashboard: DashboardTab,
   save: SaveTab,
   delete: DeleteTab,
+  schedule: ScheduleTab,
   browse: BrowseTab,
 };
 

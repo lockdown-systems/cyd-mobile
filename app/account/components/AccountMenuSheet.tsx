@@ -57,12 +57,6 @@ export function AccountMenuSheet({
     () => [
       {
         type: "action",
-        key: "schedule",
-        label: "Schedule backing up and deleting",
-        log: `Schedule saving and deleting tapped for ${handle}`,
-      },
-      {
-        type: "action",
         key: "export-archive",
         label: "Export Bluesky archive",
         log: `Export archive tapped for ${handle}`,
@@ -105,12 +99,6 @@ export function AccountMenuSheet({
       console.log(`[Account Settings] ${item.log}`);
 
       if (pendingAction) {
-        return;
-      }
-
-      if (item.key === "schedule") {
-        Alert.alert("TODO: This is not implemented yet.");
-        onClose();
         return;
       }
 
