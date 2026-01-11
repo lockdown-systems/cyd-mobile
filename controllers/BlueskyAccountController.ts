@@ -1409,12 +1409,71 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         }
       }
 
-      // Add exportTimestamp to metadata.json
+      // Add exportTimestamp and account data to metadata.json
       const metadataFile = new File(tempDir, "metadata.json");
       if (metadataFile.exists) {
         const metadataContent = await metadataFile.text();
         const metadata = JSON.parse(metadataContent) as Record<string, unknown>;
         metadata.exportTimestamp = new Date().toISOString();
+
+        // Fetch account data from main.db (excluding sensitive fields)
+        const mainDb = await getDatabase();
+        const accountData = await mainDb.getFirstAsync<{
+          createdAt: number;
+          updatedAt: number;
+          accessedAt: number | null;
+          handle: string;
+          displayName: string | null;
+          postsCount: number;
+          settingSavePosts: number;
+          settingSaveLikes: number;
+          settingSaveBookmarks: number;
+          settingSaveChats: number;
+          settingDeletePosts: number;
+          settingDeletePostsDaysOldEnabled: number;
+          settingDeletePostsDaysOld: number;
+          settingDeletePostsLikesThresholdEnabled: number;
+          settingDeletePostsLikesThreshold: number;
+          settingDeletePostsRepostsThresholdEnabled: number;
+          settingDeletePostsRepostsThreshold: number;
+          settingDeletePostsPreserveThreads: number;
+          settingDeleteReposts: number;
+          settingDeleteRepostsDaysOldEnabled: number;
+          settingDeleteRepostsDaysOld: number;
+          settingDeleteLikes: number;
+          settingDeleteLikesDaysOldEnabled: number;
+          settingDeleteLikesDaysOld: number;
+          settingDeleteChats: number;
+          settingDeleteChatsDaysOldEnabled: number;
+          settingDeleteChatsDaysOld: number;
+          settingDeleteBookmarks: number;
+          settingDeleteUnfollowEveryone: number;
+          avatarDataURI: string | null;
+          did: string | null;
+          lastSavedAt: number | null;
+        }>(
+          `SELECT 
+            b.createdAt, b.updatedAt, b.accessedAt, b.handle, b.displayName,
+            b.postsCount, b.settingSavePosts, b.settingSaveLikes, b.settingSaveBookmarks,
+            b.settingSaveChats, b.settingDeletePosts, b.settingDeletePostsDaysOldEnabled,
+            b.settingDeletePostsDaysOld, b.settingDeletePostsLikesThresholdEnabled,
+            b.settingDeletePostsLikesThreshold, b.settingDeletePostsRepostsThresholdEnabled,
+            b.settingDeletePostsRepostsThreshold, b.settingDeletePostsPreserveThreads,
+            b.settingDeleteReposts, b.settingDeleteRepostsDaysOldEnabled,
+            b.settingDeleteRepostsDaysOld, b.settingDeleteLikes, b.settingDeleteLikesDaysOldEnabled,
+            b.settingDeleteLikesDaysOld, b.settingDeleteChats, b.settingDeleteChatsDaysOldEnabled,
+            b.settingDeleteChatsDaysOld, b.settingDeleteBookmarks, b.settingDeleteUnfollowEveryone,
+            b.avatarDataURI, b.did, b.lastSavedAt
+          FROM account a
+          INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+          WHERE a.id = ?;`,
+          [this.accountId]
+        );
+
+        if (accountData) {
+          metadata.account = accountData;
+        }
+
         metadataFile.write(JSON.stringify(metadata, null, 2));
       }
 
