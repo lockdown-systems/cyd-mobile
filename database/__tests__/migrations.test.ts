@@ -38,19 +38,38 @@ describe("Database Migrations", () => {
 
     it("should have correct version and name", () => {
       expect(migration.version).toBe(1);
-      expect(migration.name).toBe("initial account + bsky schema");
+      expect(migration.name).toBe("initial schema");
     });
 
     it("should create bsky_account table", () => {
       const createTableStatement = migration.statements.find((s) =>
-        s.includes("CREATE TABLE IF NOT EXISTS bsky_account"),
+        s.includes("CREATE TABLE IF NOT EXISTS bsky_account")
       );
       expect(createTableStatement).toBeTruthy();
     });
 
+    it("should include session columns in bsky_account table", () => {
+      const createTableStatement = migration.statements.find((s) =>
+        s.includes("CREATE TABLE IF NOT EXISTS bsky_account")
+      );
+      expect(createTableStatement).toContain("did TEXT");
+      expect(createTableStatement).toContain("accessJwt TEXT");
+      expect(createTableStatement).toContain("refreshJwt TEXT");
+      expect(createTableStatement).toContain("sessionJson TEXT");
+      expect(createTableStatement).toContain("lastSavedAt INTEGER");
+    });
+
+    it("should create unique index on did", () => {
+      const createIndexStatement = migration.statements.find((s) =>
+        s.includes("CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did")
+      );
+      expect(createIndexStatement).toBeTruthy();
+      expect(createIndexStatement).toContain("bsky_account(did)");
+    });
+
     it("should create account table with foreign key to bsky_account", () => {
       const createTableStatement = migration.statements.find((s) =>
-        s.includes("CREATE TABLE IF NOT EXISTS account"),
+        s.includes("CREATE TABLE IF NOT EXISTS account")
       );
       expect(createTableStatement).toBeTruthy();
       expect(createTableStatement).toContain("FOREIGN KEY (bskyAccountID)");
@@ -59,7 +78,7 @@ describe("Database Migrations", () => {
 
     it("should create index on account sortOrder", () => {
       const createIndexStatement = migration.statements.find((s) =>
-        s.includes("CREATE INDEX IF NOT EXISTS idx_account_sort_order"),
+        s.includes("CREATE INDEX IF NOT EXISTS idx_account_sort_order")
       );
       expect(createIndexStatement).toBeTruthy();
       expect(createIndexStatement).toContain("account(sortOrder ASC, id ASC)");
@@ -67,51 +86,26 @@ describe("Database Migrations", () => {
 
     it("should enforce type constraint on account table", () => {
       const createTableStatement = migration.statements.find((s) =>
-        s.includes("CREATE TABLE IF NOT EXISTS account"),
+        s.includes("CREATE TABLE IF NOT EXISTS account")
       );
       expect(createTableStatement).toContain("CHECK (type IN ('bluesky'))");
     });
-  });
 
-  describe("migration 2: oauth session storage", () => {
-    const migration = migrations[1];
-
-    it("should have correct version and name", () => {
-      expect(migration.version).toBe(2);
-      expect(migration.name).toBe("store bluesky oauth session");
+    it("should create cyd_account table", () => {
+      const createTableStatement = migration.statements.find((s) =>
+        s.includes("CREATE TABLE IF NOT EXISTS cyd_account")
+      );
+      expect(createTableStatement).toBeTruthy();
+      expect(createTableStatement).toContain("userEmail TEXT");
+      expect(createTableStatement).toContain("deviceToken TEXT");
+      expect(createTableStatement).toContain("deviceUUID TEXT");
     });
 
-    it("should add did column to bsky_account", () => {
-      const addDidColumn = migration.statements.find((s) =>
-        s.includes("ALTER TABLE bsky_account ADD COLUMN did"),
+    it("should insert default cyd_account row", () => {
+      const insertStatement = migration.statements.find((s) =>
+        s.includes("INSERT OR IGNORE INTO cyd_account")
       );
-      expect(addDidColumn).toBeTruthy();
-    });
-
-    it("should add JWT columns to bsky_account", () => {
-      const addAccessJwt = migration.statements.find((s) =>
-        s.includes("ALTER TABLE bsky_account ADD COLUMN accessJwt"),
-      );
-      const addRefreshJwt = migration.statements.find((s) =>
-        s.includes("ALTER TABLE bsky_account ADD COLUMN refreshJwt"),
-      );
-      expect(addAccessJwt).toBeTruthy();
-      expect(addRefreshJwt).toBeTruthy();
-    });
-
-    it("should add sessionJson column to bsky_account", () => {
-      const addSessionJson = migration.statements.find((s) =>
-        s.includes("ALTER TABLE bsky_account ADD COLUMN sessionJson"),
-      );
-      expect(addSessionJson).toBeTruthy();
-    });
-
-    it("should create unique index on did", () => {
-      const createIndexStatement = migration.statements.find((s) =>
-        s.includes("CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did"),
-      );
-      expect(createIndexStatement).toBeTruthy();
-      expect(createIndexStatement).toContain("bsky_account(did)");
+      expect(insertStatement).toBeTruthy();
     });
   });
 });

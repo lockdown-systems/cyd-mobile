@@ -99,6 +99,10 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         deletedRepostAt INTEGER,
         deletedLikeAt INTEGER,
         deletedBookmarkAt INTEGER,
+        likeUri TEXT,
+
+        -- Preservation
+        preserve INTEGER NOT NULL DEFAULT 0,
 
         FOREIGN KEY (authorDid) REFERENCES profile(did)
       );`,
@@ -107,6 +111,7 @@ export const blueskyAccountMigrations: AccountMigration[] = [
       `CREATE INDEX IF NOT EXISTS idx_post_is_repost ON post(isRepost);`,
       `CREATE INDEX IF NOT EXISTS idx_post_viewer_liked ON post(viewerLiked);`,
       `CREATE INDEX IF NOT EXISTS idx_post_viewer_bookmarked ON post(viewerBookmarked);`,
+      `CREATE INDEX IF NOT EXISTS idx_post_preserve ON post(preserve);`,
 
       // Post media (images, videos attached to posts)
       `CREATE TABLE IF NOT EXISTS post_media (
@@ -250,19 +255,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
       `CREATE INDEX IF NOT EXISTS idx_message_sender ON message(senderDid);`,
       `CREATE INDEX IF NOT EXISTS idx_message_sent ON message(sentAt);`,
     ],
-  },
-  {
-    version: 2,
-    name: "add preserve flag to post table",
-    statements: [
-      `ALTER TABLE post ADD COLUMN preserve INTEGER NOT NULL DEFAULT 0;`,
-      `CREATE INDEX IF NOT EXISTS idx_post_preserve ON post(preserve);`,
-    ],
-  },
-  {
-    version: 3,
-    name: "add likeUri column for deletion tracking",
-    statements: [`ALTER TABLE post ADD COLUMN likeUri TEXT;`],
   },
 ];
 

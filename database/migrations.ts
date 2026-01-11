@@ -7,7 +7,7 @@ export type Migration = {
 export const migrations: Migration[] = [
   {
     version: 1,
-    name: "initial account + bsky schema",
+    name: "initial schema",
     statements: [
       `CREATE TABLE IF NOT EXISTS bsky_account (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,8 +40,14 @@ export const migrations: Migration[] = [
         settingDeleteChatsDaysOld INTEGER DEFAULT 14,
         settingDeleteBookmarks INTEGER DEFAULT 0,
         settingDeleteUnfollowEveryone INTEGER DEFAULT 0,
-        avatarUrl TEXT
+        avatarUrl TEXT,
+        did TEXT,
+        accessJwt TEXT,
+        refreshJwt TEXT,
+        sessionJson TEXT,
+        lastSavedAt INTEGER
       );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did ON bsky_account(did);`,
       `CREATE TABLE IF NOT EXISTS account (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         uuid TEXT NOT NULL UNIQUE,
@@ -51,23 +57,6 @@ export const migrations: Migration[] = [
         FOREIGN KEY (bskyAccountID) REFERENCES bsky_account(id) ON DELETE CASCADE
       );`,
       `CREATE INDEX IF NOT EXISTS idx_account_sort_order ON account(sortOrder ASC, id ASC);`,
-    ],
-  },
-  {
-    version: 2,
-    name: "store bluesky oauth session",
-    statements: [
-      `ALTER TABLE bsky_account ADD COLUMN did TEXT;`,
-      `ALTER TABLE bsky_account ADD COLUMN accessJwt TEXT;`,
-      `ALTER TABLE bsky_account ADD COLUMN refreshJwt TEXT;`,
-      `ALTER TABLE bsky_account ADD COLUMN sessionJson TEXT;`,
-      `CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did ON bsky_account(did);`,
-    ],
-  },
-  {
-    version: 3,
-    name: "add cyd account credentials",
-    statements: [
       `CREATE TABLE IF NOT EXISTS cyd_account (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         userEmail TEXT,
@@ -78,10 +67,5 @@ export const migrations: Migration[] = [
       );`,
       `INSERT OR IGNORE INTO cyd_account (id) VALUES (1);`,
     ],
-  },
-  {
-    version: 4,
-    name: "add lastSavedAt to bsky_account",
-    statements: [`ALTER TABLE bsky_account ADD COLUMN lastSavedAt INTEGER;`],
   },
 ];
