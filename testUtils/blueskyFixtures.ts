@@ -360,7 +360,6 @@ export interface MockChatMessage {
   sender: { did: string };
   facets?: unknown[];
   embed?: unknown;
-  reactions?: unknown[];
 }
 
 export function createChatMessage(
@@ -374,7 +373,6 @@ export function createChatMessage(
     sender: overrides?.sender ?? { did: createDid("sender") },
     facets: overrides?.facets,
     embed: overrides?.embed,
-    reactions: overrides?.reactions,
   };
 }
 
@@ -416,16 +414,6 @@ export function createChatMessageWithEmbed(): MockChatMessage {
   });
 }
 
-export function createChatMessageWithReactions(): MockChatMessage {
-  return createChatMessage({
-    text: "Great news!",
-    reactions: [
-      { emoji: "👍", count: 3 },
-      { emoji: "❤️", count: 1 },
-    ],
-  });
-}
-
 // Mock conversation
 export interface MockConversation {
   id: string;
@@ -443,7 +431,6 @@ export interface MockConversation {
     sender: { did: string };
   };
   muted: boolean;
-  unreadCount: number;
 }
 
 export function createConversation(
@@ -476,7 +463,6 @@ export function createConversation(
       sender: { did: member2Did },
     },
     muted: overrides?.muted ?? false,
-    unreadCount: overrides?.unreadCount ?? 0,
   };
 }
 

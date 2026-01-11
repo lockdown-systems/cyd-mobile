@@ -40,8 +40,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         handle TEXT NOT NULL,
         displayName TEXT,
         avatarUrl TEXT,
-        avatarLocalPath TEXT,
-        description TEXT,
         savedAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL
       );`,
@@ -91,9 +89,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         createdAt TEXT NOT NULL,
         savedAt INTEGER NOT NULL,
 
-        -- Archival status
-        archivedAt INTEGER,
-
         -- Deletion tracking
         deletedPostAt INTEGER,
         deletedRepostAt INTEGER,
@@ -136,11 +131,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         fullsizeUrl TEXT,
         playlistUrl TEXT,
 
-        -- Local storage
-        localThumbPath TEXT,
-        localFullsizePath TEXT,
-        localVideoPath TEXT,
-
         downloadedAt INTEGER,
 
         FOREIGN KEY (postUri) REFERENCES post(uri),
@@ -163,7 +153,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
       `CREATE TABLE IF NOT EXISTS bookmark (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         subjectUri TEXT NOT NULL UNIQUE,
-        subjectCid TEXT NOT NULL,
 
         -- Denormalized post info for display
         postAuthorDid TEXT,
@@ -187,7 +176,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         handle TEXT NOT NULL,
         displayName TEXT,
         avatarUrl TEXT,
-        avatarLocalPath TEXT,
 
         createdAt TEXT NOT NULL,
         savedAt INTEGER NOT NULL,
@@ -209,8 +197,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
 
         -- Status
         muted INTEGER NOT NULL DEFAULT 0,
-        status TEXT,
-        unreadCount INTEGER DEFAULT 0,
 
         -- Last message preview
         lastMessageId TEXT,
@@ -238,11 +224,6 @@ export const blueskyAccountMigrations: AccountMigration[] = [
         text TEXT NOT NULL,
         facetsJSON TEXT,
         embedJSON TEXT,
-        reactionsJSON TEXT,
-
-        -- Embedded post (record) denormalized keys for easy lookup
-        embeddedPostUri TEXT,
-        embeddedPostCid TEXT,
 
         sentAt TEXT NOT NULL,
         savedAt INTEGER NOT NULL,

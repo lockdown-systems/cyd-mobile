@@ -152,7 +152,6 @@ export type ConversationPreviewData = {
   convoId: string;
   lastMessageText?: string | null;
   lastMessageSentAt?: string | null;
-  unreadCount?: number;
   muted?: boolean;
   members: ProfileData[];
 };
@@ -169,9 +168,7 @@ export type MessagePreviewData = {
   deletedAt?: string | null;
   sender: ProfileData;
   embed?: Record<string, unknown> | null;
-  reactions?: unknown[] | null;
   facets?: unknown[] | null;
-  embeddedPost?: PostPreviewData | null;
 };
 
 /**

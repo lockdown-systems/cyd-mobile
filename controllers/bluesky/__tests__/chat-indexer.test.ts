@@ -9,9 +9,7 @@ import {
   createChatMessage,
   createChatMessageWithEmbed,
   createChatMessageWithFacets,
-  createChatMessageWithReactions,
   createConversation,
-  createPostView,
   createProfile,
 } from "@/testUtils/blueskyFixtures";
 import { createMockDatabase } from "@/testUtils/mockDatabase";
@@ -278,30 +276,6 @@ describe("ChatIndexer", () => {
 
     it("should handle messages with embedded posts", async () => {
       const messages = [createChatMessageWithEmbed()];
-      const embeddedPost = createPostView({
-        record: { text: "Embedded post content" },
-      });
-
-      (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
-        { convoId: "convo1" },
-      ]);
-      (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
-        messages,
-        cursor: undefined,
-      });
-      (mockAgent.app!.bsky.feed.getPosts as jest.Mock).mockResolvedValue({
-        posts: [embeddedPost],
-      });
-
-      const indexer = new ChatIndexer(deps);
-      await indexer.indexChatMessages();
-
-      // Should have fetched the embedded post
-      expect(mockAgent.app!.bsky.feed.getPosts).toHaveBeenCalled();
-    });
-
-    it("should handle messages with reactions", async () => {
-      const messages = [createChatMessageWithReactions(["❤️", "👍", "😂"])];
 
       (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
         { convoId: "convo1" },
@@ -314,7 +288,7 @@ describe("ChatIndexer", () => {
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatMessages();
 
-      // Should save message with reactionsJSON
+      // Should save message with embedJSON
       const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
       const messageInsert = runAsyncCalls.find(
         (call) =>
@@ -324,11 +298,11 @@ describe("ChatIndexer", () => {
       );
       expect(messageInsert).toBeDefined();
 
-      // Check that reactionsJSON is saved
+      // Check that embedJSON is saved
       const params = messageInsert[1];
-      const reactionsIndex = 7; // reactionsJSON position
-      expect(params[reactionsIndex]).toBeTruthy();
-      expect(() => JSON.parse(params[reactionsIndex])).not.toThrow();
+      const embedIndex = 6; // embedJSON position
+      expect(params[embedIndex]).toBeTruthy();
+      expect(() => JSON.parse(params[embedIndex])).not.toThrow();
     });
 
     it("should paginate through message pages", async () => {
@@ -398,7 +372,6 @@ describe("ChatIndexer", () => {
     });
 
     it("should handle messages with all features combined", async () => {
-      const embeddedPost = createPostView();
       const message: ReturnType<typeof createChatMessage> = {
         ...createChatMessageWithFacets(),
         embed: {
@@ -415,10 +388,6 @@ describe("ChatIndexer", () => {
             indexedAt: new Date().toISOString(),
           },
         },
-        reactions: [
-          { emoji: "❤️", count: 5, viewer: { reacted: true } },
-          { emoji: "👍", count: 3, viewer: { reacted: false } },
-        ],
       };
 
       (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
@@ -428,15 +397,25 @@ describe("ChatIndexer", () => {
         messages: [message],
         cursor: undefined,
       });
-      (mockAgent.app!.bsky.feed.getPosts as jest.Mock).mockResolvedValue({
-        posts: [embeddedPost],
-      });
 
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatMessages();
 
       expect(mockDb.runAsync).toHaveBeenCalled();
-      expect(mockAgent.app!.bsky.feed.getPosts).toHaveBeenCalled();
+
+      // Verify message was saved with facets and embed
+      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
+      const messageInsert = runAsyncCalls.find(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("INSERT") &&
+          call[0].includes("message")
+      );
+      expect(messageInsert).toBeDefined();
+
+      const params = messageInsert[1];
+      expect(params[5]).toBeTruthy(); // facetsJSON
+      expect(params[6]).toBeTruthy(); // embedJSON
     });
 
     it("should handle errors gracefully", async () => {

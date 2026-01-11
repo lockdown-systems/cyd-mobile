@@ -15,13 +15,10 @@ import { ConversationPreview } from "@/components/ConversationPreview";
 import { MessagePreview } from "@/components/MessagePreview";
 import type {
   ConversationPreviewData,
-  MediaAttachment,
   MessagePreviewData,
-  PostPreviewData,
   ProfileData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
-import { extractEmbeddedPostFromJson } from "@/utils/embeddedPost";
 
 import { BrowsePlaceholderCard } from "./BrowsePlaceholderCard";
 import { type DeletedFilter, fetchAccountMeta, openAccountDb } from "./shared";
@@ -44,8 +41,6 @@ type ConversationRow = {
   convoId: string;
   memberDids: string; // JSON array
   muted: number;
-  status: string | null;
-  unreadCount: number;
   lastMessageText: string | null;
   lastMessageSentAt: string | null;
   lastMessageSenderDid: string | null;
@@ -70,9 +65,7 @@ type MessageRow = {
   displayName: string | null;
   avatarUrl: string | null;
   embedJSON: string | null;
-  reactionsJSON: string | null;
   facetsJSON: string | null;
-  embeddedPostUri: string | null;
 };
 
 export function BrowseMessages({
@@ -120,7 +113,7 @@ export function BrowseMessages({
 
       const db = await openAccountDb(meta.uuid);
       const convoRows = await db.getAllAsync<ConversationRow>(
-        `SELECT convoId, memberDids, muted, status, unreadCount,
+        `SELECT convoId, memberDids, muted,
                 lastMessageText, lastMessageSentAt, lastMessageSenderDid
          FROM conversation
          ORDER BY updatedAt DESC;`
@@ -182,7 +175,6 @@ export function BrowseMessages({
           convoId: row.convoId,
           lastMessageText: row.lastMessageText,
           lastMessageSentAt: row.lastMessageSentAt,
-          unreadCount: row.unreadCount,
           muted: row.muted === 1,
           members,
         } satisfies ConversationPreviewData;
@@ -214,7 +206,7 @@ export function BrowseMessages({
 
       const rows = await db.getAllAsync<MessageRow>(
         `SELECT m.messageId, m.convoId, m.text, m.sentAt, m.savedAt, m.deletedAt, m.senderDid,
-          m.embedJSON, m.reactionsJSON, m.facetsJSON, m.embeddedPostUri,
+          m.embedJSON, m.facetsJSON,
                 p.handle, p.displayName, p.avatarUrl
          FROM message m
          LEFT JOIN profile p ON p.did = m.senderDid
@@ -223,127 +215,6 @@ export function BrowseMessages({
         [convoId]
       );
 
-      const embeddedUris = Array.from(
-        new Set(
-          rows
-            .map((r) => r.embeddedPostUri)
-            .filter((uri): uri is string => typeof uri === "string")
-        )
-      );
-
-      const postMap = new Map<string, PostPreviewData>();
-
-      if (embeddedUris.length > 0) {
-        const placeholders = embeddedUris.map(() => "?").join(",");
-
-        type EmbeddedPostRow = {
-          uri: string;
-          cid: string;
-          text: string;
-          createdAt: string;
-          savedAt: number | null;
-          deletedPostAt: number | null;
-          deletedRepostAt: number | null;
-          deletedLikeAt: number | null;
-          deletedBookmarkAt: number | null;
-          authorDid: string;
-          embedJSON: string | null;
-          quotedPostUri: string | null;
-          likeCount: number | null;
-          repostCount: number | null;
-          replyCount: number | null;
-          quoteCount: number | null;
-          handle: string | null;
-          displayName: string | null;
-          avatarUrl: string | null;
-        };
-
-        const postRows = await db.getAllAsync<EmbeddedPostRow>(
-          `SELECT p.uri, p.cid, p.text, p.createdAt, p.savedAt,
-              p.deletedPostAt, p.deletedRepostAt, p.deletedLikeAt, p.deletedBookmarkAt,
-              p.authorDid,
-              p.likeCount, p.repostCount, p.replyCount, p.quoteCount,
-                  p.embedJSON, p.quotedPostUri,
-                  prof.handle, prof.displayName, prof.avatarUrl
-           FROM post p
-           LEFT JOIN profile prof ON prof.did = p.authorDid
-           WHERE p.uri IN (${placeholders});`,
-          embeddedUris
-        );
-
-        const mediaRows = await db.getAllAsync<{
-          postUri: string;
-          position: number;
-          mediaType: string;
-          thumbUrl: string | null;
-          fullsizeUrl: string | null;
-          playlistUrl: string | null;
-          localThumbPath: string | null;
-          localFullsizePath: string | null;
-          alt: string | null;
-          width: number | null;
-          height: number | null;
-        }>(
-          `SELECT postUri, position, mediaType, thumbUrl, fullsizeUrl, playlistUrl,
-                  localThumbPath, localFullsizePath, alt, width, height
-           FROM post_media
-           WHERE postUri IN (${placeholders})
-           ORDER BY postUri, position ASC;`,
-          embeddedUris
-        );
-
-        const mediaByPost = new Map<string, MediaAttachment[]>();
-        for (const m of mediaRows) {
-          const arr = mediaByPost.get(m.postUri) ?? [];
-          arr.push({
-            type: m.mediaType === "video" ? "video" : "image",
-            thumbUrl: m.localThumbPath ?? m.thumbUrl ?? undefined,
-            fullsizeUrl: m.localFullsizePath ?? m.fullsizeUrl ?? undefined,
-            playlistUrl: m.playlistUrl ?? undefined,
-            alt: m.alt ?? undefined,
-            width: m.width ?? undefined,
-            height: m.height ?? undefined,
-          });
-          mediaByPost.set(m.postUri, arr);
-        }
-
-        for (const p of postRows) {
-          const savedAtMs =
-            typeof p.savedAt === "number" ? p.savedAt : Date.parse(p.createdAt);
-          const deletedAtEpoch =
-            p.deletedPostAt ??
-            p.deletedRepostAt ??
-            p.deletedLikeAt ??
-            p.deletedBookmarkAt ??
-            null;
-
-          const deletedAtMs =
-            typeof deletedAtEpoch === "number" ? deletedAtEpoch : null;
-
-          postMap.set(p.uri, {
-            uri: p.uri,
-            cid: p.cid,
-            text: p.text,
-            createdAt: p.createdAt,
-            savedAt: new Date(savedAtMs || Date.now()).toISOString(),
-            deletedAt: deletedAtMs ? new Date(deletedAtMs).toISOString() : null,
-            author: {
-              did: p.authorDid,
-              handle: p.handle ?? "unknown",
-              displayName: p.displayName,
-              avatarUrl: p.avatarUrl ?? undefined,
-            },
-            likeCount: p.likeCount,
-            repostCount: p.repostCount,
-            replyCount: p.replyCount,
-            quoteCount: p.quoteCount,
-            quotedPostUri: p.quotedPostUri,
-            quotedPost: extractEmbeddedPostFromJson(p.embedJSON, p.createdAt),
-            media: mediaByPost.get(p.uri),
-          });
-        }
-      }
-
       const parseUnknown = (value?: string | null): unknown => {
         if (!value) return null;
         try {
@@ -351,11 +222,6 @@ export function BrowseMessages({
         } catch {
           return null;
         }
-      };
-
-      const parseUnknownArray = (value?: string | null): unknown[] | null => {
-        const parsed = parseUnknown(value);
-        return Array.isArray(parsed) ? parsed : null;
       };
 
       const parseEmbed = (
@@ -390,12 +256,7 @@ export function BrowseMessages({
             avatarUrl: row.avatarUrl ?? undefined,
           },
           embed: parseEmbed(row.embedJSON),
-          reactions: parseUnknownArray(row.reactionsJSON),
           facets: parseUnknown(row.facetsJSON) as unknown[] | null,
-          embeddedPost:
-            row.embeddedPostUri && postMap.has(row.embeddedPostUri)
-              ? (postMap.get(row.embeddedPostUri) ?? null)
-              : null,
         };
       });
 

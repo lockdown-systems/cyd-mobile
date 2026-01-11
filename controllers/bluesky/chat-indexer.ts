@@ -249,17 +249,15 @@ export class ChatIndexer {
 
       await db.runAsync(
         `INSERT OR REPLACE INTO conversation (
-          convoId, rev, memberDids, muted, status, unreadCount,
+          convoId, rev, memberDids, muted,
           lastMessageId, lastMessageText, lastMessageSentAt, lastMessageSenderDid,
           savedAt, updatedAt, leftAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           convo.id,
           convo.rev ?? null,
           memberDids,
           convo.muted ? 1 : 0,
-          (convo as { status?: string }).status ?? null,
-          convo.unreadCount ?? 0,
           lastMsg?.id ?? null,
           lastMsg?.text ?? null,
           lastMsg?.sentAt ?? null,
@@ -338,7 +336,6 @@ export class ChatIndexer {
             sender?: { did?: string };
             facets?: unknown[];
             embed?: unknown;
-            reactions?: unknown[];
           }
         | undefined;
 
@@ -347,12 +344,10 @@ export class ChatIndexer {
         continue;
       }
 
-      const embeddedInfo = this.extractEmbeddedRecordInfo(msg.embed);
-
       await db.runAsync(
         `INSERT OR REPLACE INTO message (
-          messageId, convoId, rev, senderDid, text, facetsJSON, embedJSON, reactionsJSON, embeddedPostUri, embeddedPostCid, sentAt, savedAt, deletedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          messageId, convoId, rev, senderDid, text, facetsJSON, embedJSON, sentAt, savedAt, deletedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           msg.id ?? null,
           convoId,
@@ -361,19 +356,11 @@ export class ChatIndexer {
           msg.text,
           msg.facets ? JSON.stringify(msg.facets) : null,
           msg.embed ? JSON.stringify(msg.embed) : null,
-          msg.reactions ? JSON.stringify(msg.reactions) : null,
-          embeddedInfo?.uri ?? null,
-          embeddedInfo?.cid ?? null,
           msg.sentAt ?? null,
           now,
           null,
         ]
       );
-
-      // If the message embeds a post, fetch the full post view (counts + media) and persist it
-      if (embeddedInfo?.uri) {
-        await this.persistEmbeddedRecord(db, embeddedInfo.uri);
-      }
 
       // Save sender profile. If the sender object includes handle, save it directly.
       // Otherwise, check if we have the profile in DB; if not, fetch from API.
@@ -423,46 +410,6 @@ export class ChatIndexer {
     return savedCount;
   }
 
-  /**
-   * Persist an embedded record (post) found inside a chat message embed
-   */
-  private extractEmbeddedRecordInfo(
-    embed: unknown
-  ): { uri?: string; cid?: string } | null {
-    if (!embed || typeof embed !== "object") return null;
-    const embedObj = embed as Record<string, unknown>;
-    const record = embedObj.record as Record<string, unknown> | undefined;
-    if (record && typeof record.uri === "string") {
-      return {
-        uri: record.uri,
-        cid: typeof record.cid === "string" ? record.cid : undefined,
-      };
-    }
-    return null;
-  }
-
-  private async persistEmbeddedRecord(
-    db: SQLiteDatabase,
-    uri: string
-  ): Promise<void> {
-    try {
-      const agent = this.requireAgent();
-      const response = await this.deps.makeApiRequest(() =>
-        agent.app.bsky.feed.getPosts({ uris: [uri] })
-      );
-
-      const postView = response?.posts?.[0];
-      if (postView) {
-        await this.postPersistence.persistPostView(db, postView);
-      }
-    } catch (error) {
-      console.warn("[ChatIndexer] Failed to persist embedded post", {
-        uri,
-        error,
-      });
-    }
-  }
-
   private requireDb(): SQLiteDatabase {
     const db = this.deps.getDb();
     if (!db) {
@@ -502,7 +449,6 @@ export class ChatIndexer {
       convoId: convo.id,
       lastMessageText: lastMsg?.text ?? null,
       lastMessageSentAt: lastMsg?.sentAt ?? null,
-      unreadCount: convo.unreadCount ?? 0,
       muted: convo.muted ?? false,
       members,
     };
@@ -526,7 +472,6 @@ export class ChatIndexer {
           };
           embed?: unknown;
           facets?: unknown[];
-          reactions?: unknown[];
         }
       | undefined;
 
@@ -560,7 +505,6 @@ export class ChatIndexer {
       sender,
       embed: (msg.embed as Record<string, unknown> | null) ?? null,
       facets: msg.facets ?? null,
-      reactions: msg.reactions ?? null,
     };
   }
 }

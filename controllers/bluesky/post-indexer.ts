@@ -357,8 +357,6 @@ export class PostIndexer {
 
         const subjectUri =
           (item as { subject?: { uri?: string } }).subject?.uri ?? postView.uri;
-        const subjectCid =
-          (item as { subject?: { cid?: string } }).subject?.cid ?? postView.cid;
         const authorDid = postView.author.did ?? null;
         const authorHandle = postView.author.handle ?? null;
         const postCreatedAt =
@@ -367,12 +365,11 @@ export class PostIndexer {
 
         await db.runAsync(
           `INSERT INTO bookmark (
-            subjectUri, subjectCid,
+            subjectUri,
             postAuthorDid, postAuthorHandle, postText, postCreatedAt,
             savedAt, deletedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, NULL)
           ON CONFLICT(subjectUri) DO UPDATE SET
-            subjectCid = excluded.subjectCid,
             postAuthorDid = excluded.postAuthorDid,
             postAuthorHandle = excluded.postAuthorHandle,
             postText = excluded.postText,
@@ -381,7 +378,6 @@ export class PostIndexer {
             deletedAt = NULL;`,
           [
             subjectUri,
-            subjectCid,
             authorDid,
             authorHandle,
             persistedPost.text,
