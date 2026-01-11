@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { Directory, Paths } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
@@ -25,6 +25,7 @@ export function buildAccountPaths(accountType: string, accountUUID: string) {
     // Relative path so SQLite writes to Documents/accounts/... instead of Documents/SQLite/
     dbPathForSQLite: `../accounts/${accountType}-${accountUUID}/data.db`,
     mediaDir: `${accountDir}media/`,
+    metadataPath: `${accountDir}metadata.json`,
   } as const;
 }
 
@@ -160,6 +161,20 @@ export abstract class BaseAccountController<TProgress = unknown> {
   protected async ensureAccountDirectory(): Promise<void> {
     const accountDir = this.getAccountDirectory();
     await ensureDirectoryExists(accountDir);
+  }
+
+  /**
+   * Write metadata.json to the account directory
+   */
+  protected async writeMetadata(): Promise<void> {
+    await this.ensureAccountDirectory();
+    const paths = buildAccountPaths(this.getAccountType(), this.accountUUID);
+    const metadataFile = new File(paths.metadataPath);
+    const metadata = {
+      type: this.getAccountType(),
+      uuid: this.accountUUID,
+    };
+    metadataFile.write(JSON.stringify(metadata, null, 2));
   }
 
   /**

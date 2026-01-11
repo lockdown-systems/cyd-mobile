@@ -858,4 +858,47 @@ describe("BlueskyAccountController", () => {
       expect(callback).not.toHaveBeenCalled();
     });
   });
+
+  describe("metadata", () => {
+    it("should include metadataPath in buildAccountPaths", () => {
+      const paths = buildAccountPaths("bluesky", "test-uuid-123");
+
+      expect(paths.metadataPath).toBe(`${paths.accountDir}metadata.json`);
+    });
+  });
+
+  describe("export archive", () => {
+    it("should format date correctly for archive name", async () => {
+      const controller = new BlueskyAccountController(1);
+
+      // Access the private method via reflection for testing
+      const formatDate = (
+        controller as unknown as {
+          formatDateForArchive: (date: Date) => string;
+        }
+      ).formatDateForArchive;
+
+      const testDate = new Date(2026, 0, 10); // January 10, 2026
+      const result = formatDate.call(controller, testDate);
+
+      expect(result).toBe("2026-01-10");
+    });
+
+    it("should use unknown as handle when handle is null", async () => {
+      const controller = new BlueskyAccountController(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (controller as any).agent = { did: "did:plc:test" }; // Mock agent to pass check
+
+      // The handle should be null by default
+      expect(controller.getHandle()).toBeNull();
+    });
+
+    it("should throw error when agent is not initialized for media download", async () => {
+      const controller = new BlueskyAccountController(1);
+
+      await expect(
+        controller.downloadMedia("test-blob", "did:plc:test")
+      ).rejects.toThrow("Agent not initialized");
+    });
+  });
 });

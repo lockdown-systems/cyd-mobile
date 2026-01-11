@@ -1,7 +1,9 @@
 import { Agent, type AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
 import { Directory, File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import type { SQLiteDatabase } from "expo-sqlite";
+import { zip } from "react-native-zip-archive";
 
 import { getDatabase } from "@/database";
 import {
@@ -147,6 +149,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     console.log("[BlueskyController] initDB -> start", this.accountId);
     this.db = await this.openAccountDatabase();
     applyAccountMigrations(this.db, blueskyAccountMigrations);
+    await this.writeMetadata();
     await this.updateAccessedAt();
     console.log("[BlueskyController] initDB -> done", this.accountId);
   }
@@ -1348,6 +1351,111 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       throw err instanceof Error
         ? err
         : new Error("Unable to delete account storage");
+    }
+  }
+
+  /**
+   * Format a date as YYYY-MM-DD
+   */
+  private formatDateForArchive(date: Date): string {
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const year = String(date.getFullYear());
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Export the account data as a zip archive and share it.
+   * The zip file will be named Cyd-archive_{YYYY-MM-DD}_Bluesky_{handle}.zip
+   * and when extracted will create a folder with the same base name.
+   */
+  async exportArchive(): Promise<void> {
+    const handle = this.handle ?? "unknown";
+    const dateStr = this.formatDateForArchive(new Date());
+    const archiveBaseName = `Cyd-archive_${dateStr}_Bluesky_${handle}`;
+    const zipFileName = `${archiveBaseName}.zip`;
+
+    const accountPaths = buildAccountPaths(
+      this.getAccountType(),
+      this.getAccountUUID()
+    );
+
+    // Create a temporary directory for the archive contents
+    const cacheBase = Paths.cache?.uri ?? accountPaths.base;
+    const tempDir = new Directory(cacheBase, archiveBaseName);
+    const tempZipPath = `${cacheBase}${zipFileName}`;
+
+    try {
+      // Create the temp directory with the archive name
+      if (tempDir.exists) {
+        tempDir.delete();
+      }
+      tempDir.create({ intermediates: true, idempotent: true });
+
+      // Copy files from account directory to temp directory
+      const accountDir = new Directory(accountPaths.accountDir);
+      if (accountDir.exists) {
+        const items = accountDir.list();
+        for (const item of items) {
+          if (item instanceof File) {
+            item.copy(new File(tempDir, item.name));
+          } else if (item instanceof Directory) {
+            // Copy directories recursively
+            this.copyDirectoryRecursive(
+              item,
+              new Directory(tempDir, item.name)
+            );
+          }
+        }
+      }
+
+      // Add exportTimestamp to metadata.json
+      const metadataFile = new File(tempDir, "metadata.json");
+      if (metadataFile.exists) {
+        const metadataContent = await metadataFile.text();
+        const metadata = JSON.parse(metadataContent) as Record<string, unknown>;
+        metadata.exportTimestamp = new Date().toISOString();
+        metadataFile.write(JSON.stringify(metadata, null, 2));
+      }
+
+      // Create the zip archive
+      await zip(tempDir.uri, tempZipPath);
+
+      // Share the zip file
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(tempZipPath, {
+          mimeType: "application/zip",
+          dialogTitle: `Export ${handle} archive`,
+        });
+      } else {
+        throw new Error("Sharing is not available on this device");
+      }
+    } finally {
+      // Clean up temporary files
+      if (tempDir.exists) {
+        tempDir.delete();
+      }
+      const tempZipFile = new File(tempZipPath);
+      if (tempZipFile.exists) {
+        tempZipFile.delete();
+      }
+    }
+  }
+
+  /**
+   * Recursively copy a directory and its contents
+   */
+  private copyDirectoryRecursive(source: Directory, dest: Directory): void {
+    if (!dest.exists) {
+      dest.create({ intermediates: true, idempotent: true });
+    }
+    const items = source.list();
+    for (const item of items) {
+      if (item instanceof File) {
+        item.copy(new File(dest, item.name));
+      } else if (item instanceof Directory) {
+        this.copyDirectoryRecursive(item, new Directory(dest, item.name));
+      }
     }
   }
 

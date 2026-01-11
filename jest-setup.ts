@@ -134,26 +134,76 @@ jest.mock("expo-crypto", () => {
 
 // Mock expo-file-system
 jest.mock("expo-file-system", () => {
+  const fileContents = new Map<string, string>();
+
+  const joinUri = (uris: (string | { uri: string })[]): string =>
+    uris
+      .map((u) => (typeof u === "string" ? u : u.uri))
+      .filter((part) => part.length > 0)
+      .reduce((acc, part, index) => {
+        if (index === 0) return part;
+        if (!acc.endsWith("/") && !part.startsWith("/")) {
+          return `${acc}/${part}`;
+        }
+        if (acc.endsWith("/") && part.startsWith("/")) {
+          return `${acc}${part.slice(1)}`;
+        }
+        return `${acc}${part}`;
+      }, "");
+
   class Directory {
     uri: string;
+    exists: boolean;
+    name: string;
 
-    constructor(base?: { uri?: string } | string, ...paths: string[]) {
-      const baseUri = typeof base === "string" ? base : (base?.uri ?? "");
-      const joined = [baseUri, ...paths].filter(Boolean).join("/");
+    constructor(...uris: (string | { uri: string })[]) {
+      const joined = joinUri(uris);
       this.uri = joined.endsWith("/") ? joined : `${joined}/`;
+      this.exists = true;
+      this.name = this.uri.split("/").filter(Boolean).pop() ?? "";
     }
 
-    get exists() {
-      return true;
+    create = jest.fn(() => {
+      this.exists = true;
+    });
+
+    delete = jest.fn();
+
+    list = jest.fn(() => []);
+  }
+
+  class File {
+    uri: string;
+    exists: boolean;
+    name: string;
+
+    constructor(...uris: (string | { uri: string })[]) {
+      this.uri = joinUri(uris);
+      this.exists = true;
+      this.name = this.uri.split("/").pop() ?? "";
     }
 
-    // Directory operations are no-ops in tests
-    create = jest.fn();
+    write = jest.fn((content: string) => {
+      fileContents.set(this.uri, content);
+    });
+
+    text = jest.fn(() => fileContents.get(this.uri) ?? "");
+
+    copy = jest.fn();
+
+    delete = jest.fn();
+
+    static downloadFileAsync = jest.fn(
+      async (_url: string, to: { uri: string }) => {
+        return { uri: to.uri };
+      }
+    );
   }
 
   const Paths = {
     document: { uri: "file:///mock/document/directory/" },
     cache: { uri: "file:///mock/cache/directory/" },
+    info: jest.fn(() => ({ exists: false, isDirectory: false })),
   };
 
   const downloadAsync = jest.fn((url: string, fileUri: string) =>
@@ -167,6 +217,7 @@ jest.mock("expo-file-system", () => {
     documentDirectory: "/mock/document/directory/",
     cacheDirectory: "/mock/cache/directory/",
     Directory,
+    File,
     Paths,
     makeDirectoryAsync: jest.fn(),
     deleteAsync: jest.fn(),
@@ -174,6 +225,7 @@ jest.mock("expo-file-system", () => {
     downloadAsync,
     readAsStringAsync: jest.fn(),
     writeAsStringAsync: jest.fn(),
+    __mockState: { fileContents },
   };
 });
 
@@ -211,6 +263,18 @@ jest.mock("react-native-svg", () => ({
   Defs: "Defs",
   LinearGradient: "LinearGradient",
   Stop: "Stop",
+}));
+
+// Mock expo-sharing
+jest.mock("expo-sharing", () => ({
+  isAvailableAsync: jest.fn(() => Promise.resolve(true)),
+  shareAsync: jest.fn(() => Promise.resolve()),
+}));
+
+// Mock react-native-zip-archive
+jest.mock("react-native-zip-archive", () => ({
+  zip: jest.fn((source: string, target: string) => Promise.resolve(target)),
+  unzip: jest.fn((source: string, target: string) => Promise.resolve(target)),
 }));
 
 // Silence console warnings in tests

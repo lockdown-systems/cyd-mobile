@@ -181,6 +181,19 @@ export default function AccountPlaceholderScreen() {
     router.replace("/");
   }, [account, handleSignOut, router]);
 
+  const handleExportArchive = useCallback(async () => {
+    if (!account) {
+      throw new Error(
+        "Account information is not available yet. Please try again in a moment."
+      );
+    }
+
+    await runWithAccountController(account, async (controller) => {
+      await controller.initAgent();
+      await controller.exportArchive();
+    });
+  }, [account]);
+
   useEffect(() => {
     if (!account) {
       setAuthStatus("unknown");
@@ -514,6 +527,7 @@ export default function AccountPlaceholderScreen() {
         onReauthenticate={handleReauthenticate}
         onSignOut={handleSignOut}
         onRemoveAccount={handleRemoveAccount}
+        onExportArchive={handleExportArchive}
       />
     </>
   );

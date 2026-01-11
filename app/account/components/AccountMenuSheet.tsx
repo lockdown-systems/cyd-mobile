@@ -12,6 +12,7 @@ export type AccountMenuSheetProps = {
   onSignOut?: () => Promise<void>;
   onReauthenticate?: () => Promise<void>;
   onRemoveAccount?: () => Promise<void>;
+  onExportArchive?: () => Promise<void>;
   authStatus: "authenticated" | "signed_out" | "unknown";
 };
 
@@ -39,6 +40,7 @@ export function AccountMenuSheet({
   onSignOut,
   onReauthenticate,
   onRemoveAccount,
+  onExportArchive,
   authStatus,
 }: AccountMenuSheetProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -104,8 +106,28 @@ export function AccountMenuSheet({
       }
 
       if (item.key === "export-archive") {
-        Alert.alert("TODO: Export Bluesky Archive is not implemented yet.");
-        onClose();
+        if (!onExportArchive) {
+          Alert.alert(
+            "Export unavailable",
+            "This action is not supported here."
+          );
+          onClose();
+          return;
+        }
+
+        setPendingAction(item.key);
+        try {
+          await onExportArchive();
+          onClose();
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Unable to export archive right now.";
+          Alert.alert("Export failed", message);
+        } finally {
+          setPendingAction(null);
+        }
         return;
       }
 
@@ -203,7 +225,14 @@ export function AccountMenuSheet({
       onClose();
       setPendingAction(null);
     },
-    [onClose, onReauthenticate, onRemoveAccount, onSignOut, pendingAction]
+    [
+      onClose,
+      onExportArchive,
+      onReauthenticate,
+      onRemoveAccount,
+      onSignOut,
+      pendingAction,
+    ]
   );
 
   const dangerColor = palette.danger ?? Colors.light.danger;
