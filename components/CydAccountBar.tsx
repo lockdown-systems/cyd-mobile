@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import {
-  Alert,
   Linking,
   Modal,
   Pressable,
@@ -17,9 +16,13 @@ import { CydSignInModal } from "./CydSignInModal";
 
 type CydAccountBarProps = {
   bottomInset?: number;
+  onImportArchive?: () => void;
 };
 
-export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
+export function CydAccountBar({
+  bottomInset = 0,
+  onImportArchive,
+}: CydAccountBarProps) {
   const colorScheme = useColorScheme() ?? "light";
   const palette = Colors[colorScheme];
   const { state, signOut, getDashboardURL } = useCydAccount();
@@ -59,12 +62,13 @@ export function CydAccountBar({ bottomInset = 0 }: CydAccountBarProps) {
 
   const handleImportBlueskyAccount = useCallback(() => {
     setMenuVisible(false);
-    Alert.alert(
-      "Not Implemented",
-      "Import Bluesky archive is not yet implemented.",
-      [{ text: "OK" }]
-    );
-  }, []);
+    if (onImportArchive) {
+      // Delay to allow the modal to fully close before opening the document picker
+      setTimeout(() => {
+        onImportArchive();
+      }, 350);
+    }
+  }, [onImportArchive]);
 
   if (state.isLoading) {
     return null;
