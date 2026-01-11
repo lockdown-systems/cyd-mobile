@@ -1,5 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { Colors } from "@/constants/theme";
 
@@ -44,6 +52,7 @@ export function AccountMenuSheet({
   authStatus,
 }: AccountMenuSheetProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const items = useMemo<SettingsItem[]>(
     () => [
       {
@@ -116,6 +125,7 @@ export function AccountMenuSheet({
         }
 
         setPendingAction(item.key);
+        setIsExporting(true);
         try {
           await onExportArchive();
           onClose();
@@ -126,6 +136,7 @@ export function AccountMenuSheet({
               : "Unable to export archive right now.";
           Alert.alert("Export failed", message);
         } finally {
+          setIsExporting(false);
           setPendingAction(null);
         }
         return;
@@ -313,6 +324,18 @@ export function AccountMenuSheet({
           })}
         </View>
       </View>
+      {isExporting && (
+        <View style={styles.exportingOverlay}>
+          <View
+            style={[styles.exportingModal, { backgroundColor: palette.card }]}
+          >
+            <ActivityIndicator size="large" color={palette.tint} />
+            <Text style={[styles.exportingText, { color: palette.text }]}>
+              Preparing archive...
+            </Text>
+          </View>
+        </View>
+      )}
     </Modal>
   );
 }
@@ -359,6 +382,23 @@ const styles = StyleSheet.create({
   separator: {
     borderTopWidth: StyleSheet.hairlineWidth,
     marginVertical: 4,
+  },
+  exportingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  exportingModal: {
+    borderRadius: 16,
+    padding: 32,
+    alignItems: "center",
+    gap: 16,
+    minWidth: 200,
+  },
+  exportingText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 
