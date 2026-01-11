@@ -329,3 +329,83 @@ export async function setLastSavedAt(
     [ts, accountId]
   );
 }
+
+/**
+ * Get the timestamp of when data was last deleted for an account.
+ * @param accountId The account ID
+ * @returns The timestamp in milliseconds, or null if never deleted
+ */
+export async function getLastDeletedAt(
+  accountId: number
+): Promise<number | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ lastDeletedAt: number | null }>(
+    `SELECT b.lastDeletedAt
+     FROM account a
+     INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+     WHERE a.id = ?
+     LIMIT 1;`,
+    [accountId]
+  );
+  return row?.lastDeletedAt ?? null;
+}
+
+/**
+ * Update the last deleted timestamp for an account.
+ * @param accountId The account ID
+ * @param timestamp Optional timestamp in milliseconds; defaults to now
+ */
+export async function setLastDeletedAt(
+  accountId: number,
+  timestamp?: number
+): Promise<void> {
+  const db = await getDatabase();
+  const ts = timestamp ?? Date.now();
+  await db.runAsync(
+    `UPDATE bsky_account
+     SET lastDeletedAt = ?
+     WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
+    [ts, accountId]
+  );
+}
+
+/**
+ * Get the timestamp of when scheduled deletion was last run for an account.
+ * @param accountId The account ID
+ * @returns The timestamp in milliseconds, or null if never run
+ */
+export async function getLastScheduledDeletionAt(
+  accountId: number
+): Promise<number | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{
+    lastScheduledDeletionAt: number | null;
+  }>(
+    `SELECT b.lastScheduledDeletionAt
+     FROM account a
+     INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+     WHERE a.id = ?
+     LIMIT 1;`,
+    [accountId]
+  );
+  return row?.lastScheduledDeletionAt ?? null;
+}
+
+/**
+ * Update the last scheduled deletion timestamp for an account.
+ * @param accountId The account ID
+ * @param timestamp Optional timestamp in milliseconds; defaults to now
+ */
+export async function setLastScheduledDeletionAt(
+  accountId: number,
+  timestamp?: number
+): Promise<void> {
+  const db = await getDatabase();
+  const ts = timestamp ?? Date.now();
+  await db.runAsync(
+    `UPDATE bsky_account
+     SET lastScheduledDeletionAt = ?
+     WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
+    [ts, accountId]
+  );
+}

@@ -10,6 +10,7 @@ import {
 
 import { FinishedModal } from "@/app/account/components/FinishedModal";
 import { SaveAutomationModal } from "@/app/account/components/SaveAutomationModal";
+import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { useCydAccount } from "@/contexts";
 import type {
   BlueskyJobRecord,
@@ -247,6 +248,7 @@ export function SaveTab({
     <View style={styles.container}>
       {currentScreen === "form" && (
         <SaveOptionsForm
+          accountId={accountId}
           handle={handle}
           palette={palette}
           state={state}
@@ -312,6 +314,7 @@ export function SaveTab({
 }
 
 type SaveOptionsFormProps = {
+  accountId: number;
   handle: string;
   palette: AccountTabPalette;
   state: SaveOptionState | null;
@@ -326,6 +329,7 @@ type SaveOptionsFormProps = {
 };
 
 function SaveOptionsForm({
+  accountId,
   handle,
   palette,
   state,
@@ -433,6 +437,12 @@ function SaveOptionsForm({
             })}
           </View>
         )}
+
+        <LastActionTimestamp
+          accountId={accountId}
+          palette={palette}
+          actionType="save"
+        />
       </ScrollView>
       <View
         style={[

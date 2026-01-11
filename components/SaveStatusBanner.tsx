@@ -59,7 +59,7 @@ export function SaveStatusBanner({
         <View style={styles.topRow}>
           <View style={styles.contentContainer}>
             <Text style={[styles.messageText, { color: palette.text }]}>
-              You need to save data before you can delete it.
+              You need to save your data before you can delete it.
             </Text>
             <View style={styles.buttonColumn}>
               <Pressable
@@ -79,7 +79,7 @@ export function SaveStatusBanner({
                     { color: palette.button?.text ?? "#ffffff" },
                   ]}
                 >
-                  Go to Save Tab
+                  Save Data
                 </Text>
               </Pressable>
             </View>

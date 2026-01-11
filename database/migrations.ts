@@ -68,4 +68,16 @@ export const migrations: Migration[] = [
       `INSERT OR IGNORE INTO cyd_account (id) VALUES (1);`,
     ],
   },
+  {
+    version: 2,
+    name: "add lastDeletedAt column",
+    statements: [`ALTER TABLE bsky_account ADD COLUMN lastDeletedAt INTEGER;`],
+  },
+  {
+    version: 3,
+    name: "add lastScheduledDeletionAt column",
+    statements: [
+      `ALTER TABLE bsky_account ADD COLUMN lastScheduledDeletionAt INTEGER;`,
+    ],
+  },
 ];

@@ -18,6 +18,7 @@ import {
 
 import { DeleteAutomationModal } from "@/app/account/components/DeleteAutomationModal";
 import { FinishedModal } from "@/app/account/components/FinishedModal";
+import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PostsToDeleteReviewModal } from "@/components/PostsToDeleteReviewModal";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { PremiumRequiredModal } from "@/components/PremiumRequiredModal";
@@ -26,7 +27,7 @@ import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { BlueskyAccountController } from "@/controllers";
 import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
-import { getLastSavedAt } from "@/database/accounts";
+import { getLastSavedAt, setLastDeletedAt } from "@/database/accounts";
 import {
   getAccountDeleteSettings,
   updateAccountDeleteSettings,
@@ -253,6 +254,11 @@ export function DeleteTab({
     (result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
       // Submit progress to the server regardless of success/failure
       void submitBlueskyProgress(apiClient, accountId, accountUUID);
+
+      // Update last deleted timestamp on successful completion
+      if (result === "completed") {
+        void setLastDeletedAt(accountId, Date.now());
+      }
 
       if (!automationCancelledRef.current) {
         setAutomationVisible(false);
@@ -683,6 +689,13 @@ function DeleteOptionsForm({
             ) : null}
           </>
         )}
+
+        <LastActionTimestamp
+          accountId={accountId}
+          palette={palette}
+          actionType="delete"
+          refreshKey={refreshKey}
+        />
       </ScrollView>
 
       {hasSavedData && (
