@@ -52,7 +52,10 @@ describe("ChatIndexer", () => {
       getAgent: () => mockAgent as Agent,
       getDid: () => "did:plc:testuser",
       updateProgress: jest.fn((update) => updateProgressCalls.push(update)),
-      makeApiRequest: jest.fn((fn) => fn()),
+      makeApiRequest: jest.fn(async (fn) => {
+        const result = await fn();
+        return result.data;
+      }),
       downloadMediaFromUrl: jest.fn(async (url: string) => {
         downloadedUrls.push(url);
         return `/local/path/${encodeURIComponent(url)}`;
@@ -97,7 +100,8 @@ describe("ChatIndexer", () => {
       await indexer.indexChatConvos();
 
       // Should have called runAsync for each conversation
-      expect(mockDb.runAsync).toHaveBeenCalled();
+      const runAsyncMock = jest.mocked(mockDb.runAsync.bind(mockDb));
+      expect(runAsyncMock).toHaveBeenCalled();
 
       // Should update progress
       const lastProgress = updateProgressCalls[updateProgressCalls.length - 1];
@@ -123,7 +127,10 @@ describe("ChatIndexer", () => {
       await indexer.indexChatConvos();
 
       // Should have called API twice
-      expect(mockAgent.chat!.bsky.convo.listConvos).toHaveBeenCalledTimes(2);
+      const listConvosMock = jest.mocked(
+        mockAgent.chat!.bsky.convo.listConvos.bind(mockAgent.chat!.bsky.convo)
+      );
+      expect(listConvosMock).toHaveBeenCalledTimes(2);
     });
 
     it("should save member profiles from conversations", async () => {
@@ -149,9 +156,10 @@ describe("ChatIndexer", () => {
       await indexer.indexChatConvos();
 
       // Should have saved profile information
-      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
+        .calls as unknown[][];
       const profileInserts = runAsyncCalls.filter(
-        (call) =>
+        (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
           call[0].includes("profile")
@@ -174,7 +182,8 @@ describe("ChatIndexer", () => {
       await indexer.indexChatConvos();
 
       // Should save both conversations with correct muted flag
-      expect(mockDb.runAsync).toHaveBeenCalled();
+      const runAsyncMock = jest.mocked(mockDb.runAsync.bind(mockDb));
+      expect(runAsyncMock).toHaveBeenCalled();
     });
 
     it("should handle errors gracefully", async () => {
@@ -235,10 +244,11 @@ describe("ChatIndexer", () => {
       await indexer.indexChatMessages();
 
       // Should have saved messages from both conversations
-      expect(mockDb.runAsync).toHaveBeenCalled();
+      const runAsyncMock = jest.mocked(mockDb.runAsync.bind(mockDb));
+      expect(runAsyncMock).toHaveBeenCalled();
       const lastProgress = updateProgressCalls[updateProgressCalls.length - 1];
       expect(lastProgress).toMatchObject({
-        currentAction: expect.stringContaining("Finished saving"),
+        currentAction: expect.stringContaining("Finished saving") as unknown,
         isRunning: false,
       });
     });
@@ -258,9 +268,10 @@ describe("ChatIndexer", () => {
       await indexer.indexChatMessages();
 
       // Should save message with facetsJSON
-      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
+        .calls as unknown[][];
       const messageInsert = runAsyncCalls.find(
-        (call) =>
+        (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
           call[0].includes("message")
@@ -268,10 +279,12 @@ describe("ChatIndexer", () => {
       expect(messageInsert).toBeDefined();
 
       // Check that facetsJSON is saved
-      const params = messageInsert[1];
+      const params = messageInsert![1] as string[];
       const facetsIndex = 5; // facetsJSON position
       expect(params[facetsIndex]).toBeTruthy();
-      expect(() => JSON.parse(params[facetsIndex])).not.toThrow();
+      expect(() => {
+        JSON.parse(params[facetsIndex]);
+      }).not.toThrow();
     });
 
     it("should handle messages with embedded posts", async () => {
@@ -289,9 +302,10 @@ describe("ChatIndexer", () => {
       await indexer.indexChatMessages();
 
       // Should save message with embedJSON
-      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
+        .calls as unknown[][];
       const messageInsert = runAsyncCalls.find(
-        (call) =>
+        (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
           call[0].includes("message")
@@ -299,10 +313,12 @@ describe("ChatIndexer", () => {
       expect(messageInsert).toBeDefined();
 
       // Check that embedJSON is saved
-      const params = messageInsert[1];
+      const params = messageInsert![1] as string[];
       const embedIndex = 6; // embedJSON position
       expect(params[embedIndex]).toBeTruthy();
-      expect(() => JSON.parse(params[embedIndex])).not.toThrow();
+      expect(() => {
+        JSON.parse(params[embedIndex]);
+      }).not.toThrow();
     });
 
     it("should paginate through message pages", async () => {
@@ -324,7 +340,10 @@ describe("ChatIndexer", () => {
       await indexer.indexChatMessages();
 
       // Should have called getMessages twice
-      expect(mockAgent.chat!.bsky.convo.getMessages).toHaveBeenCalledTimes(2);
+      const getMessagesMock = jest.mocked(
+        mockAgent.chat!.bsky.convo.getMessages.bind(mockAgent.chat!.bsky.convo)
+      );
+      expect(getMessagesMock).toHaveBeenCalledTimes(2);
     });
 
     it("should handle no conversations", async () => {
@@ -361,9 +380,10 @@ describe("ChatIndexer", () => {
       await indexer.indexChatMessages();
 
       // Should have saved sender profile
-      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
+        .calls as unknown[][];
       const profileInserts = runAsyncCalls.filter(
-        (call) =>
+        (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
           call[0].includes("profile")
@@ -401,19 +421,20 @@ describe("ChatIndexer", () => {
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatMessages();
 
-      expect(mockDb.runAsync).toHaveBeenCalled();
+      expect(jest.mocked(mockDb.runAsync.bind(mockDb))).toHaveBeenCalled();
 
       // Verify message was saved with facets and embed
-      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
+        .calls as unknown[][];
       const messageInsert = runAsyncCalls.find(
-        (call) =>
+        (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
           call[0].includes("message")
       );
       expect(messageInsert).toBeDefined();
 
-      const params = messageInsert[1];
+      const params = messageInsert![1] as string[];
       expect(params[5]).toBeTruthy(); // facetsJSON
       expect(params[6]).toBeTruthy(); // embedJSON
     });
@@ -459,9 +480,10 @@ describe("ChatIndexer", () => {
       await indexer.indexChatMessages();
 
       // Should only save messages with text (2, not 3)
-      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
+        .calls as unknown[][];
       const messageInserts = runAsyncCalls.filter(
-        (call) =>
+        (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
           call[0].includes("message")
