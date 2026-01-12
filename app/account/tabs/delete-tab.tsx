@@ -480,197 +480,187 @@ function DeleteOptionsForm({
                   label="Delete my posts"
                   checked={state.deletePosts}
                   onToggle={(next) => onUpdate("deletePosts", next)}
+                  hint={!state.deletePosts ? "enable for options" : undefined}
                 />
-                <Indented>
-                  <CheckboxRow
-                    palette={palette}
-                    label="older than"
-                    checked={state.deletePostsDaysOldEnabled}
-                    disabled={!state.deletePosts}
-                    onToggle={(next) =>
-                      onUpdate("deletePostsDaysOldEnabled", next)
-                    }
-                  >
-                    <View style={styles.inlineNumberRow}>
-                      <NumberInput
-                        palette={palette}
-                        value={state.deletePostsDaysOld}
-                        onChange={(value) =>
-                          onUpdate("deletePostsDaysOld", value)
-                        }
-                        disabled={
-                          !state.deletePosts || !state.deletePostsDaysOldEnabled
-                        }
-                        min={0}
-                        suffix="days"
-                      />
-                    </View>
-                  </CheckboxRow>
-                  <CheckboxRow
-                    palette={palette}
-                    label="unless they have at least"
-                    checked={state.deletePostsLikesThresholdEnabled}
-                    disabled={!state.deletePosts}
-                    onToggle={(next) =>
-                      onUpdate("deletePostsLikesThresholdEnabled", next)
-                    }
-                  >
-                    <View style={styles.inlineNumberRow}>
-                      <NumberInput
-                        palette={palette}
-                        value={state.deletePostsLikesThreshold}
-                        onChange={(value) =>
-                          onUpdate("deletePostsLikesThreshold", value)
-                        }
-                        disabled={
-                          !state.deletePosts ||
-                          !state.deletePostsLikesThresholdEnabled
-                        }
-                        min={0}
-                        suffix="likes"
-                      />
-                    </View>
-                  </CheckboxRow>
-                  <CheckboxRow
-                    palette={palette}
-                    label="or at least"
-                    checked={state.deletePostsRepostsThresholdEnabled}
-                    disabled={!state.deletePosts}
-                    onToggle={(next) =>
-                      onUpdate("deletePostsRepostsThresholdEnabled", next)
-                    }
-                  >
-                    <View style={styles.inlineNumberRow}>
-                      <NumberInput
-                        palette={palette}
-                        value={state.deletePostsRepostsThreshold}
-                        onChange={(value) =>
-                          onUpdate("deletePostsRepostsThreshold", value)
-                        }
-                        disabled={
-                          !state.deletePosts ||
-                          !state.deletePostsRepostsThresholdEnabled
-                        }
-                        min={0}
-                        suffix="reposts"
-                      />
-                    </View>
-                  </CheckboxRow>
+                {state.deletePosts && (
+                  <Indented>
+                    <CheckboxRow
+                      palette={palette}
+                      label="older than"
+                      checked={state.deletePostsDaysOldEnabled}
+                      onToggle={(next) =>
+                        onUpdate("deletePostsDaysOldEnabled", next)
+                      }
+                    >
+                      <View style={styles.inlineNumberRow}>
+                        <NumberInput
+                          palette={palette}
+                          value={state.deletePostsDaysOld}
+                          onChange={(value) =>
+                            onUpdate("deletePostsDaysOld", value)
+                          }
+                          disabled={!state.deletePostsDaysOldEnabled}
+                          min={0}
+                          suffix="days"
+                        />
+                      </View>
+                    </CheckboxRow>
+                    <CheckboxRow
+                      palette={palette}
+                      label="unless they have at least"
+                      checked={state.deletePostsLikesThresholdEnabled}
+                      onToggle={(next) =>
+                        onUpdate("deletePostsLikesThresholdEnabled", next)
+                      }
+                    >
+                      <View style={styles.inlineNumberRow}>
+                        <NumberInput
+                          palette={palette}
+                          value={state.deletePostsLikesThreshold}
+                          onChange={(value) =>
+                            onUpdate("deletePostsLikesThreshold", value)
+                          }
+                          disabled={!state.deletePostsLikesThresholdEnabled}
+                          min={0}
+                          suffix="likes"
+                        />
+                      </View>
+                    </CheckboxRow>
+                    <CheckboxRow
+                      palette={palette}
+                      label="or at least"
+                      checked={state.deletePostsRepostsThresholdEnabled}
+                      onToggle={(next) =>
+                        onUpdate("deletePostsRepostsThresholdEnabled", next)
+                      }
+                    >
+                      <View style={styles.inlineNumberRow}>
+                        <NumberInput
+                          palette={palette}
+                          value={state.deletePostsRepostsThreshold}
+                          onChange={(value) =>
+                            onUpdate("deletePostsRepostsThreshold", value)
+                          }
+                          disabled={!state.deletePostsRepostsThresholdEnabled}
+                          min={0}
+                          suffix="reposts"
+                        />
+                      </View>
+                    </CheckboxRow>
 
-                  <CheckboxRow
-                    palette={palette}
-                    label="Preserve entire threads if any post meets these thresholds"
-                    checked={state.deletePostsPreserveThreads}
-                    disabled={
-                      !state.deletePosts ||
-                      (!state.deletePostsLikesThresholdEnabled &&
-                        !state.deletePostsRepostsThresholdEnabled)
-                    }
-                    onToggle={(next) =>
-                      onUpdate("deletePostsPreserveThreads", next)
-                    }
-                  />
-                </Indented>
+                    <CheckboxRow
+                      palette={palette}
+                      label="Preserve entire threads if any post meets these thresholds"
+                      checked={state.deletePostsPreserveThreads}
+                      disabled={
+                        !state.deletePostsLikesThresholdEnabled &&
+                        !state.deletePostsRepostsThresholdEnabled
+                      }
+                      onToggle={(next) =>
+                        onUpdate("deletePostsPreserveThreads", next)
+                      }
+                    />
+                  </Indented>
+                )}
 
                 <CheckboxRow
                   palette={palette}
                   label="Delete my reposts"
                   checked={state.deleteReposts}
                   onToggle={(next) => onUpdate("deleteReposts", next)}
+                  hint={!state.deleteReposts ? "enable for options" : undefined}
                 />
-                <Indented>
-                  <CheckboxRow
-                    palette={palette}
-                    label="older than"
-                    checked={state.deleteRepostsDaysOldEnabled}
-                    disabled={!state.deleteReposts}
-                    onToggle={(next) =>
-                      onUpdate("deleteRepostsDaysOldEnabled", next)
-                    }
-                  >
-                    <View style={styles.inlineNumberRow}>
-                      <NumberInput
-                        palette={palette}
-                        value={state.deleteRepostsDaysOld}
-                        onChange={(value) =>
-                          onUpdate("deleteRepostsDaysOld", value)
-                        }
-                        disabled={
-                          !state.deleteReposts ||
-                          !state.deleteRepostsDaysOldEnabled
-                        }
-                        min={0}
-                        suffix="days"
-                      />
-                    </View>
-                  </CheckboxRow>
-                </Indented>
+                {state.deleteReposts && (
+                  <Indented>
+                    <CheckboxRow
+                      palette={palette}
+                      label="older than"
+                      checked={state.deleteRepostsDaysOldEnabled}
+                      onToggle={(next) =>
+                        onUpdate("deleteRepostsDaysOldEnabled", next)
+                      }
+                    >
+                      <View style={styles.inlineNumberRow}>
+                        <NumberInput
+                          palette={palette}
+                          value={state.deleteRepostsDaysOld}
+                          onChange={(value) =>
+                            onUpdate("deleteRepostsDaysOld", value)
+                          }
+                          disabled={!state.deleteRepostsDaysOldEnabled}
+                          min={0}
+                          suffix="days"
+                        />
+                      </View>
+                    </CheckboxRow>
+                  </Indented>
+                )}
 
                 <CheckboxRow
                   palette={palette}
                   label="Delete my likes"
                   checked={state.deleteLikes}
                   onToggle={(next) => onUpdate("deleteLikes", next)}
+                  hint={!state.deleteLikes ? "enable for options" : undefined}
                 />
-                <Indented>
-                  <CheckboxRow
-                    palette={palette}
-                    label="older than"
-                    checked={state.deleteLikesDaysOldEnabled}
-                    disabled={!state.deleteLikes}
-                    onToggle={(next) =>
-                      onUpdate("deleteLikesDaysOldEnabled", next)
-                    }
-                  >
-                    <View style={styles.inlineNumberRow}>
-                      <NumberInput
-                        palette={palette}
-                        value={state.deleteLikesDaysOld}
-                        onChange={(value) =>
-                          onUpdate("deleteLikesDaysOld", value)
-                        }
-                        disabled={
-                          !state.deleteLikes || !state.deleteLikesDaysOldEnabled
-                        }
-                        min={0}
-                        suffix="days"
-                      />
-                    </View>
-                  </CheckboxRow>
-                </Indented>
+                {state.deleteLikes && (
+                  <Indented>
+                    <CheckboxRow
+                      palette={palette}
+                      label="older than"
+                      checked={state.deleteLikesDaysOldEnabled}
+                      onToggle={(next) =>
+                        onUpdate("deleteLikesDaysOldEnabled", next)
+                      }
+                    >
+                      <View style={styles.inlineNumberRow}>
+                        <NumberInput
+                          palette={palette}
+                          value={state.deleteLikesDaysOld}
+                          onChange={(value) =>
+                            onUpdate("deleteLikesDaysOld", value)
+                          }
+                          disabled={!state.deleteLikesDaysOldEnabled}
+                          min={0}
+                          suffix="days"
+                        />
+                      </View>
+                    </CheckboxRow>
+                  </Indented>
+                )}
 
                 <CheckboxRow
                   palette={palette}
                   label="Delete my chat messages"
                   checked={state.deleteChats}
                   onToggle={(next) => onUpdate("deleteChats", next)}
+                  hint={!state.deleteChats ? "enable for options" : undefined}
                 />
-                <Indented>
-                  <CheckboxRow
-                    palette={palette}
-                    label="older than"
-                    checked={state.deleteChatsDaysOldEnabled}
-                    disabled={!state.deleteChats}
-                    onToggle={(next) =>
-                      onUpdate("deleteChatsDaysOldEnabled", next)
-                    }
-                  >
-                    <View style={styles.inlineNumberRow}>
-                      <NumberInput
-                        palette={palette}
-                        value={state.deleteChatsDaysOld}
-                        onChange={(value) =>
-                          onUpdate("deleteChatsDaysOld", value)
-                        }
-                        disabled={
-                          !state.deleteChats || !state.deleteChatsDaysOldEnabled
-                        }
-                        min={0}
-                        suffix="days"
-                      />
-                    </View>
-                  </CheckboxRow>
-                </Indented>
+                {state.deleteChats && (
+                  <Indented>
+                    <CheckboxRow
+                      palette={palette}
+                      label="older than"
+                      checked={state.deleteChatsDaysOldEnabled}
+                      onToggle={(next) =>
+                        onUpdate("deleteChatsDaysOldEnabled", next)
+                      }
+                    >
+                      <View style={styles.inlineNumberRow}>
+                        <NumberInput
+                          palette={palette}
+                          value={state.deleteChatsDaysOld}
+                          onChange={(value) =>
+                            onUpdate("deleteChatsDaysOld", value)
+                          }
+                          disabled={!state.deleteChatsDaysOldEnabled}
+                          min={0}
+                          suffix="days"
+                        />
+                      </View>
+                    </CheckboxRow>
+                  </Indented>
+                )}
 
                 <CheckboxRow
                   palette={palette}
@@ -1145,6 +1135,7 @@ function CheckboxRow({
   disabled,
   trailing,
   children,
+  hint,
 }: {
   label: string;
   checked: boolean;
@@ -1153,6 +1144,7 @@ function CheckboxRow({
   disabled?: boolean;
   trailing?: ReactNode;
   children?: ReactNode;
+  hint?: string;
 }) {
   return (
     <Pressable
@@ -1171,14 +1163,21 @@ function CheckboxRow({
         style={{ opacity: disabled ? 0.5 : 1, marginTop: 2 }}
       />
       <View style={styles.optionRowContent}>
-        <Text
-          style={[
-            styles.optionLabel,
-            { color: palette.text, opacity: disabled ? 0.6 : 1 },
-          ]}
-        >
-          {label}
-        </Text>
+        <View style={styles.optionLabelRow}>
+          <Text
+            style={[
+              styles.optionLabel,
+              { color: palette.text, opacity: disabled ? 0.6 : 1 },
+            ]}
+          >
+            {label}
+          </Text>
+          {hint && (
+            <Text style={[styles.optionHint, { color: palette.icon }]}>
+              {hint}
+            </Text>
+          )}
+        </View>
         {children}
       </View>
       {trailing}
@@ -1325,6 +1324,16 @@ function SecondaryButton({
 // Use shared styles for consistency across tabs, with local extensions
 const styles = {
   ...sharedTabStyles,
+  optionLabelRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  optionHint: {
+    fontSize: 12,
+    fontStyle: "italic" as const,
+    opacity: 0.7,
+  },
   countsLoadingContainer: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
