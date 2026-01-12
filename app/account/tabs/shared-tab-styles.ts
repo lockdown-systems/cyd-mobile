@@ -1,7 +1,7 @@
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 
 /**
- * Shared styles used across save-tab and delete-tab
+ * Shared styles used across save-tab, delete-tab, and schedule-tab
  */
 export const sharedTabStyles = StyleSheet.create({
   container: {
@@ -41,9 +41,20 @@ export const sharedTabStyles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  optionLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   optionLabel: {
     fontSize: 16,
     flex: 1,
+  },
+  optionHint: {
+    fontSize: 12,
+    fontStyle: "italic",
+    opacity: 0.7,
   },
   inlineHint: {
     fontSize: 13,
@@ -59,6 +70,14 @@ export const sharedTabStyles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: "rgba(0, 0, 0, 0.1)",
     gap: 4,
+  },
+  indentedWithPadding: {
+    marginLeft: 28,
+    paddingLeft: 12,
+    paddingBottom: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(0, 0, 0, 0.1)",
+    gap: 12,
   },
   footerBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -88,6 +107,31 @@ export const sharedTabStyles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     textAlign: "center",
+  },
+  loadingContainer: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 24,
+  },
+  loadingText: {
+    fontSize: 15,
+  },
+  errorContainer: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    alignItems: "center",
+  },
+  retryButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   header: {
     flexDirection: "row",
@@ -206,5 +250,66 @@ export const sharedTabStyles = StyleSheet.create({
     paddingRight: 12,
     fontSize: 15,
     fontWeight: "500",
+  },
+  // Dropdown styles
+  dropdownContainer: {
+    gap: 6,
+  },
+  dropdownLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  dropdownButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  dropdownButtonText: {
+    fontSize: 15,
+  },
+  dropdownMenu: {
+    borderWidth: 1,
+    borderRadius: 8,
+    marginTop: 4,
+    overflow: "hidden",
+  },
+  dropdownScroll: {
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  dropdownItemText: {
+    fontSize: 15,
+  },
+  savingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  savingText: {
+    fontSize: 13,
+  },
+});
+
+// Platform-specific shadow for dropdown menus
+export const dropdownMenuShadow = Platform.select({
+  ios: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  android: {
+    elevation: 4,
   },
 });

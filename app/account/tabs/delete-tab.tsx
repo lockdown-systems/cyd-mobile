@@ -1172,12 +1172,12 @@ function CheckboxRow({
           >
             {label}
           </Text>
-          {hint && (
-            <Text style={[styles.optionHint, { color: palette.icon }]}>
-              {hint}
-            </Text>
-          )}
         </View>
+        {hint && (
+          <Text style={[styles.optionHint, { color: palette.icon }]}>
+            {hint}
+          </Text>
+        )}
         {children}
       </View>
       {trailing}
@@ -1324,16 +1324,6 @@ function SecondaryButton({
 // Use shared styles for consistency across tabs, with local extensions
 const styles = {
   ...sharedTabStyles,
-  optionLabelRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-  },
-  optionHint: {
-    fontSize: 12,
-    fontStyle: "italic" as const,
-    opacity: 0.7,
-  },
   countsLoadingContainer: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
