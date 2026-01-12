@@ -1,9 +1,12 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -21,13 +24,13 @@ import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
 import { dropdownMenuShadow, sharedTabStyles } from "./shared-tab-styles";
 
 const DAYS_OF_WEEK = [
-  "Sunday",
   "Monday",
   "Tuesday",
   "Wednesday",
   "Thursday",
   "Friday",
   "Saturday",
+  "Sunday",
 ];
 
 const FREQUENCY_OPTIONS: { value: ScheduleFrequency; label: string }[] = [
@@ -35,11 +38,6 @@ const FREQUENCY_OPTIONS: { value: ScheduleFrequency; label: string }[] = [
   { value: "weekly", label: "Weekly" },
   { value: "monthly", label: "Monthly" },
 ];
-
-const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => {
-  const hour = i.toString().padStart(2, "0");
-  return { value: `${hour}:00`, label: `${hour}:00` };
-});
 
 const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, i) => ({
   value: i + 1,
@@ -114,7 +112,7 @@ export function ScheduleTab({
           based on your settings.
         </Text>
         <Text style={[styles.subhead, { color: palette.icon }]}>
-          When would you like to get reminded to delete your data?
+          Would you like to get reminded to delete your data?
         </Text>
 
         <SaveAndDeleteStatusBanner
@@ -176,11 +174,9 @@ export function ScheduleTab({
             />
             {state.scheduleDeletion && (
               <View style={styles.indented}>
-                <DropdownRow
+                <FrequencyPicker
                   palette={palette}
-                  label="Frequency"
                   value={state.scheduleDeletionFrequency}
-                  options={FREQUENCY_OPTIONS}
                   onChange={(value) =>
                     void updateSetting("scheduleDeletionFrequency", value)
                   }
@@ -199,25 +195,18 @@ export function ScheduleTab({
                 )}
 
                 {state.scheduleDeletionFrequency === "weekly" && (
-                  <DropdownRow
+                  <DayOfWeekPicker
                     palette={palette}
-                    label="Day of week"
                     value={state.scheduleDeletionDayOfWeek}
-                    options={DAYS_OF_WEEK.map((day, i) => ({
-                      value: i,
-                      label: day,
-                    }))}
                     onChange={(value) =>
                       void updateSetting("scheduleDeletionDayOfWeek", value)
                     }
                   />
                 )}
 
-                <DropdownRow
+                <TimePicker
                   palette={palette}
-                  label="Time"
                   value={state.scheduleDeletionTime}
-                  options={TIME_OPTIONS}
                   onChange={(value) =>
                     void updateSetting("scheduleDeletionTime", value)
                   }
@@ -285,6 +274,177 @@ function CheckboxRow({
         )}
       </View>
     </Pressable>
+  );
+}
+
+function FrequencyPicker({
+  value,
+  onChange,
+  palette,
+}: {
+  value: ScheduleFrequency;
+  onChange: (value: ScheduleFrequency) => void;
+  palette: AccountTabPalette;
+}) {
+  return (
+    <View style={localStyles.frequencyContainer}>
+      <Text style={[styles.dropdownLabel, { color: palette.text }]}>
+        Frequency
+      </Text>
+      <View
+        style={[
+          localStyles.frequencyButtonRow,
+          {
+            borderColor: palette.icon + "33",
+            backgroundColor: palette.background,
+          },
+        ]}
+      >
+        {FREQUENCY_OPTIONS.map((option) => (
+          <Pressable
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            style={[
+              localStyles.frequencyButton,
+              value === option.value && {
+                backgroundColor: palette.tint,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                localStyles.frequencyButtonText,
+                { color: value === option.value ? "#fff" : palette.text },
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function DayOfWeekPicker({
+  value,
+  onChange,
+  palette,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  palette: AccountTabPalette;
+}) {
+  // Map display index (0=Mon, 1=Tue, ..., 6=Sun) to database value (0=Sun, 1=Mon, ...)
+  const displayIndexToValue = (displayIndex: number): number => {
+    return displayIndex === 6 ? 0 : displayIndex + 1;
+  };
+
+  // Build options with Monday first, Sunday last
+  const options = DAYS_OF_WEEK.map((day, displayIndex) => ({
+    label: day,
+    value: displayIndexToValue(displayIndex),
+  }));
+
+  return (
+    <DropdownRow
+      label="Day of week"
+      value={value}
+      options={options}
+      onChange={onChange}
+      palette={palette}
+    />
+  );
+}
+
+function TimePicker({
+  value,
+  onChange,
+  palette,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  palette: AccountTabPalette;
+}) {
+  const [showPicker, setShowPicker] = useState(Platform.OS === "ios");
+
+  // Parse time string (e.g., "09:00") to Date
+  const timeToDate = (timeStr: string): Date => {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  };
+
+  // Convert Date to time string
+  const dateToTime = (date: Date): string => {
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
+  const handleChange = (event: unknown, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowPicker(false);
+    }
+    if (selectedDate) {
+      onChange(dateToTime(selectedDate));
+    }
+  };
+
+  // Format time for display (e.g., "9:00 AM")
+  const formatTimeDisplay = (timeStr: string): string => {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+  };
+
+  return (
+    <View style={localStyles.timePickerContainer}>
+      <Text style={[styles.dropdownLabel, { color: palette.text }]}>Time</Text>
+
+      {Platform.OS === "android" && (
+        <Pressable
+          onPress={() => setShowPicker(true)}
+          style={[
+            localStyles.timeButton,
+            {
+              borderColor: palette.icon + "33",
+              backgroundColor: palette.background,
+            },
+          ]}
+        >
+          <MaterialIcons name="schedule" size={20} color={palette.icon} />
+          <Text style={[localStyles.timeButtonText, { color: palette.text }]}>
+            {formatTimeDisplay(value)}
+          </Text>
+        </Pressable>
+      )}
+
+      {Platform.OS === "ios" && (
+        <View style={localStyles.timePickerRow}>
+          <DateTimePicker
+            value={timeToDate(value)}
+            mode="time"
+            onChange={handleChange}
+            display="compact"
+            themeVariant="light"
+          />
+        </View>
+      )}
+
+      {Platform.OS === "android" && showPicker && (
+        <DateTimePicker
+          value={timeToDate(value)}
+          mode="time"
+          is24Hour={false}
+          onChange={handleChange}
+          display="default"
+          themeVariant="light"
+        />
+      )}
+    </View>
   );
 }
 
@@ -378,6 +538,50 @@ function DropdownRow<T extends string | number>({
 // Use shared styles for consistency across tabs, with local extensions
 const styles = {
   ...sharedTabStyles,
-  // Use indentedWithPadding for schedule tab's indented section
-  indented: sharedTabStyles.indentedWithPadding,
+  // Use indentedWithPadding for schedule tab's indented section, with extra right padding
+  indented: {
+    ...sharedTabStyles.indentedWithPadding,
+    paddingRight: 12,
+  },
 };
+
+const localStyles = StyleSheet.create({
+  frequencyContainer: {
+    gap: 6,
+  },
+  frequencyButtonRow: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  frequencyButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  frequencyButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  timePickerContainer: {
+    gap: 6,
+  },
+  timePickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  timeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  timeButtonText: {
+    fontSize: 15,
+  },
+});

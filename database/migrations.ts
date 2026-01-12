@@ -88,7 +88,7 @@ export const migrations: Migration[] = [
       `ALTER TABLE bsky_account ADD COLUMN settingScheduleDeletionFrequency TEXT DEFAULT 'weekly';`,
       `ALTER TABLE bsky_account ADD COLUMN settingScheduleDeletionDayOfMonth INTEGER DEFAULT 1;`,
       `ALTER TABLE bsky_account ADD COLUMN settingScheduleDeletionDayOfWeek INTEGER DEFAULT 0;`,
-      `ALTER TABLE bsky_account ADD COLUMN settingScheduleDeletionTime TEXT DEFAULT '09:00';`,
+      `ALTER TABLE bsky_account ADD COLUMN settingScheduleDeletionTime TEXT DEFAULT '10:00';`,
     ],
   },
 ];
