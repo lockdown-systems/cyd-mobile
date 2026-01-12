@@ -496,7 +496,7 @@ function SaveReviewScreen({
       />
       <ScrollView contentContainerStyle={styles.reviewContent}>
         <Text style={[styles.reviewIntro, { color: palette.text }]}>
-          Here’s what Cyd will archive on this device:
+          Here’s what Cyd will save on this device:
         </Text>
         <View style={[styles.reviewCard, { borderColor: palette.icon + "22" }]}>
           {chosen.map((option) => (
@@ -514,22 +514,6 @@ function SaveReviewScreen({
               </Text>
             </View>
           ))}
-        </View>
-        <View
-          style={[
-            styles.infoCard,
-            {
-              borderColor: palette.icon + "22",
-              backgroundColor: palette.card,
-            },
-          ]}
-          accessibilityRole="text"
-        >
-          <Text style={[styles.infoText, { color: palette.text }]}>
-            If you have a lot of data, saving your data might take a long time.
-            While Cyd is working, your phone must be unlocked and the Cyd app
-            must stay active the whole time.
-          </Text>
         </View>
       </ScrollView>
       <View

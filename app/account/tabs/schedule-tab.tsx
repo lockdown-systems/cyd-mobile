@@ -11,16 +11,26 @@ import {
   View,
 } from "react-native";
 
+import { DeleteReviewList } from "@/app/account/components/DeleteReviewList";
+import { SaveReviewList } from "@/app/account/components/SaveReviewList";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveAndDeleteStatusBanner } from "@/components/SaveAndDeleteStatusBanner";
+import type { AccountDeleteSettings } from "@/database/delete-settings";
+import { getAccountDeleteSettings } from "@/database/delete-settings";
+import type { AccountSaveSettings } from "@/database/save-settings";
+import { getAccountSaveSettings } from "@/database/save-settings";
 import {
   getAccountScheduleSettings,
   updateAccountScheduleSettings,
   type AccountScheduleSettings,
   type ScheduleFrequency,
 } from "@/database/schedule-settings";
-import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
+import type {
+  AccountTabKey,
+  AccountTabPalette,
+  AccountTabProps,
+} from "@/types/account-tabs";
 import { dropdownMenuShadow, sharedTabStyles } from "./shared-tab-styles";
 
 const DAYS_OF_WEEK = [
@@ -44,22 +54,42 @@ const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, i) => ({
   label: `${i + 1}`,
 }));
 
+type ScheduleFlowScreen = "form" | "review";
+
 export function ScheduleTab({
   accountId,
   palette,
   onSelectTab,
 }: AccountTabProps) {
+  const [screenStack, setScreenStack] = useState<ScheduleFlowScreen[]>([
+    "form",
+  ]);
   const [state, setState] = useState<AccountScheduleSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Save and delete settings for review screen
+  const [saveSettings, setSaveSettings] = useState<AccountSaveSettings | null>(
+    null
+  );
+  const [deleteSettings, setDeleteSettings] =
+    useState<AccountDeleteSettings | null>(null);
+
+  const currentScreen = screenStack[screenStack.length - 1];
+
   const loadSettings = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const settings = await getAccountScheduleSettings(accountId);
-      setState(settings);
+      const [scheduleSettings, save, del] = await Promise.all([
+        getAccountScheduleSettings(accountId),
+        getAccountSaveSettings(accountId),
+        getAccountDeleteSettings(accountId),
+      ]);
+      setState(scheduleSettings);
+      setSaveSettings(save);
+      setDeleteSettings(del);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       setState(null);
@@ -95,8 +125,98 @@ export function ScheduleTab({
     [accountId, state]
   );
 
+  const pushScreen = useCallback((next: ScheduleFlowScreen) => {
+    setScreenStack((prev) => [...prev, next]);
+  }, []);
+
+  const popScreen = useCallback(() => {
+    setScreenStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  }, []);
+
+  // Check if any save or delete options are selected
+  const hasSaveOptions = saveSettings
+    ? saveSettings.posts ||
+      saveSettings.likes ||
+      saveSettings.bookmarks ||
+      saveSettings.chat
+    : false;
+
+  const hasDeleteOptions = deleteSettings
+    ? deleteSettings.deletePosts ||
+      deleteSettings.deleteReposts ||
+      deleteSettings.deleteLikes ||
+      deleteSettings.deleteBookmarks ||
+      deleteSettings.deleteChats ||
+      deleteSettings.deleteUnfollowEveryone
+    : false;
+
+  const canProceed = hasSaveOptions || hasDeleteOptions;
+
   return (
     <View style={styles.container}>
+      {currentScreen === "form" && (
+        <ScheduleOptionsForm
+          accountId={accountId}
+          palette={palette}
+          state={state}
+          loading={loading}
+          error={error}
+          saving={saving}
+          canProceed={canProceed}
+          onSelectTab={onSelectTab}
+          onRetry={loadSettings}
+          onUpdateSetting={updateSetting}
+          onContinue={() => pushScreen("review")}
+        />
+      )}
+      {currentScreen === "review" &&
+        state &&
+        saveSettings &&
+        deleteSettings && (
+          <ScheduleReviewScreen
+            palette={palette}
+            saveSettings={saveSettings}
+            deleteSettings={deleteSettings}
+            onBack={popScreen}
+            onSelectTab={onSelectTab}
+          />
+        )}
+    </View>
+  );
+}
+
+type ScheduleOptionsFormProps = {
+  accountId: number;
+  palette: AccountTabPalette;
+  state: AccountScheduleSettings | null;
+  loading: boolean;
+  error: Error | null;
+  saving: boolean;
+  canProceed: boolean;
+  onSelectTab?: (tab: AccountTabKey) => void;
+  onRetry: () => void | Promise<void>;
+  onUpdateSetting: <K extends keyof AccountScheduleSettings>(
+    key: K,
+    value: AccountScheduleSettings[K]
+  ) => Promise<void>;
+  onContinue: () => void;
+};
+
+function ScheduleOptionsForm({
+  accountId,
+  palette,
+  state,
+  loading,
+  error,
+  saving,
+  canProceed,
+  onSelectTab,
+  onRetry,
+  onUpdateSetting,
+  onContinue,
+}: ScheduleOptionsFormProps) {
+  return (
+    <View style={styles.stackScreen}>
       <PremiumRequiredBanner palette={palette} />
 
       <ScrollView
@@ -147,7 +267,7 @@ export function ScheduleTab({
               Failed to load your existing preferences.
             </Text>
             <Pressable
-              onPress={() => void loadSettings()}
+              onPress={() => void onRetry()}
               style={[styles.retryButton, { borderColor: palette.icon + "33" }]}
             >
               <Text style={[styles.retryButtonText, { color: palette.text }]}>
@@ -169,7 +289,9 @@ export function ScheduleTab({
               palette={palette}
               label="Remind me to delete my data"
               checked={state.scheduleDeletion}
-              onToggle={(next) => void updateSetting("scheduleDeletion", next)}
+              onToggle={(next) =>
+                void onUpdateSetting("scheduleDeletion", next)
+              }
               hint={!state.scheduleDeletion ? "enable for options" : undefined}
             />
             {state.scheduleDeletion && (
@@ -178,7 +300,7 @@ export function ScheduleTab({
                   palette={palette}
                   value={state.scheduleDeletionFrequency}
                   onChange={(value) =>
-                    void updateSetting("scheduleDeletionFrequency", value)
+                    void onUpdateSetting("scheduleDeletionFrequency", value)
                   }
                 />
 
@@ -189,7 +311,7 @@ export function ScheduleTab({
                     value={state.scheduleDeletionDayOfMonth}
                     options={DAY_OF_MONTH_OPTIONS}
                     onChange={(value) =>
-                      void updateSetting("scheduleDeletionDayOfMonth", value)
+                      void onUpdateSetting("scheduleDeletionDayOfMonth", value)
                     }
                   />
                 )}
@@ -199,7 +321,7 @@ export function ScheduleTab({
                     palette={palette}
                     value={state.scheduleDeletionDayOfWeek}
                     onChange={(value) =>
-                      void updateSetting("scheduleDeletionDayOfWeek", value)
+                      void onUpdateSetting("scheduleDeletionDayOfWeek", value)
                     }
                   />
                 )}
@@ -208,7 +330,7 @@ export function ScheduleTab({
                   palette={palette}
                   value={state.scheduleDeletionTime}
                   onChange={(value) =>
-                    void updateSetting("scheduleDeletionTime", value)
+                    void onUpdateSetting("scheduleDeletionTime", value)
                   }
                 />
 
@@ -231,6 +353,143 @@ export function ScheduleTab({
           actionType="schedule"
         />
       </ScrollView>
+      <View
+        style={[
+          styles.footerBar,
+          {
+            borderColor: palette.icon + "22",
+            backgroundColor: palette.background,
+          },
+        ]}
+      >
+        <PrimaryButton
+          label="Save and Delete Data Now"
+          onPress={onContinue}
+          disabled={!canProceed || loading}
+          palette={palette}
+        />
+      </View>
+    </View>
+  );
+}
+
+type ScheduleReviewScreenProps = {
+  palette: AccountTabPalette;
+  saveSettings: AccountSaveSettings;
+  deleteSettings: AccountDeleteSettings;
+  onBack: () => void;
+  onSelectTab?: (tab: AccountTabKey) => void;
+};
+
+function ScheduleReviewScreen({
+  palette,
+  saveSettings,
+  deleteSettings,
+  onBack,
+  onSelectTab,
+}: ScheduleReviewScreenProps) {
+  return (
+    <View style={styles.stackScreen}>
+      <StackHeader
+        title="Ready to save and delete your Bluesky data?"
+        palette={palette}
+        onBack={onBack}
+      />
+      <ScrollView contentContainerStyle={styles.reviewContent}>
+        <Text style={[styles.reviewIntro, { color: palette.text }]}>
+          Here&apos;s what Cyd will save on this device:
+        </Text>
+        <View style={[styles.reviewCard, { borderColor: palette.icon + "22" }]}>
+          <SaveReviewList
+            selections={{
+              posts: saveSettings.posts,
+              likes: saveSettings.likes,
+              bookmarks: saveSettings.bookmarks,
+              chat: saveSettings.chat,
+            }}
+            palette={palette}
+          />
+        </View>
+        <Text style={[styles.reviewSubtext, { color: palette.icon }]}>
+          To change this, go to{" "}
+          <Text
+            style={[localStyles.linkText, { color: palette.tint }]}
+            onPress={() => onSelectTab?.("save")}
+          >
+            save options
+          </Text>
+          .
+        </Text>
+
+        <View style={{ height: 20 }} />
+
+        <Text style={[styles.reviewIntro, { color: palette.text }]}>
+          Here&apos;s what Cyd will delete from your Bluesky account:
+        </Text>
+        <View style={[styles.reviewCard, { borderColor: palette.icon + "22" }]}>
+          <DeleteReviewList selections={deleteSettings} palette={palette} />
+        </View>
+        <Text style={[styles.reviewSubtext, { color: palette.icon }]}>
+          To change this, go to{" "}
+          <Text
+            style={[localStyles.linkText, { color: palette.tint }]}
+            onPress={() => onSelectTab?.("delete")}
+          >
+            delete options
+          </Text>
+          .
+        </Text>
+      </ScrollView>
+      <View
+        style={[
+          styles.footerBar,
+          {
+            borderColor: palette.icon + "22",
+            backgroundColor: palette.background,
+          },
+        ]}
+      >
+        <SecondaryButton
+          label="Back to Schedule Options"
+          onPress={onBack}
+          palette={palette}
+        />
+        <PrimaryButton
+          label="Save and Delete Data Now"
+          onPress={() => {
+            // TODO: Implement save and delete automation
+          }}
+          disabled={false}
+          palette={palette}
+        />
+      </View>
+    </View>
+  );
+}
+
+function StackHeader({
+  title,
+  palette,
+  onBack,
+}: {
+  title: string;
+  palette: AccountTabPalette;
+  onBack: () => void;
+}) {
+  return (
+    <View
+      style={[styles.header, { borderColor: palette.icon + "22" }]}
+      accessibilityRole="header"
+    >
+      <Pressable
+        onPress={onBack}
+        style={styles.backButton}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <MaterialIcons name="arrow-back" size={24} color={palette.text} />
+      </Pressable>
+      <Text style={[styles.headerTitle, { color: palette.text }]}>{title}</Text>
     </View>
   );
 }
@@ -535,6 +794,76 @@ function DropdownRow<T extends string | number>({
   );
 }
 
+type PrimaryButtonProps = {
+  label: string;
+  palette: AccountTabPalette;
+  onPress: () => void | Promise<void>;
+  disabled?: boolean;
+};
+
+function PrimaryButton({
+  label,
+  palette,
+  onPress,
+  disabled,
+}: PrimaryButtonProps) {
+  const backgroundColor = palette.button?.background ?? palette.tint;
+  const textColor = palette.button?.text ?? "#ffffff";
+  return (
+    <Pressable
+      onPress={
+        disabled
+          ? undefined
+          : () => {
+              void onPress();
+            }
+      }
+      style={({ pressed }) => [
+        styles.primaryButton,
+        {
+          backgroundColor,
+          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+    >
+      <Text style={[styles.primaryButtonText, { color: textColor }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+type SecondaryButtonProps = {
+  label: string;
+  palette: AccountTabPalette;
+  onPress: () => void | Promise<void>;
+};
+
+function SecondaryButton({ label, palette, onPress }: SecondaryButtonProps) {
+  return (
+    <Pressable
+      onPress={() => {
+        void onPress();
+      }}
+      style={({ pressed }) => [
+        styles.secondaryButton,
+        {
+          borderColor: palette.icon + "33",
+          backgroundColor: palette.card,
+          opacity: pressed ? 0.85 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+    >
+      <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 // Use shared styles for consistency across tabs, with local extensions
 const styles = {
   ...sharedTabStyles,
@@ -583,5 +912,8 @@ const localStyles = StyleSheet.create({
   },
   timeButtonText: {
     fontSize: 15,
+  },
+  linkText: {
+    textDecorationLine: "underline",
   },
 });
