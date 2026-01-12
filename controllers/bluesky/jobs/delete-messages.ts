@@ -43,8 +43,14 @@ export async function runDeleteMessagesJob(
   let deleted = 0;
   let errors = 0;
 
+  // Track unique conversation IDs for cleanup check
+  const conversationIds = new Set<string>();
+
   for (const message of messagesToDelete) {
     await controller.waitForPause();
+
+    // Track this conversation for later cleanup check
+    conversationIds.add(message.convoId);
 
     // Build preview data for display
     const previewData: MessagePreviewData = {
@@ -81,8 +87,50 @@ export async function runDeleteMessagesJob(
     }
   }
 
+  // Check for empty conversations and clean them up
+  let conversationsLeft = 0;
+  const conversationArray = Array.from(conversationIds);
+
+  for (const convoId of conversationArray) {
+    await controller.waitForPause();
+
+    emit({
+      progressMessage: `Checking conversation ${conversationsLeft + 1} of ${conversationArray.length} for cleanup…`,
+      progressPercent: 1,
+      unknownTotal: false,
+    });
+
+    try {
+      const messageCount =
+        await controller.getConversationMessageCount(convoId);
+
+      if (messageCount === 0) {
+        emit({
+          progressMessage: `Leaving empty conversation ${conversationsLeft + 1} of ${conversationArray.length}…`,
+          progressPercent: 1,
+          unknownTotal: false,
+        });
+
+        await controller.leaveConversation(convoId);
+        conversationsLeft++;
+      }
+    } catch (err) {
+      console.warn(
+        "[DeleteMessagesJob] Failed to check/leave conversation:",
+        convoId,
+        err
+      );
+      // Continue with next conversation despite error
+    }
+  }
+
+  const conversationMessage =
+    conversationsLeft > 0
+      ? `, left ${conversationsLeft} empty conversation${conversationsLeft > 1 ? "s" : ""}`
+      : "";
+
   emit({
-    progressMessage: `Deleted ${deleted} messages${errors > 0 ? ` (${errors} failed)` : ""}`,
+    progressMessage: `Deleted ${deleted} messages${errors > 0 ? ` (${errors} failed)` : ""}${conversationMessage}`,
     progressPercent: 1,
     unknownTotal: false,
     progress: { currentItemIndex: deleted, totalItems: total },

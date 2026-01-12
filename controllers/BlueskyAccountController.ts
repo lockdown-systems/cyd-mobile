@@ -1078,6 +1078,54 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
+   * Get the count of messages remaining in a conversation from the Bluesky API
+   */
+  async getConversationMessageCount(convoId: string): Promise<number> {
+    const agent = this.requireAgent();
+
+    const DM_SERVICE_HEADERS = {
+      "atproto-proxy": "did:web:api.bsky.chat#bsky_chat",
+    };
+
+    const response = await this.makeApiRequest(() =>
+      agent.chat.bsky.convo.getMessages(
+        {
+          convoId,
+          limit: 1,
+        },
+        { headers: DM_SERVICE_HEADERS }
+      )
+    );
+
+    return response.messages?.length ?? 0;
+  }
+
+  /**
+   * Leave a conversation (removes it from the user's view)
+   */
+  async leaveConversation(convoId: string): Promise<void> {
+    const agent = this.requireAgent();
+    const db = this.requireDb();
+
+    const DM_SERVICE_HEADERS = {
+      "atproto-proxy": "did:web:api.bsky.chat#bsky_chat",
+    };
+
+    await this.makeApiRequest(() =>
+      agent.api.chat.bsky.convo.leaveConvo(
+        { convoId },
+        { encoding: "application/json", headers: DM_SERVICE_HEADERS }
+      )
+    );
+
+    // Mark conversation as left in local DB
+    db.runSync(`UPDATE conversation SET leftAt = ? WHERE convoId = ?;`, [
+      Date.now(),
+      convoId,
+    ]);
+  }
+
+  /**
    * Fetch all follows from the Bluesky API (paginated).
    * Returns an array of follow records with URI and subject info.
    * Used for unfollowing everyone since we don't save follows locally.
