@@ -31,8 +31,8 @@ type SaveFlowScreen = "form" | "review";
 const SAVE_OPTION_DEFINITIONS = [
   {
     key: "posts",
-    label: "Save my posts",
-    reviewLabel: "Save posts",
+    label: "Save my posts and reposts",
+    reviewLabel: "Save posts and reposts",
   },
   {
     key: "likes",

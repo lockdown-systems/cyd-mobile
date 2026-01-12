@@ -19,34 +19,20 @@ type PremiumRequiredBannerProps = {
 };
 
 export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
-  const { state: cydState, apiClient, getDashboardURL } = useCydAccount();
+  const {
+    state: cydState,
+    getDashboardURL,
+    checkPremiumAccess,
+  } = useCydAccount();
   const [showSignInModal, setShowSignInModal] = useState(false);
-  const [hasPremium, setHasPremium] = useState<boolean | null>(null);
   const [checkingPremium, setCheckingPremium] = useState(false);
 
-  const checkPremiumAccess = useCallback(async () => {
-    if (!cydState.isSignedIn) {
-      setHasPremium(null);
-      return;
-    }
-    setCheckingPremium(true);
-    try {
-      const response = await apiClient.getUserPremium();
-      if ("error" in response) {
-        setHasPremium(false);
-      } else {
-        setHasPremium(response.premium_access);
-      }
-    } catch {
-      setHasPremium(false);
-    } finally {
-      setCheckingPremium(false);
-    }
-  }, [cydState.isSignedIn, apiClient]);
-
+  // Check premium access on mount if not already checked
   useEffect(() => {
-    void checkPremiumAccess();
-  }, [checkPremiumAccess]);
+    if (cydState.isSignedIn && cydState.hasPremiumAccess === null) {
+      void checkPremiumAccess();
+    }
+  }, [cydState.isSignedIn, cydState.hasPremiumAccess, checkPremiumAccess]);
 
   const handleManageAccount = useCallback(() => {
     const url = getDashboardURL();
@@ -59,35 +45,21 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
     setCheckingPremium(true);
     void (async () => {
       try {
-        const response = await apiClient.getUserPremium();
-        if ("error" in response) {
-          Alert.alert(
-            "Error",
-            "Could not check your account status. Please try again."
-          );
-          return;
-        }
-        setHasPremium(response.premium_access);
-        if (response.premium_access) {
-          Alert.alert("Success", "You now have Premium access!");
-        } else {
-          Alert.alert(
-            "Not Yet",
-            "Your account doesn't have Premium access yet. Please complete your upgrade and try again."
-          );
-        }
+        await checkPremiumAccess();
+        // Re-read from context after refresh - need a small delay for state to update
+        // We'll show success/failure based on the next render
+        setCheckingPremium(false);
       } catch {
         Alert.alert(
           "Error",
           "Could not check your account status. Please try again."
         );
-      } finally {
         setCheckingPremium(false);
       }
     })();
-  }, [apiClient]);
+  }, [checkPremiumAccess]);
 
-  // Loading state while checking premium
+  // Loading state while checking premium (only show if actively checking, not on initial load)
   if (cydState.isLoading || checkingPremium) {
     return (
       <View
@@ -172,7 +144,7 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
   }
 
   // User is signed in but doesn't have premium
-  if (hasPremium === false) {
+  if (cydState.hasPremiumAccess === false) {
     return (
       <View
         style={[

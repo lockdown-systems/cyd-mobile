@@ -29,6 +29,7 @@ export type CydAccountState = {
   isSignedIn: boolean;
   userEmail: string | null;
   isLoading: boolean;
+  hasPremiumAccess: boolean | null;
 };
 
 export type CydAccountContextType = {
@@ -45,6 +46,7 @@ export type CydAccountContextType = {
   ) => Promise<{ success: boolean; error?: string }>;
   refreshState: () => Promise<void>;
   getDashboardURL: () => string;
+  checkPremiumAccess: () => Promise<void>;
 };
 
 const CydAccountContext = createContext<CydAccountContextType | null>(null);
@@ -66,6 +68,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
     isSignedIn: false,
     userEmail: null,
     isLoading: true,
+    hasPremiumAccess: null,
   });
 
   const apiClient = useMemo(() => new CydAPIClient(API_URL, DASH_URL), []);
@@ -83,30 +86,33 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         // Verify the session is still valid
         const isValid = await apiClient.ping();
 
-        setState({
+        setState((prev) => ({
+          ...prev,
           isSignedIn: isValid,
           userEmail: isValid ? credentials.userEmail : null,
           isLoading: false,
-        });
+        }));
 
         if (!isValid) {
           // Clear invalid credentials
           await clearCydAccountCredentials();
         }
       } else {
-        setState({
+        setState((prev) => ({
+          ...prev,
           isSignedIn: false,
           userEmail: null,
           isLoading: false,
-        });
+        }));
       }
     } catch (error) {
       console.error("Error refreshing Cyd account state:", error);
-      setState({
+      setState((prev) => ({
+        ...prev,
         isSignedIn: false,
         userEmail: null,
         isLoading: false,
-      });
+      }));
     }
   }, [apiClient]);
 
@@ -224,6 +230,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
           isSignedIn: true,
           userEmail: email,
           isLoading: false,
+          hasPremiumAccess: null, // Will be checked on next checkPremiumAccess call
         });
 
         return { success: true };
@@ -258,6 +265,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         isSignedIn: false,
         userEmail: null,
         isLoading: false,
+        hasPremiumAccess: null,
       });
     } catch (error) {
       console.error("Error signing out:", error);
@@ -268,9 +276,30 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         isSignedIn: false,
         userEmail: null,
         isLoading: false,
+        hasPremiumAccess: null,
       });
     }
   }, [apiClient]);
+
+  const checkPremiumAccess = useCallback(async () => {
+    if (!state.isSignedIn) {
+      setState((prev) => ({ ...prev, hasPremiumAccess: false }));
+      return;
+    }
+    try {
+      const response = await apiClient.getUserPremium();
+      if ("error" in response) {
+        setState((prev) => ({ ...prev, hasPremiumAccess: false }));
+      } else {
+        setState((prev) => ({
+          ...prev,
+          hasPremiumAccess: response.premium_access,
+        }));
+      }
+    } catch {
+      setState((prev) => ({ ...prev, hasPremiumAccess: false }));
+    }
+  }, [state.isSignedIn, apiClient]);
 
   const getDashboardURL = useCallback(() => {
     return apiClient.getDashboardURL();
@@ -285,6 +314,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       sendVerificationCode,
       refreshState,
       getDashboardURL,
+      checkPremiumAccess,
     }),
     [
       state,
@@ -294,6 +324,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       sendVerificationCode,
       refreshState,
       getDashboardURL,
+      checkPremiumAccess,
     ]
   );
 

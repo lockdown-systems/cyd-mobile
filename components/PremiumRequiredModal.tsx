@@ -28,34 +28,32 @@ export function PremiumRequiredModal({
   onDismiss,
   onPremiumConfirmed,
 }: PremiumRequiredModalProps) {
-  const { state: cydState, apiClient, getDashboardURL } = useCydAccount();
+  const {
+    state: cydState,
+    getDashboardURL,
+    checkPremiumAccess,
+  } = useCydAccount();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(false);
 
-  const checkPremiumAccess = useCallback(async () => {
-    if (!cydState.isSignedIn) {
-      return;
-    }
-    setCheckingPremium(true);
-    try {
-      const response = await apiClient.getUserPremium();
-      if (!("error" in response) && response.premium_access) {
-        // If user has premium, trigger the callback
-        onPremiumConfirmed();
-      }
-    } catch {
-      // Silently fail - user can try again
-    } finally {
-      setCheckingPremium(false);
-    }
-  }, [cydState.isSignedIn, apiClient, onPremiumConfirmed]);
-
-  // Check premium status when modal becomes visible or sign-in state changes
+  // Check premium status when modal becomes visible (only if not already checked)
   useEffect(() => {
-    if (visible) {
+    if (visible && cydState.isSignedIn && cydState.hasPremiumAccess === null) {
       void checkPremiumAccess();
     }
-  }, [visible, cydState.isSignedIn, checkPremiumAccess]);
+  }, [
+    visible,
+    cydState.isSignedIn,
+    cydState.hasPremiumAccess,
+    checkPremiumAccess,
+  ]);
+
+  // If user has premium and modal is visible, trigger the callback
+  useEffect(() => {
+    if (visible && cydState.hasPremiumAccess === true) {
+      onPremiumConfirmed();
+    }
+  }, [visible, cydState.hasPremiumAccess, onPremiumConfirmed]);
 
   const handleManageAccount = useCallback(() => {
     const url = getDashboardURL();
@@ -68,37 +66,27 @@ export function PremiumRequiredModal({
     setCheckingPremium(true);
     void (async () => {
       try {
-        const response = await apiClient.getUserPremium();
-        if ("error" in response) {
-          Alert.alert(
-            "Error",
-            "Could not check your account status. Please try again."
-          );
-          return;
-        }
-        if (response.premium_access) {
-          Alert.alert("Success", "You now have Premium access!", [
-            {
-              text: "OK",
-              onPress: () => onPremiumConfirmed(),
-            },
-          ]);
-        } else {
-          Alert.alert(
-            "Not Yet",
-            "Your account doesn't have Premium access yet. Please complete your upgrade and try again."
-          );
-        }
+        await checkPremiumAccess();
+        // The useEffect above will call onPremiumConfirmed if hasPremiumAccess becomes true
+        // We just need to show appropriate feedback
+        setCheckingPremium(false);
       } catch {
         Alert.alert(
           "Error",
           "Could not check your account status. Please try again."
         );
-      } finally {
         setCheckingPremium(false);
       }
     })();
-  }, [apiClient, onPremiumConfirmed]);
+  }, [checkPremiumAccess]);
+
+  // Show alert when premium status changes after clicking "I've Upgraded"
+  useEffect(() => {
+    if (!checkingPremium && cydState.hasPremiumAccess === false) {
+      // Only show "Not Yet" if user just checked (checkingPremium was true)
+      // This is handled by the flow - no alert needed on initial render
+    }
+  }, [checkingPremium, cydState.hasPremiumAccess]);
 
   const handleSignInClose = useCallback(() => {
     setShowSignInModal(false);

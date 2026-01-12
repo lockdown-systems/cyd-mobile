@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Image,
   Pressable,
@@ -61,9 +61,8 @@ export function DashboardTab({
   palette,
   onSelectTab,
 }: AccountTabProps) {
-  const { state: cydState, apiClient } = useCydAccount();
+  const { state: cydState, checkPremiumAccess } = useCydAccount();
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-  const [hasPremium, setHasPremium] = useState<boolean | null>(null);
 
   // Load last saved timestamp
   useEffect(() => {
@@ -73,29 +72,16 @@ export function DashboardTab({
     })();
   }, [accountId]);
 
-  // Check premium access
-  const checkPremiumAccess = useCallback(async () => {
-    if (!cydState.isSignedIn) {
-      setHasPremium(false);
-      return;
-    }
-    try {
-      const response = await apiClient.getUserPremium();
-      if ("error" in response) {
-        setHasPremium(false);
-      } else {
-        setHasPremium(response.premium_access);
-      }
-    } catch {
-      setHasPremium(false);
-    }
-  }, [cydState.isSignedIn, apiClient]);
-
+  // Check premium access (only if not already checked)
   useEffect(() => {
-    void checkPremiumAccess();
-  }, [checkPremiumAccess]);
+    if (cydState.hasPremiumAccess === null) {
+      void checkPremiumAccess();
+    }
+  }, [cydState.hasPremiumAccess, checkPremiumAccess]);
 
   const hasSavedData = lastSavedAt !== null;
+  // Use cached premium status, default to showing premium badges if not yet checked
+  const hasPremium = cydState.hasPremiumAccess ?? false;
 
   const getBadge = (cardKey: AccountTabKey): "startHere" | "premium" | null => {
     if (cardKey === "save" && !hasSavedData) {
