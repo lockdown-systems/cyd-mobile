@@ -46,6 +46,13 @@ export async function runDeleteMessagesJob(
   // Track unique conversation IDs for cleanup check
   const conversationIds = new Set<string>();
 
+  // Get signed-in user info for display (includes avatar from local DB)
+  const userProfile = controller.getUserProfileData();
+  const userDid = userProfile?.did ?? "";
+  const userHandle = userProfile?.handle ?? "you";
+  const userDisplayName = userProfile?.displayName;
+  const userAvatarUrl = userProfile?.avatarUrl;
+
   for (const message of messagesToDelete) {
     await controller.waitForPause();
 
@@ -60,8 +67,10 @@ export async function runDeleteMessagesJob(
       sentAt: message.sentAt,
       savedAt: message.sentAt,
       sender: {
-        did: "",
-        handle: "you",
+        did: userDid,
+        handle: userHandle,
+        displayName: userDisplayName,
+        avatarUrl: userAvatarUrl,
       },
     };
 

@@ -260,6 +260,32 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
+   * Get the user's profile data from the local database (includes avatar URL)
+   */
+  getUserProfileData(): {
+    did: string;
+    handle: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+  } | null {
+    if (!this.db || !this.did) {
+      return null;
+    }
+
+    const profile = this.db.getFirstSync<{
+      displayName: string | null;
+      avatarUrl: string | null;
+    }>(`SELECT displayName, avatarUrl FROM profile WHERE did = ?;`, [this.did]);
+
+    return {
+      did: this.did,
+      handle: this.handle ?? "",
+      displayName: profile?.displayName,
+      avatarUrl: profile?.avatarUrl,
+    };
+  }
+
+  /**
    * Check if the agent is initialized
    */
   isAgentReady(): boolean {
