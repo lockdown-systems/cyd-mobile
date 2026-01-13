@@ -92,16 +92,14 @@ describe("ChatIndexer", () => {
       ];
 
       (mockAgent.chat!.bsky.convo.listConvos as jest.Mock).mockResolvedValue({
-        convos,
-        cursor: undefined,
+        data: { convos, cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatConvos();
 
       // Should have called runAsync for each conversation
-      const runAsyncMock = jest.mocked(mockDb.runAsync.bind(mockDb));
-      expect(runAsyncMock).toHaveBeenCalled();
+      expect(mockDb.runAsync).toHaveBeenCalled();
 
       // Should update progress
       const lastProgress = updateProgressCalls[updateProgressCalls.length - 1];
@@ -120,17 +118,14 @@ describe("ChatIndexer", () => {
       );
 
       (mockAgent.chat!.bsky.convo.listConvos as jest.Mock)
-        .mockResolvedValueOnce({ convos: page1, cursor: "cursor1" })
-        .mockResolvedValueOnce({ convos: page2, cursor: undefined });
+        .mockResolvedValueOnce({ data: { convos: page1, cursor: "cursor1" } })
+        .mockResolvedValueOnce({ data: { convos: page2, cursor: undefined } });
 
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatConvos();
 
       // Should have called API twice
-      const listConvosMock = jest.mocked(
-        mockAgent.chat!.bsky.convo.listConvos.bind(mockAgent.chat!.bsky.convo)
-      );
-      expect(listConvosMock).toHaveBeenCalledTimes(2);
+      expect(mockAgent.chat!.bsky.convo.listConvos).toHaveBeenCalledTimes(2);
     });
 
     it("should save member profiles from conversations", async () => {
@@ -148,8 +143,7 @@ describe("ChatIndexer", () => {
       ];
 
       (mockAgent.chat!.bsky.convo.listConvos as jest.Mock).mockResolvedValue({
-        convos,
-        cursor: undefined,
+        data: { convos, cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);
@@ -174,16 +168,14 @@ describe("ChatIndexer", () => {
       ];
 
       (mockAgent.chat!.bsky.convo.listConvos as jest.Mock).mockResolvedValue({
-        convos,
-        cursor: undefined,
+        data: { convos, cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatConvos();
 
       // Should save both conversations with correct muted flag
-      const runAsyncMock = jest.mocked(mockDb.runAsync.bind(mockDb));
-      expect(runAsyncMock).toHaveBeenCalled();
+      expect(mockDb.runAsync).toHaveBeenCalled();
     });
 
     it("should handle errors gracefully", async () => {
@@ -237,15 +229,18 @@ describe("ChatIndexer", () => {
       const messages2 = [createChatMessage({ text: "Hello from convo2" })];
 
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock)
-        .mockResolvedValueOnce({ messages: messages1, cursor: undefined })
-        .mockResolvedValueOnce({ messages: messages2, cursor: undefined });
+        .mockResolvedValueOnce({
+          data: { messages: messages1, cursor: undefined },
+        })
+        .mockResolvedValueOnce({
+          data: { messages: messages2, cursor: undefined },
+        });
 
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatMessages();
 
       // Should have saved messages from both conversations
-      const runAsyncMock = jest.mocked(mockDb.runAsync.bind(mockDb));
-      expect(runAsyncMock).toHaveBeenCalled();
+      expect(mockDb.runAsync).toHaveBeenCalled();
       const lastProgress = updateProgressCalls[updateProgressCalls.length - 1];
       expect(lastProgress).toMatchObject({
         currentAction: expect.stringContaining("Finished saving") as unknown,
@@ -260,8 +255,7 @@ describe("ChatIndexer", () => {
         { convoId: "convo1" },
       ]);
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
-        messages,
-        cursor: undefined,
+        data: { messages, cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);
@@ -294,8 +288,7 @@ describe("ChatIndexer", () => {
         { convoId: "convo1" },
       ]);
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
-        messages,
-        cursor: undefined,
+        data: { messages, cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);
@@ -333,17 +326,16 @@ describe("ChatIndexer", () => {
         { convoId: "convo1" },
       ]);
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock)
-        .mockResolvedValueOnce({ messages: page1, cursor: "cursor1" })
-        .mockResolvedValueOnce({ messages: page2, cursor: undefined });
+        .mockResolvedValueOnce({ data: { messages: page1, cursor: "cursor1" } })
+        .mockResolvedValueOnce({
+          data: { messages: page2, cursor: undefined },
+        });
 
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatMessages();
 
       // Should have called getMessages twice
-      const getMessagesMock = jest.mocked(
-        mockAgent.chat!.bsky.convo.getMessages.bind(mockAgent.chat!.bsky.convo)
-      );
-      expect(getMessagesMock).toHaveBeenCalledTimes(2);
+      expect(mockAgent.chat!.bsky.convo.getMessages).toHaveBeenCalledTimes(2);
     });
 
     it("should handle no conversations", async () => {
@@ -372,8 +364,7 @@ describe("ChatIndexer", () => {
         { convoId: "convo1" },
       ]);
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
-        messages,
-        cursor: undefined,
+        data: { messages, cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);
@@ -414,14 +405,13 @@ describe("ChatIndexer", () => {
         { convoId: "convo1" },
       ]);
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
-        messages: [message],
-        cursor: undefined,
+        data: { messages: [message], cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatMessages();
 
-      expect(jest.mocked(mockDb.runAsync.bind(mockDb))).toHaveBeenCalled();
+      expect(mockDb.runAsync).toHaveBeenCalled();
 
       // Verify message was saved with facets and embed
       const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
@@ -472,8 +462,7 @@ describe("ChatIndexer", () => {
         { convoId: "convo1" },
       ]);
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
-        messages,
-        cursor: undefined,
+        data: { messages, cursor: undefined },
       });
 
       const indexer = new ChatIndexer(deps);

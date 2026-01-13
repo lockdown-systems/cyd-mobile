@@ -29,6 +29,7 @@ const mockApiClient = {
 };
 
 const mockGetDashboardURL = jest.fn(() => "https://dash.cyd.social/manage");
+const mockCheckPremiumAccess = jest.fn();
 
 jest.mock("@/contexts/CydAccountProvider", () => ({
   useCydAccount: jest.fn(() => ({
@@ -36,9 +37,11 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
       isSignedIn: false,
       userEmail: null,
       isLoading: false,
+      hasPremiumAccess: null,
     },
     apiClient: mockApiClient,
     getDashboardURL: mockGetDashboardURL,
+    checkPremiumAccess: mockCheckPremiumAccess,
   })),
 }));
 
@@ -70,6 +73,8 @@ jest.mock("@/database/delete-settings", () => ({
 
 jest.mock("@/database/accounts", () => ({
   getLastSavedAt: jest.fn().mockResolvedValue(Date.now()),
+  getLastDeletedAt: jest.fn().mockResolvedValue(null),
+  getLastScheduledDeletionAt: jest.fn().mockResolvedValue(null),
 }));
 
 // Mock BlueskyAccountController
@@ -134,34 +139,11 @@ jest.mock("@/components/PremiumRequiredBanner", () => {
   return {
     PremiumRequiredBanner: () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-      const { state, apiClient } = useCydAccount();
-      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
-      const React = require("react");
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      const [hasPremium, setHasPremium] = React.useState<boolean | null>(null);
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      React.useEffect(() => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        if (state.isSignedIn) {
-          void (async () => {
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-              const response = await apiClient.getUserPremium();
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-              setHasPremium(response.premium_access ?? false);
-            } catch {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-              setHasPremium(false);
-            }
-          })();
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      }, [state.isSignedIn, apiClient]);
+      const { state } = useCydAccount();
 
       // If signed in and has premium, render nothing (like the real component)
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (state.isSignedIn && hasPremium === true) {
+      if (state.isSignedIn && state.hasPremiumAccess === true) {
         return null;
       }
 
@@ -171,7 +153,7 @@ jest.mock("@/components/PremiumRequiredBanner", () => {
           {/* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */}
           {!state.isSignedIn && <Text>Sign In Required</Text>}
           {/* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */}
-          {state.isSignedIn && hasPremium === false && (
+          {state.isSignedIn && state.hasPremiumAccess === false && (
             <Text>Upgrade Required</Text>
           )}
         </View>
@@ -243,9 +225,11 @@ describe("DeleteTab Premium Integration", () => {
         isSignedIn: false,
         userEmail: null,
         isLoading: false,
+        hasPremiumAccess: null,
       },
       apiClient: mockApiClient,
       getDashboardURL: mockGetDashboardURL,
+      checkPremiumAccess: mockCheckPremiumAccess,
     });
   });
 
@@ -265,9 +249,11 @@ describe("DeleteTab Premium Integration", () => {
           isSignedIn: true,
           userEmail: "test@example.com",
           isLoading: false,
+          hasPremiumAccess: false,
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        checkPremiumAccess: mockCheckPremiumAccess,
       });
       mockApiClient.getUserPremium.mockResolvedValue({
         premium_access: false,
@@ -287,9 +273,11 @@ describe("DeleteTab Premium Integration", () => {
           isSignedIn: true,
           userEmail: "test@example.com",
           isLoading: false,
+          hasPremiumAccess: true,
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        checkPremiumAccess: mockCheckPremiumAccess,
       });
       mockApiClient.getUserPremium.mockResolvedValue({
         premium_access: true,
@@ -313,9 +301,11 @@ describe("DeleteTab Premium Integration", () => {
           isSignedIn: false,
           userEmail: null,
           isLoading: false,
+          hasPremiumAccess: null,
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        checkPremiumAccess: mockCheckPremiumAccess,
       });
     });
 
@@ -354,9 +344,11 @@ describe("DeleteTab Premium Integration", () => {
           isSignedIn: true,
           userEmail: "test@example.com",
           isLoading: false,
+          hasPremiumAccess: false,
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        checkPremiumAccess: mockCheckPremiumAccess,
       });
       mockApiClient.getUserPremium.mockResolvedValue({
         premium_access: false,
@@ -472,12 +464,11 @@ describe("DeleteTab Premium Integration", () => {
           isSignedIn: true,
           userEmail: "test@example.com",
           isLoading: false,
+          hasPremiumAccess: true,
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
-      });
-      mockApiClient.getUserPremium.mockResolvedValue({
-        premium_access: true,
+        checkPremiumAccess: mockCheckPremiumAccess,
       });
     });
 
@@ -569,14 +560,11 @@ describe("DeleteTab Premium Integration", () => {
           isSignedIn: true,
           userEmail: "test@example.com",
           isLoading: false,
+          hasPremiumAccess: false,
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
-      });
-      // Return error for premium check
-      mockApiClient.getUserPremium.mockResolvedValue({
-        error: true,
-        message: "Server error",
+        checkPremiumAccess: mockCheckPremiumAccess,
       });
 
       render(<DeleteTab {...defaultProps} />);
@@ -599,7 +587,7 @@ describe("DeleteTab Premium Integration", () => {
         fireEvent.press(screen.getByText("Delete My Data"));
       });
 
-      // Should show premium modal (fail-safe when can't verify premium)
+      // Should show premium modal (since hasPremiumAccess is false)
       await waitFor(() => {
         expect(screen.getByTestId("premium-required-modal")).toBeTruthy();
       });
@@ -611,14 +599,12 @@ describe("DeleteTab Premium Integration", () => {
           isSignedIn: true,
           userEmail: "test@example.com",
           isLoading: false,
+          hasPremiumAccess: false,
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        checkPremiumAccess: mockCheckPremiumAccess,
       });
-      // Throw error for premium check
-      mockApiClient.getUserPremium.mockRejectedValue(
-        new Error("Network error")
-      );
 
       render(<DeleteTab {...defaultProps} />);
 
@@ -640,7 +626,7 @@ describe("DeleteTab Premium Integration", () => {
         fireEvent.press(screen.getByText("Delete My Data"));
       });
 
-      // Should show premium modal (fail-safe when can't verify premium)
+      // Should show premium modal (since hasPremiumAccess is false)
       await waitFor(() => {
         expect(screen.getByTestId("premium-required-modal")).toBeTruthy();
       });

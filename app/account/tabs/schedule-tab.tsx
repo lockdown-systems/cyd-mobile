@@ -45,6 +45,12 @@ import type {
   AccountTabPalette,
   AccountTabProps,
 } from "@/types/account-tabs";
+import {
+  CheckboxRow,
+  PrimaryButton,
+  SecondaryButton,
+  StackHeader,
+} from "./_shared-tab-components";
 import { dropdownMenuShadow, sharedTabStyles } from "./_shared-tab-styles";
 
 const DAYS_OF_WEEK = [
@@ -744,75 +750,6 @@ function ScheduleReviewScreen({
   );
 }
 
-function StackHeader({
-  title,
-  palette,
-  onBack,
-}: {
-  title: string;
-  palette: AccountTabPalette;
-  onBack: () => void;
-}) {
-  return (
-    <View
-      style={[styles.header, { borderColor: palette.icon + "22" }]}
-      accessibilityRole="header"
-    >
-      <Pressable
-        onPress={onBack}
-        style={styles.backButton}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-      >
-        <MaterialIcons name="arrow-back" size={24} color={palette.text} />
-      </Pressable>
-      <Text style={[styles.headerTitle, { color: palette.text }]}>{title}</Text>
-    </View>
-  );
-}
-
-function CheckboxRow({
-  label,
-  checked,
-  onToggle,
-  palette,
-  hint,
-}: {
-  label: string;
-  checked: boolean;
-  onToggle: (next: boolean) => void;
-  palette: AccountTabPalette;
-  hint?: string;
-}) {
-  return (
-    <Pressable
-      onPress={() => onToggle(!checked)}
-      style={styles.optionRow}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-    >
-      <MaterialIcons
-        name={checked ? "check-box" : "check-box-outline-blank"}
-        size={24}
-        color={checked ? palette.tint : palette.icon}
-        style={{ marginTop: 2 }}
-      />
-      <View style={styles.optionRowContent}>
-        <View style={styles.optionLabelRow}>
-          <Text style={[styles.optionLabel, { color: palette.text }]}>
-            {label}
-          </Text>
-        </View>
-        {hint && (
-          <Text style={[styles.optionHint, { color: palette.icon }]}>
-            {hint}
-          </Text>
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
 function FrequencyPicker({
   value,
   onChange,
@@ -1073,76 +1010,6 @@ function DropdownRow<T extends string | number>({
         </View>
       )}
     </View>
-  );
-}
-
-type PrimaryButtonProps = {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  disabled?: boolean;
-};
-
-function PrimaryButton({
-  label,
-  palette,
-  onPress,
-  disabled,
-}: PrimaryButtonProps) {
-  const backgroundColor = palette.button?.background ?? palette.tint;
-  const textColor = palette.button?.text ?? "#ffffff";
-  return (
-    <Pressable
-      onPress={
-        disabled
-          ? undefined
-          : () => {
-              void onPress();
-            }
-      }
-      style={({ pressed }) => [
-        styles.primaryButton,
-        {
-          backgroundColor,
-          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-    >
-      <Text style={[styles.primaryButtonText, { color: textColor }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-type SecondaryButtonProps = {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-};
-
-function SecondaryButton({ label, palette, onPress }: SecondaryButtonProps) {
-  return (
-    <Pressable
-      onPress={() => {
-        void onPress();
-      }}
-      style={({ pressed }) => [
-        styles.secondaryButton,
-        {
-          borderColor: palette.icon + "33",
-          backgroundColor: palette.card,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-    >
-      <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 

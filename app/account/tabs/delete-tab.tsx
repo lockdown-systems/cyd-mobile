@@ -5,14 +5,12 @@ import React, {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -39,6 +37,15 @@ import type {
   AccountTabPalette,
   AccountTabProps,
 } from "@/types/account-tabs";
+import {
+  CheckboxRow,
+  Indented,
+  NumberInput,
+  PrimaryButton,
+  SecondaryButton,
+  StackHeader,
+  StatusCard,
+} from "./_shared-tab-components";
 import { sharedTabStyles } from "./_shared-tab-styles";
 
 type DeleteFlowScreen = "form" | "review";
@@ -743,12 +750,11 @@ function DeleteReviewScreen({
   onPremiumRequired,
   refreshKey: externalRefreshKey,
 }: DeleteReviewScreenProps) {
-  const { state: cydState, apiClient } = useCydAccount();
+  const { state: cydState } = useCydAccount();
   const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
   const [countsLoading, setCountsLoading] = useState(true);
   const [countsError, setCountsError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [checkingPremium, setCheckingPremium] = useState(false);
 
   // Refresh when external key changes (e.g., after automation completes)
   useEffect(() => {
@@ -805,7 +811,7 @@ function DeleteReviewScreen({
   }, []);
 
   // Handle Delete My Data button - check premium first
-  const handleDeletePress = useCallback(async () => {
+  const handleDeletePress = useCallback(() => {
     if (!counts) return;
 
     // If not signed in, show premium modal
@@ -814,27 +820,18 @@ function DeleteReviewScreen({
       return;
     }
 
-    // Check if user has premium
-    setCheckingPremium(true);
-    try {
-      const response = await apiClient.getUserPremium();
-      if ("error" in response || !response.premium_access) {
-        // No premium, show the modal
-        onPremiumRequired(selections, counts);
-      } else {
-        // Has premium, proceed with deletion
-        onConfirm(selections, counts);
-      }
-    } catch {
-      // Error checking premium, show the modal to be safe
+    // Check if user has premium (from context state)
+    if (cydState.hasPremiumAccess === true) {
+      // Has premium, proceed with deletion
+      onConfirm(selections, counts);
+    } else {
+      // No premium or unknown, show the modal
       onPremiumRequired(selections, counts);
-    } finally {
-      setCheckingPremium(false);
     }
   }, [
     counts,
     cydState.isSignedIn,
-    apiClient,
+    cydState.hasPremiumAccess,
     selections,
     onConfirm,
     onPremiumRequired,
@@ -1042,9 +1039,9 @@ function DeleteReviewScreen({
           palette={palette}
         />
         <PrimaryButton
-          label={checkingPremium ? "Checking..." : "Delete My Data"}
+          label="Delete My Data"
           onPress={handleDeletePress}
-          disabled={chosen.length === 0 || !counts || checkingPremium}
+          disabled={chosen.length === 0 || !counts}
           palette={palette}
         />
       </View>
@@ -1059,249 +1056,6 @@ function DeleteReviewScreen({
         selections={selections}
       />
     </View>
-  );
-}
-
-function StackHeader({
-  title,
-  palette,
-  onBack,
-}: {
-  title: string;
-  palette: AccountTabPalette;
-  onBack: () => void;
-}) {
-  return (
-    <View
-      style={[styles.header, { borderColor: palette.icon + "22" }]}
-      accessibilityRole="header"
-    >
-      <Pressable
-        onPress={onBack}
-        style={styles.backButton}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-      >
-        <MaterialIcons name="arrow-back" size={24} color={palette.text} />
-      </Pressable>
-      <Text style={[styles.headerTitle, { color: palette.text }]}>{title}</Text>
-    </View>
-  );
-}
-
-function StatusCard({
-  children,
-  palette,
-}: {
-  children: ReactNode;
-  palette: AccountTabPalette;
-}) {
-  return (
-    <View
-      style={[
-        styles.statusCard,
-        {
-          borderColor: palette.icon + "22",
-          backgroundColor: palette.card,
-        },
-      ]}
-    >
-      {children}
-    </View>
-  );
-}
-
-function CheckboxRow({
-  label,
-  checked,
-  onToggle,
-  palette,
-  disabled,
-  trailing,
-  children,
-  hint,
-}: {
-  label: string;
-  checked: boolean;
-  onToggle: (next: boolean) => void;
-  palette: AccountTabPalette;
-  disabled?: boolean;
-  trailing?: ReactNode;
-  children?: ReactNode;
-  hint?: string;
-}) {
-  return (
-    <Pressable
-      onPress={() => {
-        if (disabled) return;
-        onToggle(!checked);
-      }}
-      style={styles.optionRow}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked, disabled }}
-    >
-      <MaterialIcons
-        name={checked ? "check-box" : "check-box-outline-blank"}
-        size={24}
-        color={checked ? palette.tint : palette.icon}
-        style={{ opacity: disabled ? 0.5 : 1, marginTop: 2 }}
-      />
-      <View style={styles.optionRowContent}>
-        <View style={styles.optionLabelRow}>
-          <Text
-            style={[
-              styles.optionLabel,
-              { color: palette.text, opacity: disabled ? 0.6 : 1 },
-            ]}
-          >
-            {label}
-          </Text>
-        </View>
-        {hint && (
-          <Text style={[styles.optionHint, { color: palette.icon }]}>
-            {hint}
-          </Text>
-        )}
-        {children}
-      </View>
-      {trailing}
-    </Pressable>
-  );
-}
-
-function Indented({ children }: { children: ReactNode }) {
-  return <View style={styles.indented}>{children}</View>;
-}
-
-function NumberInput({
-  value,
-  onChange,
-  palette,
-  disabled,
-  min = 0,
-  suffix,
-}: {
-  value: number;
-  onChange: (next: number) => void;
-  palette: AccountTabPalette;
-  disabled?: boolean;
-  min?: number;
-  suffix?: string;
-}) {
-  const clampValue = useCallback(
-    (next: number) => {
-      if (Number.isNaN(next)) return;
-      onChange(Math.max(min, Math.floor(next)));
-    },
-    [min, onChange]
-  );
-
-  return (
-    <View style={styles.numberInputContainer}>
-      <Pressable
-        onPress={() => clampValue(value - 1)}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.stepperButton,
-          { opacity: disabled ? 0.4 : pressed ? 0.85 : 1 },
-        ]}
-      >
-        <Text style={[styles.stepperText, { color: palette.text }]}>-</Text>
-      </Pressable>
-      <TextInput
-        style={[
-          styles.numberInput,
-          { color: palette.text, borderColor: palette.icon + "33" },
-        ]}
-        value={String(value)}
-        onChangeText={(text) => clampValue(Number(text))}
-        editable={!disabled}
-        keyboardType="number-pad"
-        inputMode="numeric"
-      />
-      <Pressable
-        onPress={() => clampValue(value + 1)}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.stepperButton,
-          { opacity: disabled ? 0.4 : pressed ? 0.85 : 1 },
-        ]}
-      >
-        <Text style={[styles.stepperText, { color: palette.text }]}>+</Text>
-      </Pressable>
-      {suffix ? (
-        <Text
-          style={[
-            styles.numberSuffix,
-            { color: palette.text, opacity: disabled ? 0.6 : 1 },
-          ]}
-        >
-          {suffix}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function PrimaryButton({
-  label,
-  palette,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  disabled?: boolean;
-}) {
-  const backgroundColor = palette.button?.background ?? palette.tint;
-  const textColor = palette.button?.text ?? "#ffffff";
-  return (
-    <Pressable
-      onPress={disabled ? undefined : () => void onPress()}
-      style={({ pressed }) => [
-        styles.primaryButton,
-        {
-          backgroundColor,
-          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-    >
-      <Text style={[styles.primaryButtonText, { color: textColor }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function SecondaryButton({
-  label,
-  palette,
-  onPress,
-}: {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-}) {
-  return (
-    <Pressable
-      onPress={() => void onPress()}
-      style={({ pressed }) => [
-        styles.secondaryButton,
-        {
-          borderColor: palette.icon + "33",
-          backgroundColor: palette.card,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-    >
-      <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 

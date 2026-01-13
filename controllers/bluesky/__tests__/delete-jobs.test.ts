@@ -62,6 +62,12 @@ function createMockController(overrides?: Partial<BlueskyAccountController>) {
     initAgent: jest.fn().mockResolvedValue(undefined),
     getDeleteSettings: jest.fn().mockReturnValue(mockDeleteSettings),
     waitForPause: jest.fn().mockResolvedValue(undefined),
+    // User profile
+    getUserProfileData: jest.fn().mockReturnValue({
+      did: "did:plc:testuser",
+      handle: "testuser.bsky.social",
+      displayName: "Test User",
+    }),
     // Post-related
     getPostsToDeleteWithPreview: jest.fn().mockReturnValue([]),
     deletePost: jest.fn().mockResolvedValue(undefined),

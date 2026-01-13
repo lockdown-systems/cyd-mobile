@@ -24,6 +24,11 @@ import {
 } from "@/database/save-settings";
 import { submitBlueskyProgress } from "@/services/submit-bluesky-progress";
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
+import {
+  PrimaryButton,
+  SecondaryButton,
+  StackHeader,
+} from "./_shared-tab-components";
 import { sharedTabStyles } from "./_shared-tab-styles";
 
 type SaveFlowScreen = "form" | "review";
@@ -538,100 +543,6 @@ function SaveReviewScreen({
         />
       </View>
     </View>
-  );
-}
-
-type StackHeaderProps = {
-  title: string;
-  palette: AccountTabPalette;
-  onBack: () => void;
-};
-
-function StackHeader({ title, palette, onBack }: StackHeaderProps) {
-  return (
-    <View
-      style={[styles.header, { borderColor: palette.icon + "22" }]}
-      accessibilityRole="header"
-    >
-      <Pressable
-        onPress={onBack}
-        style={styles.backButton}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-      >
-        <MaterialIcons name="arrow-back" size={24} color={palette.text} />
-      </Pressable>
-      <Text style={[styles.headerTitle, { color: palette.text }]}>{title}</Text>
-    </View>
-  );
-}
-type PrimaryButtonProps = {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-  disabled?: boolean;
-};
-
-function PrimaryButton({
-  label,
-  palette,
-  onPress,
-  disabled,
-}: PrimaryButtonProps) {
-  const backgroundColor = palette.button?.background ?? palette.tint;
-  const textColor = palette.button?.text ?? "#ffffff";
-  return (
-    <Pressable
-      onPress={
-        disabled
-          ? undefined
-          : () => {
-              void onPress();
-            }
-      }
-      style={({ pressed }) => [
-        styles.primaryButton,
-        {
-          backgroundColor,
-          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-    >
-      <Text style={[styles.primaryButtonText, { color: textColor }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-type SecondaryButtonProps = {
-  label: string;
-  palette: AccountTabPalette;
-  onPress: () => void | Promise<void>;
-};
-
-function SecondaryButton({ label, palette, onPress }: SecondaryButtonProps) {
-  return (
-    <Pressable
-      onPress={() => {
-        void onPress();
-      }}
-      style={({ pressed }) => [
-        styles.secondaryButton,
-        {
-          borderColor: palette.icon + "33",
-          backgroundColor: palette.card,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-    >
-      <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 

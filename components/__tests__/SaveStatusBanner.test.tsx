@@ -52,16 +52,18 @@ describe("SaveStatusBanner", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText("You need to save data before you can delete it.")
+          screen.getByText(
+            "You need to save your data before you can delete it."
+          )
         ).toBeTruthy();
       });
     });
 
-    it("should show Go to Save Tab button", async () => {
+    it("should show Save Data button", async () => {
       render(<SaveStatusBanner accountId={1} palette={defaultPalette} />);
 
       await waitFor(() => {
-        expect(screen.getByText("Go to Save Tab")).toBeTruthy();
+        expect(screen.getByText("Save Data")).toBeTruthy();
       });
     });
 
@@ -77,10 +79,10 @@ describe("SaveStatusBanner", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Go to Save Tab")).toBeTruthy();
+        expect(screen.getByText("Save Data")).toBeTruthy();
       });
 
-      fireEvent.press(screen.getByText("Go to Save Tab"));
+      fireEvent.press(screen.getByText("Save Data"));
 
       expect(mockOnSelectTab).toHaveBeenCalledWith("save");
     });
@@ -89,12 +91,12 @@ describe("SaveStatusBanner", () => {
       render(<SaveStatusBanner accountId={1} palette={defaultPalette} />);
 
       await waitFor(() => {
-        expect(screen.getByText("Go to Save Tab")).toBeTruthy();
+        expect(screen.getByText("Save Data")).toBeTruthy();
       });
 
       // Should not throw when pressed without onSelectTab
       expect(() => {
-        fireEvent.press(screen.getByText("Go to Save Tab"));
+        fireEvent.press(screen.getByText("Save Data"));
       }).not.toThrow();
     });
   });
@@ -215,7 +217,7 @@ describe("SaveStatusBanner", () => {
       render(<SaveStatusBanner accountId={1} palette={defaultPalette} />);
 
       await waitFor(() => {
-        expect(screen.getByText("Go to Save Tab")).toBeTruthy();
+        expect(screen.getByText("Save Data")).toBeTruthy();
       });
     });
 
@@ -235,20 +237,20 @@ describe("SaveStatusBanner", () => {
       render(<SaveStatusBanner accountId={1} palette={defaultPalette} />);
 
       await waitFor(() => {
-        expect(screen.getByText("Go to Save Tab")).toBeTruthy();
+        expect(screen.getByText("Save Data")).toBeTruthy();
       });
     });
   });
 
   describe("accessibility", () => {
-    it("should have accessible button for Go to Save Tab", async () => {
+    it("should have accessible button for Save Data", async () => {
       mockGetLastSavedAt.mockResolvedValue(null);
 
       render(<SaveStatusBanner accountId={1} palette={defaultPalette} />);
 
       await waitFor(() => {
         // The button should exist and be pressable
-        expect(screen.getByText("Go to Save Tab")).toBeTruthy();
+        expect(screen.getByText("Save Data")).toBeTruthy();
       });
     });
 
