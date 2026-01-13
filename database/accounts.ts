@@ -409,3 +409,23 @@ export async function setLastScheduledDeletionAt(
     [ts, accountId]
   );
 }
+
+/**
+ * Get the handle for an account.
+ * @param accountId The account ID
+ * @returns The handle (e.g., "user.bsky.social"), or null if not found
+ */
+export async function getAccountHandle(
+  accountId: number
+): Promise<string | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ handle: string }>(
+    `SELECT b.handle
+     FROM account a
+     INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+     WHERE a.id = ?
+     LIMIT 1;`,
+    [accountId]
+  );
+  return row?.handle ?? null;
+}

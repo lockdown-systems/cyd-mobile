@@ -3,6 +3,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +19,7 @@ import { ScheduledAutomationModal } from "@/app/account/components/ScheduledAuto
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveAndDeleteStatusBanner } from "@/components/SaveAndDeleteStatusBanner";
+import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { BlueskyAccountController } from "@/controllers";
 import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import type {
@@ -25,6 +27,7 @@ import type {
   SaveAndDeleteJobOptions,
 } from "@/controllers/bluesky/job-types";
 import {
+  getAccountHandle,
   getLastDeletedAt,
   getLastSavedAt,
   setLastDeletedAt,
@@ -40,6 +43,7 @@ import {
   type AccountScheduleSettings,
   type ScheduleFrequency,
 } from "@/database/schedule-settings";
+import { registerForPushNotifications } from "@/services/push-notifications";
 import type {
   AccountTabKey,
   AccountTabPalette,
@@ -82,6 +86,7 @@ export function ScheduleTab({
   palette,
   onSelectTab,
 }: AccountTabProps) {
+  const { apiClient, state: cydState } = useCydAccount();
   const [screenStack, setScreenStack] = useState<ScheduleFlowScreen[]>([
     "form",
   ]);
@@ -89,6 +94,7 @@ export function ScheduleTab({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [saving, setSaving] = useState(false);
+  const [accountHandle, setAccountHandle] = useState<string | null>(null);
 
   // Save and delete settings for review screen
   const [saveSettings, setSaveSettings] = useState<AccountSaveSettings | null>(
@@ -114,14 +120,16 @@ export function ScheduleTab({
     setLoading(true);
     setError(null);
     try {
-      const [scheduleSettings, save, del] = await Promise.all([
+      const [scheduleSettings, save, del, handle] = await Promise.all([
         getAccountScheduleSettings(accountId),
         getAccountSaveSettings(accountId),
         getAccountDeleteSettings(accountId),
+        getAccountHandle(accountId),
       ]);
       setState(scheduleSettings);
       setSaveSettings(save);
       setDeleteSettings(del);
+      setAccountHandle(handle);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       setState(null);
@@ -134,12 +142,107 @@ export function ScheduleTab({
     void loadSettings();
   }, [loadSettings]);
 
+  /**
+   * Sync schedule settings to the server for push notification scheduling
+   */
+  const syncScheduleToServer = useCallback(
+    async (settings: AccountScheduleSettings) => {
+      if (!cydState.isSignedIn || !accountUUID) {
+        return;
+      }
+
+      try {
+        await apiClient.updateScheduleSettings({
+          account_uuid: accountUUID,
+          schedule_enabled: settings.scheduleDeletion,
+          schedule_frequency: settings.scheduleDeletionFrequency,
+          schedule_day_of_month: settings.scheduleDeletionDayOfMonth,
+          schedule_day_of_week: settings.scheduleDeletionDayOfWeek,
+          schedule_time: settings.scheduleDeletionTime,
+        });
+      } catch (err) {
+        console.error("Failed to sync schedule to server:", err);
+      }
+    },
+    [apiClient, accountUUID, cydState.isSignedIn]
+  );
+
+  /**
+   * Register push notifications for this account
+   */
+  const registerPushNotificationsForAccount =
+    useCallback(async (): Promise<boolean> => {
+      if (!cydState.isSignedIn) {
+        Alert.alert(
+          "Sign In Required",
+          "Please sign in to your Cyd account to receive push notifications.",
+          [{ text: "OK" }]
+        );
+        return false;
+      }
+
+      if (!accountUUID || !accountHandle) {
+        console.error("Missing account UUID or handle for push registration");
+        return false;
+      }
+
+      const result = await registerForPushNotifications();
+      if (!result.success) {
+        if (result.error?.includes("denied")) {
+          Alert.alert(
+            "Notifications Disabled",
+            "Push notifications are disabled. Please enable them in your device settings to receive deletion reminders.",
+            [{ text: "OK" }]
+          );
+        } else if (result.error?.includes("simulator")) {
+          // Silently skip on simulator
+          console.log("Push notifications not available in simulator");
+        } else {
+          Alert.alert(
+            "Notification Error",
+            "Could not enable push notifications. Please try again later.",
+            [{ text: "OK" }]
+          );
+        }
+        return false;
+      }
+
+      // Register the token with the server
+      const registerResult = await apiClient.registerPushToken({
+        push_token: result.token!,
+        platform: result.platform!,
+        account_uuid: accountUUID,
+        account_handle: accountHandle,
+      });
+
+      if (registerResult !== true) {
+        console.error("Failed to register push token:", registerResult.message);
+        return false;
+      }
+
+      return true;
+    }, [apiClient, accountUUID, accountHandle, cydState.isSignedIn]);
+
   const updateSetting = useCallback(
     async <K extends keyof AccountScheduleSettings>(
       key: K,
       value: AccountScheduleSettings[K]
     ) => {
       if (!state) return;
+
+      // If enabling scheduled deletion for the first time, request notification permission
+      if (
+        key === "scheduleDeletion" &&
+        value === true &&
+        !state.scheduleDeletion
+      ) {
+        const registered = await registerPushNotificationsForAccount();
+        if (!registered) {
+          // Don't enable scheduling if push registration failed
+          return;
+        }
+      }
+
       const newState = { ...state, [key]: value };
       setState(newState);
 
@@ -147,6 +250,8 @@ export function ScheduleTab({
       setSaving(true);
       try {
         await updateAccountScheduleSettings(accountId, newState);
+        // Sync to server for push notification scheduling
+        await syncScheduleToServer(newState);
       } catch {
         // Revert on error
         setState(state);
@@ -154,7 +259,12 @@ export function ScheduleTab({
         setSaving(false);
       }
     },
-    [accountId, state]
+    [
+      accountId,
+      state,
+      registerPushNotificationsForAccount,
+      syncScheduleToServer,
+    ]
   );
 
   const pushScreen = useCallback((next: ScheduleFlowScreen) => {

@@ -10,11 +10,15 @@ import "react-native-reanimated";
 
 import { CydAccountProvider } from "@/contexts/CydAccountProvider";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useNotificationHandler } from "@/hooks/use-notification-handler";
 import { trackEvent } from "@/services/analytics";
 import { PlausibleEvents } from "@/types/analytics";
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const colorScheme = useColorScheme();
+
+  // Set up notification handling
+  useNotificationHandler();
 
   useEffect(() => {
     // Track app opened event on initial load
@@ -22,21 +26,27 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen
+          name="account/[accountId]"
+          options={{ headerShown: true }}
+        />
+        <Stack.Screen
+          name="add-account"
+          options={{ headerShown: true, presentation: "modal" }}
+        />
+      </Stack>
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <CydAccountProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen
-            name="account/[accountId]"
-            options={{ headerShown: true }}
-          />
-          <Stack.Screen
-            name="add-account"
-            options={{ headerShown: true, presentation: "modal" }}
-          />
-        </Stack>
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      </ThemeProvider>
+      <RootLayoutContent />
     </CydAccountProvider>
   );
 }

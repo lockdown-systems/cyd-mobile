@@ -52,10 +52,14 @@ import { SaveTab } from "./tabs/save-tab";
 import { ScheduleTab } from "./tabs/schedule-tab";
 
 export default function AccountPlaceholderScreen() {
-  const params = useLocalSearchParams<{ accountId: string | string[] }>();
+  const params = useLocalSearchParams<{
+    accountId: string | string[];
+    initialTab?: AccountTabKey;
+  }>();
   const accountId = Array.isArray(params.accountId)
     ? params.accountId[0]
     : params.accountId;
+  const initialTab = params.initialTab;
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const palette = Colors[colorScheme];
@@ -64,7 +68,9 @@ export default function AccountPlaceholderScreen() {
     () => accounts.find((item) => item.uuid === accountId),
     [accounts, accountId]
   );
-  const [activeTab, setActiveTab] = useState<AccountTabKey>("dashboard");
+  const [activeTab, setActiveTab] = useState<AccountTabKey>(
+    initialTab ?? "dashboard"
+  );
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [authStatus, setAuthStatus] = useState<
     AccountAuthStatusValue | "unknown"
@@ -72,6 +78,18 @@ export default function AccountPlaceholderScreen() {
   const [statusActionPending, setStatusActionPending] = useState(false);
   const [verifyingAuth, setVerifyingAuth] = useState(false);
   const insets = useSafeAreaInsets();
+
+  // Handle initialTab from deep link
+  useEffect(() => {
+    if (initialTab) {
+      console.log(
+        "[AccountScreen] setting initial tab from deep link:",
+        initialTab
+      );
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   const handleSelectTab = useCallback((tab: AccountTabKey) => {
     console.log("[AccountScreen] select tab", tab);
     setActiveTab(tab);

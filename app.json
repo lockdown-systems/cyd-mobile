@@ -5,10 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": ["social.cyd.api", "social.cyd.dev-api"],
+    "scheme": [
+      "social.cyd.api",
+      "social.cyd.dev-api"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "platforms": ["android", "ios"],
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "systems.lockdown.cyd-mobile",
@@ -16,7 +22,10 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["social.cyd.api", "social.cyd.dev-api"]
+            "CFBundleURLSchemes": [
+              "social.cyd.api",
+              "social.cyd.dev-api"
+            ]
           }
         ]
       },
@@ -43,7 +52,10 @@
               "scheme": "social.cyd.dev-api"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -69,11 +81,25 @@
           }
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#4A90D9"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "192811c5-4578-4acb-b55d-4da9d2a5f44a"
+      }
+    },
+    "owner": "lockdownsystems"
   }
 }

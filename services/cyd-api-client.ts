@@ -86,6 +86,29 @@ export type PostBlueskyProgressAPIRequest = {
   total_accounts_unfollowed: number;
 };
 
+// API models for POST /push-notification
+export type RegisterPushTokenAPIRequest = {
+  push_token: string;
+  platform: "ios" | "android";
+  account_uuid: string;
+  account_handle: string;
+};
+
+// API models for PUT /push-notification/schedule
+export type UpdateScheduleSettingsAPIRequest = {
+  account_uuid: string;
+  schedule_enabled: boolean;
+  schedule_frequency: "daily" | "weekly" | "monthly";
+  schedule_day_of_month: number;
+  schedule_day_of_week: number;
+  schedule_time: string; // HH:MM format
+};
+
+// API models for DELETE /push-notification
+export type UnregisterPushTokenAPIRequest = {
+  account_uuid: string;
+};
+
 // The API client
 export default class CydAPIClient {
   public apiURL: string;
@@ -514,6 +537,86 @@ export default class CydAPIClient {
     } catch {
       return this.returnError(
         "Failed to submit Bluesky progress. Maybe the server is down?"
+      );
+    }
+  }
+
+  // ==================== Push Notification API ====================
+
+  /**
+   * Register a push notification token with the server
+   */
+  async registerPushToken(
+    request: RegisterPushTokenAPIRequest
+  ): Promise<true | APIErrorResponse> {
+    try {
+      const response = await this.fetchAuthenticated(
+        "POST",
+        `${this.apiURL}/push-notification`,
+        request
+      );
+      if (response.status !== 200 && response.status !== 201) {
+        return this.returnError(
+          "Failed to register push token.",
+          response.status
+        );
+      }
+      return true;
+    } catch {
+      return this.returnError(
+        "Failed to register push token. Maybe the server is down?"
+      );
+    }
+  }
+
+  /**
+   * Update schedule settings on the server
+   */
+  async updateScheduleSettings(
+    request: UpdateScheduleSettingsAPIRequest
+  ): Promise<true | APIErrorResponse> {
+    try {
+      const response = await this.fetchAuthenticated(
+        "PUT",
+        `${this.apiURL}/push-notification/schedule`,
+        request
+      );
+      if (response.status !== 200) {
+        return this.returnError(
+          "Failed to update schedule settings.",
+          response.status
+        );
+      }
+      return true;
+    } catch {
+      return this.returnError(
+        "Failed to update schedule settings. Maybe the server is down?"
+      );
+    }
+  }
+
+  /**
+   * Unregister push notifications for an account
+   */
+  async unregisterPushToken(
+    request: UnregisterPushTokenAPIRequest
+  ): Promise<true | APIErrorResponse> {
+    try {
+      const response = await this.fetchAuthenticated(
+        "DELETE",
+        `${this.apiURL}/push-notification`,
+        request
+      );
+      if (response.status !== 200 && response.status !== 204) {
+        return this.returnError(
+          "Failed to unregister push token.",
+          response.status
+        );
+      }
+      return true;
+    } catch {
+      return this.returnError(
+        "Failed to unregister push token. Maybe the server is down?"
       );
     }
   }
