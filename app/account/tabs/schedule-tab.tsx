@@ -618,14 +618,19 @@ function FrequencyPicker({
             style={[
               localStyles.frequencyButton,
               value === option.value && {
-                backgroundColor: palette.tint,
+                backgroundColor: palette.button?.background ?? palette.tint,
               },
             ]}
           >
             <Text
               style={[
                 localStyles.frequencyButtonText,
-                { color: value === option.value ? "#fff" : palette.text },
+                {
+                  color:
+                    value === option.value
+                      ? (palette.button?.text ?? "#fff")
+                      : palette.text,
+                },
               ]}
             >
               {option.label}
@@ -740,7 +745,7 @@ function TimePicker({
             mode="time"
             onChange={handleChange}
             display="compact"
-            themeVariant="light"
+            accentColor={palette.tint}
           />
         </View>
       )}
