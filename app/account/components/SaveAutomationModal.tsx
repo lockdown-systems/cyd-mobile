@@ -166,7 +166,7 @@ export function SaveAutomationModal({
 
       try {
         const controller = await ensureController();
-        const definedJobs = await controller.defineJobs(options);
+        const definedJobs = await controller.defineSaveJobs(options);
         console.log(
           "[SaveAutomationModal] jobs defined",
           accountId,

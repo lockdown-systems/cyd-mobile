@@ -460,8 +460,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
   // ==================== Job Management ====================
 
-  async defineJobs(options: SaveJobOptions): Promise<BlueskyJobRecord[]> {
-    console.log("[BlueskyController] defineJobs -> start", this.accountId, {
+  async defineSaveJobs(options: SaveJobOptions): Promise<BlueskyJobRecord[]> {
+    console.log("[BlueskyController] defineSaveJobs -> start", this.accountId, {
       posts: options.posts,
       likes: options.likes,
       bookmarks: options.bookmarks,
@@ -509,7 +509,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     console.log(
-      "[BlueskyController] defineJobs -> inserted",
+      "[BlueskyController] defineSaveJobs -> inserted",
       this.accountId,
       inserted.map((j) => j.jobType)
     );

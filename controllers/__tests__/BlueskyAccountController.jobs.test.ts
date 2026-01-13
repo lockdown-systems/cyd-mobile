@@ -53,7 +53,7 @@ describe("BlueskyAccountController job pipeline", () => {
 
   it("defines jobs for verifyAuthorization and savePosts only", async () => {
     const { controller, mockDb } = setupControllerWithDb();
-    const jobs = await controller.defineJobs(defaultOptions);
+    const jobs = await controller.defineSaveJobs(defaultOptions);
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
     expect(jobs.map((job) => job.jobType)).toEqual([
@@ -65,7 +65,7 @@ describe("BlueskyAccountController job pipeline", () => {
 
   it("adds likes and bookmarks jobs when enabled", async () => {
     const { controller, mockDb } = setupControllerWithDb();
-    const jobs = await controller.defineJobs({
+    const jobs = await controller.defineSaveJobs({
       ...defaultOptions,
       likes: true,
       bookmarks: true,
@@ -82,7 +82,7 @@ describe("BlueskyAccountController job pipeline", () => {
 
   it("runs jobs sequentially and marks completion", async () => {
     const { controller, mockDb } = setupControllerWithDb();
-    const jobs = await controller.defineJobs(defaultOptions);
+    const jobs = await controller.defineSaveJobs(defaultOptions);
 
     const initAgent = jest
       .spyOn(controller, "initAgent")
