@@ -268,32 +268,30 @@ export function FinishedModal({
                 ? formatDuration(job.finishedAt - job.startedAt)
                 : "";
             const savedLabel = formattedSavedCount(job);
+            const label = savedLabel ?? jobLabel(job.jobType);
+            const suffix =
+              job.status === "completed"
+                ? duration
+                  ? ` (${duration})`
+                  : ""
+                : job.status === "failed"
+                  ? " – Failed"
+                  : job.status === "running"
+                    ? " – In progress"
+                    : " – Pending";
             return (
-              <View
-                key={job.id}
-                style={[styles.jobRow, { borderColor: palette.icon + "22" }]}
-              >
+              <View key={job.id} style={styles.jobRow}>
                 <MaterialIcons
                   name={statusIcon(job.status)}
-                  size={22}
+                  size={20}
                   color={statusColor(job.status, palette)}
                 />
-                <View style={styles.jobTextWrap}>
-                  <Text style={[styles.jobLabel, { color: palette.text }]}>
-                    {savedLabel ?? jobLabel(job.jobType)}
+                <Text style={[styles.jobLabel, { color: palette.text }]}>
+                  {label}
+                  <Text style={{ color: palette.icon, fontWeight: "400" }}>
+                    {suffix}
                   </Text>
-                  <Text style={[styles.jobDetail, { color: palette.icon }]}>
-                    {job.status === "completed"
-                      ? duration
-                        ? `Completed in ${duration}`
-                        : "Completed"
-                      : job.status === "failed"
-                        ? (job.error ?? "Failed")
-                        : job.status === "running"
-                          ? "In progress"
-                          : "Pending"}
-                  </Text>
-                </View>
+                </Text>
               </View>
             );
           })}
@@ -384,7 +382,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    gap: 16,
+    gap: 12,
   },
   headerRow: {
     flexDirection: "row",
@@ -392,7 +390,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
   },
   subtitle: {
@@ -400,9 +398,9 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 14,
-    padding: 12,
-    gap: 8,
+    borderRadius: 12,
+    padding: 10,
+    gap: 6,
   },
   summaryRow: {
     flexDirection: "row",
@@ -410,7 +408,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   summaryText: {
-    fontSize: 15,
+    fontSize: 14,
     flex: 1,
   },
   jobList: {
@@ -418,27 +416,19 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   jobListContent: {
-    gap: 10,
+    gap: 4,
     paddingBottom: 8,
   },
   jobRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 12,
-  },
-  jobTextWrap: {
-    flex: 1,
-    gap: 2,
+    gap: 8,
+    paddingVertical: 6,
   },
   jobLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
-  },
-  jobDetail: {
-    fontSize: 14,
+    flex: 1,
   },
   buttonRow: {
     flexDirection: "row",
