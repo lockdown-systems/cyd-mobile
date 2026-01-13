@@ -29,7 +29,7 @@ import {
   StepRow,
   SuccessCard,
   styles,
-} from "./AutomationModalShared";
+} from "./_AutomationModalShared";
 import { SimpleProgressBar } from "./SimpleProgressBar";
 
 export type { AutomationModalState as DeleteAutomationModalState };

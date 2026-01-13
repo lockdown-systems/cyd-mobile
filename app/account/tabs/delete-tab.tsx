@@ -39,7 +39,7 @@ import type {
   AccountTabPalette,
   AccountTabProps,
 } from "@/types/account-tabs";
-import { sharedTabStyles } from "./shared-tab-styles";
+import { sharedTabStyles } from "./_shared-tab-styles";
 
 type DeleteFlowScreen = "form" | "review";
 

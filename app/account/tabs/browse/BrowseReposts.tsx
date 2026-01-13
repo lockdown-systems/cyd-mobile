@@ -1,4 +1,4 @@
-import { BrowseList, type BrowseProps } from "./shared";
+import { BrowseList, type BrowseProps } from "./_shared";
 
 export function BrowseReposts({
   handle,

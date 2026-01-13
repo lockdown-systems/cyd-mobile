@@ -13,7 +13,7 @@ import {
 import {
   fetchExternalEmbedsForPosts,
   fetchMediaForPosts,
-} from "@/app/account/tabs/browse/shared";
+} from "@/app/account/tabs/browse/_shared";
 import { PostPreview } from "@/components/PostPreview";
 import { BlueskyAccountController } from "@/controllers";
 import type { PostToDeletePreview } from "@/controllers/bluesky/deletion-calculator";

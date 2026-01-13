@@ -21,7 +21,7 @@ import type {
 import type { AccountTabPalette } from "@/types/account-tabs";
 
 import { BrowsePlaceholderCard } from "./BrowsePlaceholderCard";
-import { type DeletedFilter, fetchAccountMeta, openAccountDb } from "./shared";
+import { type DeletedFilter, fetchAccountMeta, openAccountDb } from "./_shared";
 
 type Props = {
   handle: string;

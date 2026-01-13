@@ -28,7 +28,7 @@ import {
   StepRow,
   SuccessCard,
   styles,
-} from "./AutomationModalShared";
+} from "./_AutomationModalShared";
 import { SaveAutomationProgressBar } from "./SaveAutomationProgressBar";
 
 export type { AutomationModalState as SaveAutomationModalState };

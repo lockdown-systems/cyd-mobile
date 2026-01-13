@@ -24,7 +24,7 @@ import {
 } from "@/database/save-settings";
 import { submitBlueskyProgress } from "@/services/submit-bluesky-progress";
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
-import { sharedTabStyles } from "./shared-tab-styles";
+import { sharedTabStyles } from "./_shared-tab-styles";
 
 type SaveFlowScreen = "form" | "review";
 

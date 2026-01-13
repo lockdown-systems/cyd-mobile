@@ -31,7 +31,7 @@ import type {
   AccountTabPalette,
   AccountTabProps,
 } from "@/types/account-tabs";
-import { dropdownMenuShadow, sharedTabStyles } from "./shared-tab-styles";
+import { dropdownMenuShadow, sharedTabStyles } from "./_shared-tab-styles";
 
 const DAYS_OF_WEEK = [
   "Monday",
@@ -917,3 +917,5 @@ const localStyles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 });
+
+export default ScheduleTab;

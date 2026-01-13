@@ -18,7 +18,7 @@ import {
   SecondaryButton,
   StepRow,
   SuccessCard,
-} from "../AutomationModalShared";
+} from "../_AutomationModalShared";
 
 const defaultPalette: AccountTabPalette = Colors.light;
 
