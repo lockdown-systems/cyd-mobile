@@ -631,24 +631,25 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     // Then add delete jobs
-    const { settings, counts } = options.deleteOptions;
+    const { settings } = options.deleteOptions;
 
     // Store the delete settings for use during job execution
     this.deleteSettings = settings;
 
-    if (settings.deletePosts && counts.posts > 0) {
+    // Add delete jobs even when counts are 0, so the finished modal shows them
+    if (settings.deletePosts) {
       jobTypes.push("deletePosts");
     }
-    if (settings.deleteReposts && counts.reposts > 0) {
+    if (settings.deleteReposts) {
       jobTypes.push("deleteReposts");
     }
-    if (settings.deleteLikes && counts.likes > 0) {
+    if (settings.deleteLikes) {
       jobTypes.push("deleteLikes");
     }
-    if (settings.deleteBookmarks && counts.bookmarks > 0) {
+    if (settings.deleteBookmarks) {
       jobTypes.push("deleteBookmarks");
     }
-    if (settings.deleteChats && counts.messages > 0) {
+    if (settings.deleteChats) {
       jobTypes.push("deleteMessages");
     }
     if (settings.deleteUnfollowEveryone) {

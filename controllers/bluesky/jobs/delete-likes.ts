@@ -32,6 +32,7 @@ export async function runDeleteLikesJob(
       progressMessage: "No likes to delete",
       progressPercent: 1,
       unknownTotal: false,
+      progress: { currentItemIndex: 0, totalItems: 0 },
     });
     return;
   }

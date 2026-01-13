@@ -104,7 +104,15 @@ function extractSavedCount(job: BlueskyJobRecord): number | null {
     case "deleteBookmarks":
     case "deleteMessages":
     case "unfollowUsers":
-      return progress.currentItemIndex ?? null;
+      // For delete jobs, use currentItemIndex if available, otherwise check if totalItems is 0
+      if (typeof progress.currentItemIndex === "number") {
+        return progress.currentItemIndex;
+      }
+      // If totalItems is 0, return 0 (job completed with nothing to delete)
+      if (progress.totalItems === 0) {
+        return 0;
+      }
+      return null;
     default:
       return null;
   }

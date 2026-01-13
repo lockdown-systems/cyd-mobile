@@ -36,6 +36,7 @@ export async function runUnfollowUsersJob(
       progressMessage: "No users to unfollow",
       progressPercent: 1,
       unknownTotal: false,
+      progress: { currentItemIndex: 0, totalItems: 0 },
     });
     return;
   }
