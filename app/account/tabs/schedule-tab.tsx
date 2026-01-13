@@ -16,6 +16,7 @@ import { SaveReviewList } from "@/app/account/components/SaveReviewList";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveAndDeleteStatusBanner } from "@/components/SaveAndDeleteStatusBanner";
+import { getLastDeletedAt, getLastSavedAt } from "@/database/accounts";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 import { getAccountDeleteSettings } from "@/database/delete-settings";
 import type { AccountSaveSettings } from "@/database/save-settings";
@@ -215,6 +216,36 @@ function ScheduleOptionsForm({
   onUpdateSetting,
   onContinue,
 }: ScheduleOptionsFormProps) {
+  const [lastSavedAt, setLastSavedAt] = useState<number | null | undefined>(
+    undefined
+  );
+  const [lastDeletedAt, setLastDeletedAt] = useState<number | null | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const savedTs = await getLastSavedAt(accountId);
+      if (!cancelled) {
+        setLastSavedAt(savedTs);
+      }
+      const deletedTs = await getLastDeletedAt(accountId);
+      if (!cancelled) {
+        setLastDeletedAt(deletedTs);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId]);
+
+  const hasSavedAndDeletedData =
+    lastSavedAt !== undefined &&
+    lastDeletedAt !== undefined &&
+    lastSavedAt !== null &&
+    lastDeletedAt !== null;
+
   return (
     <View style={styles.stackScreen}>
       <PremiumRequiredBanner palette={palette} />
@@ -241,111 +272,130 @@ function ScheduleOptionsForm({
           onSelectTab={onSelectTab}
         />
 
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={palette.tint} size="large" />
-            <Text style={[styles.loadingText, { color: palette.icon }]}>
-              Loading your current settings…
-            </Text>
-          </View>
-        ) : error ? (
-          <View
-            style={[
-              styles.errorContainer,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name="error-outline"
-              size={20}
-              color={palette.tint}
-            />
-            <Text style={[styles.errorText, { color: palette.icon }]}>
-              Failed to load your existing preferences.
-            </Text>
-            <Pressable
-              onPress={() => void onRetry()}
-              style={[styles.retryButton, { borderColor: palette.icon + "33" }]}
-            >
-              <Text style={[styles.retryButtonText, { color: palette.text }]}>
-                Try again
-              </Text>
-            </Pressable>
-          </View>
-        ) : state ? (
-          <View
-            style={[
-              styles.optionCard,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <CheckboxRow
-              palette={palette}
-              label="Remind me to delete my data"
-              checked={state.scheduleDeletion}
-              onToggle={(next) =>
-                void onUpdateSetting("scheduleDeletion", next)
-              }
-              hint={!state.scheduleDeletion ? "enable for options" : undefined}
-            />
-            {state.scheduleDeletion && (
-              <View style={styles.indented}>
-                <FrequencyPicker
+        {hasSavedAndDeletedData && (
+          <>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color={palette.tint} size="large" />
+                <Text style={[styles.loadingText, { color: palette.icon }]}>
+                  Loading your current settings…
+                </Text>
+              </View>
+            ) : error ? (
+              <View
+                style={[
+                  styles.errorContainer,
+                  {
+                    borderColor: palette.icon + "22",
+                    backgroundColor: palette.card,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="error-outline"
+                  size={20}
+                  color={palette.tint}
+                />
+                <Text style={[styles.errorText, { color: palette.icon }]}>
+                  Failed to load your existing preferences.
+                </Text>
+                <Pressable
+                  onPress={() => void onRetry()}
+                  style={[
+                    styles.retryButton,
+                    { borderColor: palette.icon + "33" },
+                  ]}
+                >
+                  <Text
+                    style={[styles.retryButtonText, { color: palette.text }]}
+                  >
+                    Try again
+                  </Text>
+                </Pressable>
+              </View>
+            ) : state ? (
+              <View
+                style={[
+                  styles.optionCard,
+                  {
+                    borderColor: palette.icon + "22",
+                    backgroundColor: palette.card,
+                  },
+                ]}
+              >
+                <CheckboxRow
                   palette={palette}
-                  value={state.scheduleDeletionFrequency}
-                  onChange={(value) =>
-                    void onUpdateSetting("scheduleDeletionFrequency", value)
+                  label="Remind me to delete my data"
+                  checked={state.scheduleDeletion}
+                  onToggle={(next) =>
+                    void onUpdateSetting("scheduleDeletion", next)
+                  }
+                  hint={
+                    !state.scheduleDeletion ? "enable for options" : undefined
                   }
                 />
+                {state.scheduleDeletion && (
+                  <View style={styles.indented}>
+                    <FrequencyPicker
+                      palette={palette}
+                      value={state.scheduleDeletionFrequency}
+                      onChange={(value) =>
+                        void onUpdateSetting("scheduleDeletionFrequency", value)
+                      }
+                    />
 
-                {state.scheduleDeletionFrequency === "monthly" && (
-                  <DropdownRow
-                    palette={palette}
-                    label="Day of month"
-                    value={state.scheduleDeletionDayOfMonth}
-                    options={DAY_OF_MONTH_OPTIONS}
-                    onChange={(value) =>
-                      void onUpdateSetting("scheduleDeletionDayOfMonth", value)
-                    }
-                  />
-                )}
+                    {state.scheduleDeletionFrequency === "monthly" && (
+                      <DropdownRow
+                        palette={palette}
+                        label="Day of month"
+                        value={state.scheduleDeletionDayOfMonth}
+                        options={DAY_OF_MONTH_OPTIONS}
+                        onChange={(value) =>
+                          void onUpdateSetting(
+                            "scheduleDeletionDayOfMonth",
+                            value
+                          )
+                        }
+                      />
+                    )}
 
-                {state.scheduleDeletionFrequency === "weekly" && (
-                  <DayOfWeekPicker
-                    palette={palette}
-                    value={state.scheduleDeletionDayOfWeek}
-                    onChange={(value) =>
-                      void onUpdateSetting("scheduleDeletionDayOfWeek", value)
-                    }
-                  />
-                )}
+                    {state.scheduleDeletionFrequency === "weekly" && (
+                      <DayOfWeekPicker
+                        palette={palette}
+                        value={state.scheduleDeletionDayOfWeek}
+                        onChange={(value) =>
+                          void onUpdateSetting(
+                            "scheduleDeletionDayOfWeek",
+                            value
+                          )
+                        }
+                      />
+                    )}
 
-                <TimePicker
-                  palette={palette}
-                  value={state.scheduleDeletionTime}
-                  onChange={(value) =>
-                    void onUpdateSetting("scheduleDeletionTime", value)
-                  }
-                />
+                    <TimePicker
+                      palette={palette}
+                      value={state.scheduleDeletionTime}
+                      onChange={(value) =>
+                        void onUpdateSetting("scheduleDeletionTime", value)
+                      }
+                    />
 
-                {saving && (
-                  <View style={styles.savingIndicator}>
-                    <ActivityIndicator size="small" color={palette.tint} />
-                    <Text style={[styles.savingText, { color: palette.icon }]}>
-                      Saving...
-                    </Text>
+                    {saving && (
+                      <View style={styles.savingIndicator}>
+                        <ActivityIndicator size="small" color={palette.tint} />
+                        <Text
+                          style={[styles.savingText, { color: palette.icon }]}
+                        >
+                          Saving...
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
-            )}
-          </View>
-        ) : null}
+            ) : null}
+          </>
+        )}
 
         <LastActionTimestamp
           accountId={accountId}
@@ -353,22 +403,24 @@ function ScheduleOptionsForm({
           actionType="schedule"
         />
       </ScrollView>
-      <View
-        style={[
-          styles.footerBar,
-          {
-            borderColor: palette.icon + "22",
-            backgroundColor: palette.background,
-          },
-        ]}
-      >
-        <PrimaryButton
-          label="Save and Delete Data Now"
-          onPress={onContinue}
-          disabled={!canProceed || loading}
-          palette={palette}
-        />
-      </View>
+      {hasSavedAndDeletedData && (
+        <View
+          style={[
+            styles.footerBar,
+            {
+              borderColor: palette.icon + "22",
+              backgroundColor: palette.background,
+            },
+          ]}
+        >
+          <PrimaryButton
+            label="Save and Delete Data Now"
+            onPress={onContinue}
+            disabled={!canProceed || loading}
+            palette={palette}
+          />
+        </View>
+      )}
     </View>
   );
 }
