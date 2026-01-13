@@ -41,6 +41,7 @@ import {
   type BlueskyJobType,
   type DeleteJobOptions,
   type JobEmit,
+  type SaveAndDeleteJobOptions,
   type SaveJobOptions,
 } from "./bluesky/job-types";
 import { BlueskyRateLimiter, type ApiRequestFn } from "./bluesky/rate-limiter";
@@ -585,6 +586,97 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
     console.log(
       "[BlueskyController] defineDeleteJobs -> inserted",
+      this.accountId,
+      inserted.map((j) => j.jobType)
+    );
+
+    return inserted;
+  }
+
+  /**
+   * Define both save and delete jobs to be run in sequence.
+   * This is used for scheduled automation that saves data first, then deletes.
+   * Only one verifyAuthorization job is added at the start.
+   */
+  async defineSaveAndDeleteJobs(
+    options: SaveAndDeleteJobOptions
+  ): Promise<BlueskyJobRecord[]> {
+    console.log(
+      "[BlueskyController] defineSaveAndDeleteJobs -> start",
+      this.accountId,
+      {
+        saveOptions: options.saveOptions,
+        deleteSettings: options.deleteOptions.settings,
+        deleteCounts: options.deleteOptions.counts,
+      }
+    );
+    const db = this.requireDb();
+    const scheduledAt = Date.now();
+    const jobTypes: BlueskyJobType[] = ["verifyAuthorization"];
+
+    // Add save jobs first
+    const { saveOptions } = options;
+    if (saveOptions.posts) {
+      jobTypes.push("savePosts");
+    }
+    if (saveOptions.likes) {
+      jobTypes.push("saveLikes");
+    }
+    if (saveOptions.bookmarks) {
+      jobTypes.push("saveBookmarks");
+    }
+    if (saveOptions.chat) {
+      jobTypes.push("saveChatConvos");
+      jobTypes.push("saveChatMessages");
+    }
+
+    // Then add delete jobs
+    const { settings, counts } = options.deleteOptions;
+
+    // Store the delete settings for use during job execution
+    this.deleteSettings = settings;
+
+    if (settings.deletePosts && counts.posts > 0) {
+      jobTypes.push("deletePosts");
+    }
+    if (settings.deleteReposts && counts.reposts > 0) {
+      jobTypes.push("deleteReposts");
+    }
+    if (settings.deleteLikes && counts.likes > 0) {
+      jobTypes.push("deleteLikes");
+    }
+    if (settings.deleteBookmarks && counts.bookmarks > 0) {
+      jobTypes.push("deleteBookmarks");
+    }
+    if (settings.deleteChats && counts.messages > 0) {
+      jobTypes.push("deleteMessages");
+    }
+    if (settings.deleteUnfollowEveryone) {
+      jobTypes.push("unfollowUsers");
+    }
+
+    const inserted: BlueskyJobRecord[] = [];
+
+    for (const jobType of jobTypes) {
+      const result = await db.runAsync(
+        `INSERT INTO job (jobType, status, scheduledAt, progressJSON) VALUES (?, 'pending', ?, NULL);`,
+        [jobType, scheduledAt]
+      );
+      const id = Number(result.lastInsertRowId);
+      inserted.push({
+        id,
+        jobType,
+        status: "pending",
+        scheduledAt,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      });
+    }
+
+    console.log(
+      "[BlueskyController] defineSaveAndDeleteJobs -> inserted",
       this.accountId,
       inserted.map((j) => j.jobType)
     );

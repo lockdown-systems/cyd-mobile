@@ -12,7 +12,7 @@ import {
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
-export type FinishedModalMode = "save" | "delete";
+export type FinishedModalMode = "save" | "delete" | "schedule";
 
 export type FinishedModalProps = {
   visible: boolean;
@@ -206,9 +206,11 @@ export function FinishedModal({
       <View style={[styles.container, { backgroundColor: palette.background }]}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text }]}>
-            {mode === "delete"
-              ? "Finished deleting Bluesky data"
-              : "Finished saving Bluesky data"}
+            {mode === "schedule"
+              ? "Finished saving and deleting Bluesky data"
+              : mode === "delete"
+                ? "Finished deleting Bluesky data"
+                : "Finished saving Bluesky data"}
           </Text>
         </View>
         <View
@@ -292,7 +294,7 @@ export function FinishedModal({
         <View style={styles.buttonRow}>
           <Pressable
             onPress={() => {
-              if (mode === "delete") {
+              if (mode === "delete" || mode === "schedule") {
                 onClose();
               } else if (onViewDashboard) {
                 onViewDashboard();

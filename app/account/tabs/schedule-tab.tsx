@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -12,11 +12,24 @@ import {
 } from "react-native";
 
 import { DeleteReviewList } from "@/app/account/components/DeleteReviewList";
+import { FinishedModal } from "@/app/account/components/FinishedModal";
 import { SaveReviewList } from "@/app/account/components/SaveReviewList";
+import { ScheduledAutomationModal } from "@/app/account/components/ScheduledAutomationModal";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveAndDeleteStatusBanner } from "@/components/SaveAndDeleteStatusBanner";
-import { getLastDeletedAt, getLastSavedAt } from "@/database/accounts";
+import { BlueskyAccountController } from "@/controllers";
+import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
+import type {
+  BlueskyJobRecord,
+  SaveAndDeleteJobOptions,
+} from "@/controllers/bluesky/job-types";
+import {
+  getLastDeletedAt,
+  getLastSavedAt,
+  setLastDeletedAt,
+  setLastSavedAt,
+} from "@/database/accounts";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 import { getAccountDeleteSettings } from "@/database/delete-settings";
 import type { AccountSaveSettings } from "@/database/save-settings";
@@ -59,6 +72,7 @@ type ScheduleFlowScreen = "form" | "review";
 
 export function ScheduleTab({
   accountId,
+  accountUUID,
   palette,
   onSelectTab,
 }: AccountTabProps) {
@@ -76,6 +90,17 @@ export function ScheduleTab({
   );
   const [deleteSettings, setDeleteSettings] =
     useState<AccountDeleteSettings | null>(null);
+
+  // Automation modal state
+  const [automationVisible, setAutomationVisible] = useState(false);
+  const [automationOptions, setAutomationOptions] =
+    useState<SaveAndDeleteJobOptions | null>(null);
+  const [automationKey, setAutomationKey] = useState(0);
+  const automationCancelledRef = useRef(false);
+
+  // Finished modal state
+  const [finishedModalVisible, setFinishedModalVisible] = useState(false);
+  const [finishedJobs, setFinishedJobs] = useState<BlueskyJobRecord[]>([]);
 
   const currentScreen = screenStack[screenStack.length - 1];
 
@@ -153,6 +178,80 @@ export function ScheduleTab({
 
   const canProceed = hasSaveOptions || hasDeleteOptions;
 
+  const resetToForm = useCallback(() => {
+    setScreenStack(["form"]);
+    setAutomationVisible(false);
+    setAutomationOptions(null);
+  }, []);
+
+  const handleStartAutomation = useCallback(
+    (options: SaveAndDeleteJobOptions) => {
+      automationCancelledRef.current = false;
+      setAutomationOptions(options);
+      setAutomationKey((prev) => prev + 1);
+      setAutomationVisible(true);
+    },
+    []
+  );
+
+  const handleAutomationFinished = useCallback(
+    (result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
+      // Update timestamps on successful completion
+      if (result === "completed") {
+        const now = Date.now();
+        // Check if we had any save jobs
+        const hadSaveJobs = jobs.some(
+          (j) => j.jobType.startsWith("save") && j.status === "completed"
+        );
+        // Check if we had any delete jobs
+        const hadDeleteJobs = jobs.some(
+          (j) =>
+            (j.jobType.startsWith("delete") || j.jobType === "unfollowUsers") &&
+            j.status === "completed"
+        );
+        if (hadSaveJobs) {
+          void setLastSavedAt(accountId, now);
+        }
+        if (hadDeleteJobs) {
+          void setLastDeletedAt(accountId, now);
+        }
+      }
+
+      if (!automationCancelledRef.current) {
+        setAutomationVisible(false);
+        // Delay showing the FinishedModal
+        setTimeout(() => {
+          setFinishedJobs(jobs);
+          setFinishedModalVisible(true);
+        }, 350);
+      }
+    },
+    [accountId]
+  );
+
+  const closeFinishedModal = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+    resetToForm();
+  }, [resetToForm]);
+
+  const handleFinishedBrowse = useCallback(() => {
+    setFinishedModalVisible(false);
+    setFinishedJobs([]);
+    onSelectTab?.("browse");
+  }, [onSelectTab]);
+
+  const handleAutomationClose = useCallback(() => {
+    automationCancelledRef.current = true;
+    setAutomationVisible(false);
+  }, []);
+
+  const handleAutomationRestart = useCallback(() => {
+    automationCancelledRef.current = true;
+    setAutomationVisible(false);
+    resetToForm();
+  }, [resetToForm]);
+
   return (
     <View style={styles.container}>
       {currentScreen === "form" && (
@@ -175,13 +274,39 @@ export function ScheduleTab({
         saveSettings &&
         deleteSettings && (
           <ScheduleReviewScreen
+            accountId={accountId}
+            accountUUID={accountUUID}
             palette={palette}
             saveSettings={saveSettings}
             deleteSettings={deleteSettings}
             onBack={popScreen}
             onSelectTab={onSelectTab}
+            onStartAutomation={handleStartAutomation}
           />
         )}
+      {automationOptions && (
+        <ScheduledAutomationModal
+          key={automationKey}
+          visible={automationVisible}
+          accountId={accountId}
+          accountUUID={accountUUID}
+          palette={palette}
+          options={automationOptions}
+          totalSaveItems={0}
+          totalDeleteItems={0}
+          onFinished={handleAutomationFinished}
+          onClose={handleAutomationClose}
+          onRestart={handleAutomationRestart}
+        />
+      )}
+      <FinishedModal
+        visible={finishedModalVisible}
+        palette={palette}
+        jobs={finishedJobs}
+        mode="schedule"
+        onClose={closeFinishedModal}
+        onViewBrowse={handleFinishedBrowse}
+      />
     </View>
   );
 }
@@ -426,20 +551,92 @@ function ScheduleOptionsForm({
 }
 
 type ScheduleReviewScreenProps = {
+  accountId: number;
+  accountUUID: string;
   palette: AccountTabPalette;
   saveSettings: AccountSaveSettings;
   deleteSettings: AccountDeleteSettings;
   onBack: () => void;
   onSelectTab?: (tab: AccountTabKey) => void;
+  onStartAutomation: (options: SaveAndDeleteJobOptions) => void;
 };
 
 function ScheduleReviewScreen({
+  accountId,
+  accountUUID,
   palette,
   saveSettings,
   deleteSettings,
   onBack,
   onSelectTab,
+  onStartAutomation,
 }: ScheduleReviewScreenProps) {
+  const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
+  const [countsLoading, setCountsLoading] = useState(true);
+  const [countsError, setCountsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCounts() {
+      setCountsLoading(true);
+      setCountsError(null);
+      try {
+        const controller = new BlueskyAccountController(accountId, accountUUID);
+        await controller.initDB();
+        await controller.initAgent();
+        const result = controller.getDeletionPreviewCounts(deleteSettings);
+        if (!cancelled) {
+          setCounts(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCountsError(
+            err instanceof Error ? err.message : "Failed to calculate counts"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCountsLoading(false);
+        }
+      }
+    }
+
+    void loadCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, accountUUID, deleteSettings]);
+
+  const handleSaveAndDelete = useCallback(() => {
+    if (!counts) return;
+
+    const options: SaveAndDeleteJobOptions = {
+      saveOptions: {
+        posts: saveSettings.posts,
+        likes: saveSettings.likes,
+        bookmarks: saveSettings.bookmarks,
+        chat: saveSettings.chat,
+      },
+      deleteOptions: {
+        settings: deleteSettings,
+        counts: {
+          posts: counts.posts,
+          reposts: counts.reposts,
+          likes: counts.likes,
+          bookmarks: counts.bookmarks,
+          messages: counts.messages,
+          follows: counts.follows,
+        },
+      },
+    };
+
+    onStartAutomation(options);
+  }, [counts, saveSettings, deleteSettings, onStartAutomation]);
+
+  const canStart = !countsLoading && !countsError && counts !== null;
+
   return (
     <View style={styles.stackScreen}>
       <StackHeader
@@ -491,6 +688,36 @@ function ScheduleReviewScreen({
           </Text>
           .
         </Text>
+
+        {countsLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color={palette.tint} size="small" />
+            <Text style={[styles.loadingText, { color: palette.icon }]}>
+              Calculating items to process…
+            </Text>
+          </View>
+        )}
+
+        {countsError && (
+          <View
+            style={[
+              styles.errorContainer,
+              {
+                borderColor: palette.icon + "22",
+                backgroundColor: palette.card,
+              },
+            ]}
+          >
+            <MaterialIcons
+              name="error-outline"
+              size={20}
+              color={palette.tint}
+            />
+            <Text style={[styles.errorText, { color: palette.icon }]}>
+              {countsError}
+            </Text>
+          </View>
+        )}
       </ScrollView>
       <View
         style={[
@@ -508,10 +735,8 @@ function ScheduleReviewScreen({
         />
         <PrimaryButton
           label="Save and Delete Data Now"
-          onPress={() => {
-            // TODO: Implement save and delete automation
-          }}
-          disabled={false}
+          onPress={handleSaveAndDelete}
+          disabled={!canStart}
           palette={palette}
         />
       </View>

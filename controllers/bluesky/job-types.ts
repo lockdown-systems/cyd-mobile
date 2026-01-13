@@ -96,3 +96,12 @@ export type DeleteJobOptions = {
     follows: number;
   };
 };
+
+/**
+ * Options for defining combined save and delete jobs (used for scheduled automation).
+ * This combines save options with delete options to run both in sequence.
+ */
+export type SaveAndDeleteJobOptions = {
+  saveOptions: SaveJobOptions;
+  deleteOptions: DeleteJobOptions;
+};

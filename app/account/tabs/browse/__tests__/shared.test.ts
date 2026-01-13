@@ -18,7 +18,7 @@ import {
   type ExternalRow,
   type MediaRow,
   type PostRow,
-} from "../shared";
+} from "../_shared";
 
 // Type for embedded record structure
 interface MockEmbedRecord {
