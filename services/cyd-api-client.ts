@@ -92,6 +92,7 @@ export type RegisterPushTokenAPIRequest = {
   platform: "ios" | "android";
   account_uuid: string;
   account_handle: string;
+  timezone: string;
 };
 
 // API models for PUT /push-notification/schedule

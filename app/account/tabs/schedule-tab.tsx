@@ -1,5 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Localization from "expo-localization";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -213,6 +214,7 @@ export function ScheduleTab({
         platform: result.platform!,
         account_uuid: accountUUID,
         account_handle: accountHandle,
+        timezone: Localization.getCalendars()[0]?.timeZone ?? "UTC",
       });
 
       if (registerResult !== true) {
