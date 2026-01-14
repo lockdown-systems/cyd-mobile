@@ -24,13 +24,13 @@ export function useNotificationHandler() {
   const handleNotificationResponse = useCallback(
     (accountUUID?: string) => {
       if (accountUUID) {
-        // Navigate to the schedule tab for this account
-        // First we need to find the account ID from the UUID
+        // Navigate to the schedule tab's review screen for this account
         router.push({
           pathname: "/account/[accountId]",
           params: {
             accountId: accountUUID,
             initialTab: "schedule",
+            scheduleShowReview: "true",
           },
         });
       }

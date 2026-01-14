@@ -1,6 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Localization from "expo-localization";
+import { useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -88,9 +89,12 @@ export function ScheduleTab({
   onSelectTab,
 }: AccountTabProps) {
   const { apiClient, state: cydState } = useCydAccount();
+  const params = useLocalSearchParams<{ scheduleShowReview?: string }>();
+  const showReviewOnLoad = params.scheduleShowReview === "true";
   const [screenStack, setScreenStack] = useState<ScheduleFlowScreen[]>([
     "form",
   ]);
+  const [hasInitializedScreen, setHasInitializedScreen] = useState(false);
   const [state, setState] = useState<AccountScheduleSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -142,6 +146,14 @@ export function ScheduleTab({
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
+
+  // Navigate to review screen if opened from notification
+  useEffect(() => {
+    if (!loading && showReviewOnLoad && !hasInitializedScreen) {
+      setHasInitializedScreen(true);
+      setScreenStack(["form", "review"]);
+    }
+  }, [loading, showReviewOnLoad, hasInitializedScreen]);
 
   /**
    * Sync schedule settings to the server for push notification scheduling
