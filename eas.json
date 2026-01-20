@@ -1,16 +1,11 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "env": {
-        "APP_VARIANT": "development"
-      }
-    },
-    "preview": {
       "distribution": "internal",
       "env": {
         "APP_VARIANT": "development"
@@ -23,6 +18,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleTeamId": "G762K6CH36",
+        "bundleIdentifier": "systems.lockdown.cyd-mobile"
+      }
+    }
   }
 }

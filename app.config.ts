@@ -24,6 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "aps-environment": isProduction ? "production" : "development",
       },
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         CFBundleURLTypes: [
           {
             CFBundleURLSchemes: ["social.cyd.api", "social.cyd.dev-api"],
