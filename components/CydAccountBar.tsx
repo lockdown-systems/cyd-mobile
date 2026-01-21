@@ -205,7 +205,7 @@ export function CydAccountBar() {
                   style={[styles.sheetEmailText, { color: palette.icon }]}
                   numberOfLines={1}
                 >
-                  {state.userEmail}
+                  Signed in as {state.userEmail}
                 </Text>
                 <Pressable
                   onPress={handleManageAccount}
@@ -226,6 +226,30 @@ export function CydAccountBar() {
                   </Text>
                 </Pressable>
                 <Pressable
+                  onPress={handleSignOut}
+                  style={({ pressed }) => [
+                    styles.sheetActionButton,
+                    {
+                      borderColor: palette.icon + "22",
+                      backgroundColor: palette.background,
+                      opacity: pressed ? 0.9 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[styles.sheetActionText, { color: palette.text }]}
+                  >
+                    Sign out of Cyd account
+                  </Text>
+                </Pressable>
+                <View
+                  style={[
+                    styles.sheetSeparator,
+                    { borderColor: palette.icon + "22" },
+                  ]}
+                />
+                <Pressable
                   onPress={() => void handleImportBlueskyAccount()}
                   style={({ pressed }) => [
                     styles.sheetActionButton,
@@ -241,30 +265,6 @@ export function CydAccountBar() {
                     style={[styles.sheetActionText, { color: palette.text }]}
                   >
                     Import Bluesky archive
-                  </Text>
-                </Pressable>
-                <View
-                  style={[
-                    styles.sheetSeparator,
-                    { borderColor: palette.icon + "22" },
-                  ]}
-                />
-                <Pressable
-                  onPress={handleSignOut}
-                  style={({ pressed }) => [
-                    styles.sheetActionButton,
-                    {
-                      borderColor: palette.icon + "22",
-                      backgroundColor: palette.background,
-                      opacity: pressed ? 0.9 : 1,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                >
-                  <Text
-                    style={[styles.sheetActionText, { color: palette.text }]}
-                  >
-                    Sign out
                   </Text>
                 </Pressable>
               </>
