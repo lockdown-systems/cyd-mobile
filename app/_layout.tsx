@@ -6,8 +6,10 @@ import {
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 
+import { CydAccountBar } from "@/components/CydAccountBar";
 import { CydAccountProvider } from "@/contexts/CydAccountProvider";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationHandler } from "@/hooks/use-notification-handler";
@@ -27,17 +29,22 @@ function RootLayoutContent() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen
-          name="account/[accountId]"
-          options={{ headerShown: true }}
-        />
-        <Stack.Screen
-          name="add-account"
-          options={{ headerShown: true, presentation: "modal" }}
-        />
-      </Stack>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen
+              name="account/[accountId]"
+              options={{ headerShown: true }}
+            />
+            <Stack.Screen
+              name="add-account"
+              options={{ headerShown: true, presentation: "modal" }}
+            />
+          </Stack>
+        </View>
+        <CydAccountBar />
+      </View>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </ThemeProvider>
   );
@@ -50,3 +57,12 @@ export default function RootLayout() {
     </CydAccountProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+});

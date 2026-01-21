@@ -2,36 +2,23 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   Linking,
-  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
-import { CydAccountBar } from "@/components/CydAccountBar";
 import { Colors } from "@/constants/theme";
 import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import {
-  cleanupTempDir,
-  importArchive,
-  pickArchiveFile,
-  validateArchive,
-  validateArchiveFilename,
-} from "@/services/archive-import";
 
 const CYD_DESKTOP_URL = "https://cyd.social/";
 
@@ -41,80 +28,19 @@ export default function AccountSelectionScreen() {
   const Wordmark = colorScheme === "dark" ? WordmarkDark : WordmarkLight;
   const { accounts, loading, error, refresh } = useAccounts();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [navigatingAccountId, setNavigatingAccountId] = useState<string | null>(
-    null
+    null,
   );
-  const [isImporting, setIsImporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       setNavigatingAccountId(null);
-    }, [])
+    }, []),
   );
 
   const handleAddAccount = useCallback(() => {
     void router.push("/add-account");
   }, [router]);
-
-  const handleImportArchive = useCallback(async () => {
-    if (isImporting) return;
-
-    try {
-      // Pick a zip file
-      const pickedFile = await pickArchiveFile();
-      if (!pickedFile) {
-        return; // User cancelled
-      }
-
-      // Validate the filename
-      const filenameValidation = validateArchiveFilename(pickedFile.filename);
-      if (!filenameValidation.valid) {
-        Alert.alert("Import Failed", filenameValidation.error);
-        return;
-      }
-
-      setIsImporting(true);
-
-      // Validate the archive
-      const validation = await validateArchive(pickedFile.uri);
-
-      if (!validation.valid) {
-        if (validation.tempDir) {
-          cleanupTempDir(validation.tempDir);
-        }
-        Alert.alert("Import Failed", validation.error);
-        return;
-      }
-
-      // Import the archive
-      const result = await importArchive(
-        validation.metadata,
-        validation.tempDir
-      );
-
-      // Clean up temp directory
-      cleanupTempDir(validation.tempDir);
-
-      if (!result.success) {
-        Alert.alert("Import Failed", result.error);
-        return;
-      }
-
-      // Refresh the accounts list
-      await refresh();
-
-      Alert.alert(
-        "Import Successful",
-        `Successfully imported archive for @${validation.metadata.account.handle}.`
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      Alert.alert("Import Failed", message);
-    } finally {
-      setIsImporting(false);
-    }
-  }, [isImporting, refresh]);
 
   const handleSelectAccount = useCallback(
     (account: AccountListItem) => {
@@ -130,10 +56,10 @@ export default function AccountSelectionScreen() {
       console.log(
         "[AccountSelectionScreen] navigated to account",
         account.id,
-        account.handle
+        account.handle,
       );
     },
-    [router, navigatingAccountId]
+    [router, navigatingAccountId],
   );
 
   const handleRefresh = useCallback(() => {
@@ -142,7 +68,7 @@ export default function AccountSelectionScreen() {
 
   const handleOpenDesktop = useCallback(() => {
     void Linking.openURL(CYD_DESKTOP_URL).catch((err) =>
-      console.warn("Unable to open URL", err)
+      console.warn("Unable to open URL", err),
     );
   }, []);
 
@@ -156,7 +82,7 @@ export default function AccountSelectionScreen() {
         busy={navigatingAccountId === item.uuid}
       />
     ),
-    [palette, handleSelectAccount, navigatingAccountId]
+    [palette, handleSelectAccount, navigatingAccountId],
   );
 
   const listEmpty = useMemo(() => {
@@ -262,32 +188,6 @@ export default function AccountSelectionScreen() {
           on a computer.
         </Text>
       </View>
-
-      <CydAccountBar
-        bottomInset={insets.bottom}
-        onImportArchive={() => void handleImportArchive()}
-      />
-
-      <Modal
-        visible={isImporting}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-      >
-        <View style={styles.loadingOverlay}>
-          <View
-            style={[
-              styles.loadingContainer,
-              { backgroundColor: palette.background },
-            ]}
-          >
-            <ActivityIndicator size="large" color={palette.tint} />
-            <Text style={[styles.loadingText, { color: palette.text }]}>
-              Importing archive...
-            </Text>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -441,22 +341,6 @@ const styles = StyleSheet.create({
   addAccountButtonText: {
     fontSize: 16,
     fontWeight: "600",
-  },
-  loadingOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingContainer: {
-    padding: 24,
-    borderRadius: 16,
-    alignItems: "center",
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: "500",
   },
   footerText: {
     fontSize: 13,

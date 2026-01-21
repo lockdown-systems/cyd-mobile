@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Linking,
   Modal,
   Pressable,
@@ -7,28 +9,33 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
+import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  cleanupTempDir,
+  importArchive,
+  pickArchiveFile,
+  validateArchive,
+  validateArchiveFilename,
+} from "@/services/archive-import";
 
 import { CydSignInModal } from "./CydSignInModal";
 
-type CydAccountBarProps = {
-  bottomInset?: number;
-  onImportArchive?: () => void;
-};
-
-export function CydAccountBar({
-  bottomInset = 0,
-  onImportArchive,
-}: CydAccountBarProps) {
+export function CydAccountBar() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom;
   const colorScheme = useColorScheme() ?? "light";
   const palette = Colors[colorScheme];
   const { state, signOut, getDashboardURL } = useCydAccount();
+  const { refresh } = useAccounts();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [signInModalVisible, setSignInModalVisible] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleMenuPress = useCallback(() => {
     setMenuVisible(true);
@@ -51,7 +58,7 @@ export function CydAccountBar({
     setMenuVisible(false);
     const dashboardURL = getDashboardURL();
     void Linking.openURL(dashboardURL).catch((err) =>
-      console.warn("Unable to open dashboard URL:", err)
+      console.warn("Unable to open dashboard URL:", err),
     );
   }, [getDashboardURL]);
 
@@ -60,15 +67,68 @@ export function CydAccountBar({
     void signOut();
   }, [signOut]);
 
-  const handleImportBlueskyAccount = useCallback(() => {
+  const handleImportBlueskyAccount = useCallback(async () => {
+    if (isImporting) return;
     setMenuVisible(false);
-    if (onImportArchive) {
-      // Delay to allow the modal to fully close before opening the document picker
-      setTimeout(() => {
-        onImportArchive();
-      }, 50);
+
+    // Delay to allow the modal to fully close before opening the document picker
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    try {
+      // Pick a zip file
+      const pickedFile = await pickArchiveFile();
+      if (!pickedFile) {
+        return; // User cancelled
+      }
+
+      // Validate the filename
+      const filenameValidation = validateArchiveFilename(pickedFile.filename);
+      if (!filenameValidation.valid) {
+        Alert.alert("Import Failed", filenameValidation.error);
+        return;
+      }
+
+      setIsImporting(true);
+
+      // Validate the archive
+      const validation = await validateArchive(pickedFile.uri);
+
+      if (!validation.valid) {
+        if (validation.tempDir) {
+          cleanupTempDir(validation.tempDir);
+        }
+        Alert.alert("Import Failed", validation.error);
+        return;
+      }
+
+      // Import the archive
+      const result = await importArchive(
+        validation.metadata,
+        validation.tempDir,
+      );
+
+      // Clean up temp directory
+      cleanupTempDir(validation.tempDir);
+
+      if (!result.success) {
+        Alert.alert("Import Failed", result.error);
+        return;
+      }
+
+      // Refresh the accounts list
+      await refresh();
+
+      Alert.alert(
+        "Import Successful",
+        `Successfully imported archive for @${validation.metadata.account.handle}.`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert("Import Failed", message);
+    } finally {
+      setIsImporting(false);
     }
-  }, [onImportArchive]);
+  }, [isImporting, refresh]);
 
   if (state.isLoading) {
     return null;
@@ -166,7 +226,7 @@ export function CydAccountBar({
                   </Text>
                 </Pressable>
                 <Pressable
-                  onPress={handleImportBlueskyAccount}
+                  onPress={() => void handleImportBlueskyAccount()}
                   style={({ pressed }) => [
                     styles.sheetActionButton,
                     {
@@ -229,7 +289,7 @@ export function CydAccountBar({
                   </Text>
                 </Pressable>
                 <Pressable
-                  onPress={handleImportBlueskyAccount}
+                  onPress={() => void handleImportBlueskyAccount()}
                   style={({ pressed }) => [
                     styles.sheetActionButton,
                     {
@@ -257,6 +317,28 @@ export function CydAccountBar({
         visible={signInModalVisible}
         onClose={handleCloseSignInModal}
       />
+
+      {/* Importing Modal */}
+      <Modal
+        visible={isImporting}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.loadingOverlay}>
+          <View
+            style={[
+              styles.loadingContainer,
+              { backgroundColor: palette.background },
+            ]}
+          >
+            <ActivityIndicator size="large" color={palette.tint} />
+            <Text style={[styles.loadingText, { color: palette.text }]}>
+              Importing archive...
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -324,5 +406,21 @@ const styles = StyleSheet.create({
   sheetSeparator: {
     borderTopWidth: StyleSheet.hairlineWidth,
     marginVertical: 4,
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingContainer: {
+    padding: 24,
+    borderRadius: 16,
+    alignItems: "center",
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: "500",
   },
 });

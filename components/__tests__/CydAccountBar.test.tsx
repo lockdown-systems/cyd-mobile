@@ -18,6 +18,7 @@ import { useCydAccount } from "@/contexts/CydAccountProvider";
 // Mock the hooks
 const mockSignOut = jest.fn();
 const mockGetDashboardURL = jest.fn(() => "https://dash.cyd.social");
+const mockRefresh = jest.fn();
 
 jest.mock("@/contexts/CydAccountProvider", () => ({
   useCydAccount: jest.fn(() => ({
@@ -29,6 +30,27 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
     signOut: mockSignOut,
     getDashboardURL: mockGetDashboardURL,
   })),
+}));
+
+jest.mock("@/hooks/use-accounts", () => ({
+  useAccounts: () => ({
+    accounts: [],
+    loading: false,
+    error: null,
+    refresh: mockRefresh,
+  }),
+}));
+
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
+jest.mock("@/services/archive-import", () => ({
+  cleanupTempDir: jest.fn(),
+  importArchive: jest.fn(),
+  pickArchiveFile: jest.fn(),
+  validateArchive: jest.fn(),
+  validateArchiveFilename: jest.fn(),
 }));
 
 jest.mock("@/hooks/use-color-scheme", () => ({
@@ -112,7 +134,7 @@ describe("CydAccountBar", () => {
       fireEvent.press(screen.getByText("☰"));
 
       expect(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       ).toBeTruthy();
     });
 
@@ -122,7 +144,7 @@ describe("CydAccountBar", () => {
       fireEvent.press(screen.getByText("☰"));
 
       expect(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       ).toBeTruthy();
     });
 
@@ -131,7 +153,7 @@ describe("CydAccountBar", () => {
 
       fireEvent.press(screen.getByText("☰"));
       fireEvent.press(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       );
 
       await waitFor(() => {
@@ -144,11 +166,11 @@ describe("CydAccountBar", () => {
 
       fireEvent.press(screen.getByText("☰"));
       expect(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       ).toBeTruthy();
 
       fireEvent.press(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       );
 
       // Menu should close (the menu text should no longer be visible in the modal)
@@ -243,7 +265,7 @@ describe("CydAccountBar", () => {
 
       fireEvent.press(screen.getByText("☰"));
       expect(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       ).toBeTruthy();
 
       // The Modal overlay press should close the menu
@@ -276,7 +298,7 @@ describe("CydAccountBar", () => {
       fireEvent.press(screen.getByText("☰"));
 
       expect(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       ).toBeTruthy();
       // These should NOT be present when signed out
       expect(screen.queryByText("Manage my account")).toBeNull();
@@ -284,15 +306,9 @@ describe("CydAccountBar", () => {
     });
   });
 
-  describe("bottom inset", () => {
-    it("should accept bottomInset prop", () => {
+  describe("safe area handling", () => {
+    it("should render with useSafeAreaInsets", () => {
       // This should not throw
-      expect(() => {
-        render(<CydAccountBar bottomInset={34} />);
-      }).not.toThrow();
-    });
-
-    it("should render with default bottomInset of 0", () => {
       expect(() => {
         render(<CydAccountBar />);
       }).not.toThrow();
@@ -306,7 +322,7 @@ describe("CydAccountBar", () => {
       // Open menu and then sign in modal
       fireEvent.press(screen.getByText("☰"));
       fireEvent.press(
-        screen.getByText("Sign in to Cyd to access premium features")
+        screen.getByText("Sign in to Cyd to access premium features"),
       );
 
       await waitFor(() => {
@@ -339,8 +355,8 @@ describe("CydAccountBar", () => {
       // The text should be present (numberOfLines={1} handles truncation)
       expect(
         screen.getByText(
-          /Signed in as very.long.email.address.that.might.overflow@example.com/
-        )
+          /Signed in as very.long.email.address.that.might.overflow@example.com/,
+        ),
       ).toBeTruthy();
     });
   });
