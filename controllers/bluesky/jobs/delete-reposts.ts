@@ -4,7 +4,7 @@ import type { BlueskyJobRecord, JobEmit, PostPreviewData } from "../job-types";
 export async function runDeleteRepostsJob(
   controller: BlueskyAccountController,
   _job: BlueskyJobRecord,
-  emit: JobEmit
+  emit: JobEmit,
 ): Promise<void> {
   emit({
     speechText: "I'm deleting your reposts",
@@ -45,15 +45,21 @@ export async function runDeleteRepostsJob(
 
     // Build preview data for display (showing the reposted post info)
     const previewData: PostPreviewData = {
-      uri: repost.originalPostUri,
+      uri: repost.uri,
       cid: repost.repostCid,
-      text: `Repost of ${repost.originalPostUri}`,
+      text: repost.text,
       createdAt: repost.createdAt,
-      savedAt: repost.createdAt,
+      savedAt: new Date(repost.savedAt).toISOString(),
       author: {
-        did: "",
-        handle: "repost",
+        did: repost.authorDid,
+        handle: repost.authorHandle ?? "unknown",
+        displayName: repost.authorDisplayName,
+        avatarUrl: repost.avatarUrl,
       },
+      likeCount: repost.likeCount,
+      repostCount: repost.repostCount,
+      replyCount: repost.replyCount,
+      quoteCount: repost.quoteCount,
       isRepost: true,
     };
 
@@ -72,7 +78,7 @@ export async function runDeleteRepostsJob(
       console.warn(
         "[DeleteRepostsJob] Failed to delete repost:",
         repost.repostUri,
-        err
+        err,
       );
       errors++;
       // Continue with next repost despite error

@@ -45,7 +45,17 @@ export interface RepostToDelete {
   repostUri: string;
   repostCid: string;
   createdAt: string;
+  savedAt: number;
   originalPostUri: string;
+  text: string;
+  authorDid: string;
+  authorHandle: string | null;
+  authorDisplayName: string | null;
+  avatarUrl: string | null;
+  likeCount: number | null;
+  repostCount: number | null;
+  replyCount: number | null;
+  quoteCount: number | null;
 }
 
 export interface LikeToDelete {
@@ -124,7 +134,7 @@ export function getTimestampDaysAgo(days: number): string {
 export function calculatePostsToDelete(
   db: SQLiteDatabase,
   userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): PostToDelete[] {
   if (!settings.deletePosts) {
     return [];
@@ -173,7 +183,7 @@ export function calculatePostsToDelete(
      FROM post
      WHERE ${whereClause}
      ORDER BY createdAt ASC;`,
-    params
+    params,
   );
 
   if (!settings.deletePostsPreserveThreads) {
@@ -207,7 +217,7 @@ export function calculatePostsToDelete(
 export function calculatePostsToDeleteWithPreview(
   db: SQLiteDatabase,
   userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): PostToDeletePreview[] {
   if (!settings.deletePosts) {
     return [];
@@ -274,7 +284,7 @@ export function calculatePostsToDeleteWithPreview(
      LEFT JOIN profile prof ON prof.did = p.authorDid
      WHERE ${whereClause}
      ORDER BY p.createdAt DESC;`,
-    params
+    params,
   );
 
   const mapPost = (post: (typeof candidatePosts)[0]): PostToDeletePreview => ({
@@ -324,7 +334,7 @@ export function calculatePostsToDeleteWithPreview(
 export function calculatePostsForDeletionReview(
   db: SQLiteDatabase,
   userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): PostToDeletePreview[] {
   if (!settings.deletePosts) {
     return [];
@@ -390,7 +400,7 @@ export function calculatePostsForDeletionReview(
      LEFT JOIN profile prof ON prof.did = p.authorDid
      WHERE ${whereClause}
      ORDER BY p.createdAt DESC;`,
-    params
+    params,
   );
 
   const mapPost = (post: (typeof candidatePosts)[0]): PostToDeletePreview => ({
@@ -436,7 +446,7 @@ export function calculatePostsForDeletionReview(
 function findPreservedThreadRoots(
   db: SQLiteDatabase,
   userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): Set<string> {
   // A thread should be preserved if any post by this user in the thread
   // meets at least one of the threshold criteria.
@@ -492,7 +502,7 @@ function findPreservedThreadRoots(
 export function calculateRepostsToDelete(
   db: SQLiteDatabase,
   _userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): RepostToDelete[] {
   if (!settings.deleteReposts) {
     return [];
@@ -512,11 +522,18 @@ export function calculateRepostsToDelete(
   }
 
   return db.getAllSync<RepostToDelete>(
-    `SELECT uri, repostUri, repostCid, createdAt, originalPostUri
-     FROM post
+    `SELECT 
+       p.uri, p.repostUri, p.repostCid, p.createdAt, p.savedAt, p.originalPostUri,
+       p.text, p.authorDid, 
+       COALESCE(pr.handle, p.authorDid) as authorHandle,
+       pr.displayName as authorDisplayName,
+       pr.avatarUrl,
+       p.likeCount, p.repostCount, p.replyCount, p.quoteCount
+     FROM post p
+     LEFT JOIN profile pr ON p.authorDid = pr.did
      WHERE ${whereClause}
-     ORDER BY createdAt ASC;`,
-    params
+     ORDER BY p.createdAt ASC;`,
+    params,
   );
 }
 
@@ -526,7 +543,7 @@ export function calculateRepostsToDelete(
 export function calculateLikesToDelete(
   db: SQLiteDatabase,
   _userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): LikeToDelete[] {
   if (!settings.deleteLikes) {
     return [];
@@ -553,7 +570,7 @@ export function calculateLikesToDelete(
      LEFT JOIN profile pr ON p.authorDid = pr.did
      WHERE ${whereClause}
      ORDER BY p.createdAt ASC;`,
-    params
+    params,
   );
 }
 
@@ -563,7 +580,7 @@ export function calculateLikesToDelete(
 export function calculateMessagesToDelete(
   db: SQLiteDatabase,
   _userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): MessageToDelete[] {
   if (!settings.deleteChats) {
     return [];
@@ -588,7 +605,7 @@ export function calculateMessagesToDelete(
      FROM message m
      WHERE ${whereClause}
      ORDER BY m.sentAt ASC;`,
-    params
+    params,
   );
 }
 
@@ -598,7 +615,7 @@ export function calculateMessagesToDelete(
  */
 export function calculateBookmarksToDelete(
   db: SQLiteDatabase,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): BookmarkToDelete[] {
   if (!settings.deleteBookmarks) {
     return [];
@@ -608,7 +625,7 @@ export function calculateBookmarksToDelete(
     `SELECT id, subjectUri, postText
      FROM bookmark
      WHERE deletedAt IS NULL
-     ORDER BY savedAt ASC;`
+     ORDER BY savedAt ASC;`,
   );
 }
 
@@ -617,7 +634,7 @@ export function calculateBookmarksToDelete(
  */
 export function calculateFollowsToUnfollow(
   db: SQLiteDatabase,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): FollowToUnfollow[] {
   if (!settings.deleteUnfollowEveryone) {
     return [];
@@ -627,7 +644,7 @@ export function calculateFollowsToUnfollow(
     `SELECT uri, cid, subjectDid, handle, displayName
      FROM follow
      WHERE unfollowedAt IS NULL
-     ORDER BY handle ASC;`
+     ORDER BY handle ASC;`,
   );
 }
 
@@ -637,7 +654,7 @@ export function calculateFollowsToUnfollow(
 export function calculateDeletionPreview(
   db: SQLiteDatabase,
   userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): DeletionPreview {
   return {
     postsToDelete: calculatePostsToDelete(db, userDid, settings),
@@ -655,7 +672,7 @@ export function calculateDeletionPreview(
 export function calculateDeletionPreviewCounts(
   db: SQLiteDatabase,
   userDid: string,
-  settings: AccountDeleteSettings
+  settings: AccountDeleteSettings,
 ): DeletionPreviewCounts {
   const preview = calculateDeletionPreview(db, userDid, settings);
   return {
