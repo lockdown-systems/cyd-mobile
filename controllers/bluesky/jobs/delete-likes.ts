@@ -49,11 +49,17 @@ export async function runDeleteLikesJob(
       cid: "",
       text: like.text,
       createdAt: like.createdAt,
-      savedAt: like.createdAt,
+      savedAt: new Date(like.savedAt).toISOString(),
       author: {
-        did: "",
+        did: like.authorDid,
         handle: like.authorHandle,
+        displayName: like.authorDisplayName,
+        avatarUrl: like.avatarUrl,
       },
+      likeCount: like.likeCount,
+      repostCount: like.repostCount,
+      replyCount: like.replyCount,
+      quoteCount: like.quoteCount,
     };
 
     emit({

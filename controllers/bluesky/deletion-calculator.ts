@@ -62,8 +62,16 @@ export interface LikeToDelete {
   uri: string;
   likeUri: string | null;
   createdAt: string;
+  savedAt: number;
   text: string;
+  authorDid: string;
   authorHandle: string;
+  authorDisplayName: string | null;
+  avatarUrl: string | null;
+  likeCount: number;
+  repostCount: number;
+  replyCount: number;
+  quoteCount: number;
 }
 
 export interface MessageToDelete {
@@ -79,6 +87,10 @@ export interface BookmarkToDelete {
   id: number;
   subjectUri: string;
   postText: string | null;
+  postCreatedAt: string | null;
+  postAuthorDid: string | null;
+  postAuthorHandle: string | null;
+  savedAt: number;
 }
 
 export interface FollowToUnfollow {
@@ -567,7 +579,9 @@ export function calculateLikesToDelete(
   }
 
   return db.getAllSync<LikeToDelete>(
-    `SELECT p.uri, p.likeUri, p.createdAt, p.text, pr.handle as authorHandle
+    `SELECT p.uri, p.likeUri, p.createdAt, p.savedAt, p.text, 
+            p.authorDid, pr.handle as authorHandle, pr.displayName as authorDisplayName, pr.avatarUrl,
+            p.likeCount, p.repostCount, p.replyCount, p.quoteCount
      FROM post p
      LEFT JOIN profile pr ON p.authorDid = pr.did
      WHERE ${whereClause}
@@ -625,7 +639,7 @@ export function calculateBookmarksToDelete(
   }
 
   return db.getAllSync<BookmarkToDelete>(
-    `SELECT id, subjectUri, postText
+    `SELECT id, subjectUri, postText, postCreatedAt, postAuthorDid, postAuthorHandle, savedAt
      FROM bookmark
      WHERE deletedAt IS NULL
      ORDER BY savedAt ASC;`,

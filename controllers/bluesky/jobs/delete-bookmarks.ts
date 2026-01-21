@@ -48,11 +48,11 @@ export async function runDeleteBookmarksJob(
       uri: bookmark.subjectUri,
       cid: "",
       text: bookmark.postText ?? "Bookmarked post",
-      createdAt: "",
-      savedAt: "",
+      createdAt: bookmark.postCreatedAt ?? "",
+      savedAt: new Date(bookmark.savedAt).toISOString(),
       author: {
-        did: "",
-        handle: "bookmarked",
+        did: bookmark.postAuthorDid ?? "",
+        handle: bookmark.postAuthorHandle ?? "unknown",
       },
     };
 

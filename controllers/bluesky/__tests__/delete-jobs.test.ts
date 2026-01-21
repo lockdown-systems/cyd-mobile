@@ -367,8 +367,16 @@ describe("Delete Job Runners", () => {
           uri: "at://did:plc:author/app.bsky.feed.post/1",
           likeUri: "at://did:plc:test/app.bsky.feed.like/1",
           createdAt: "2024-01-01T00:00:00Z",
+          savedAt: Date.now(),
           text: "Liked post",
+          authorDid: "did:plc:author",
           authorHandle: "author.bsky.social",
+          authorDisplayName: "Author",
+          avatarUrl: null,
+          likeCount: 10,
+          repostCount: 5,
+          replyCount: 2,
+          quoteCount: 1,
         },
       ];
 
@@ -398,8 +406,16 @@ describe("Delete Job Runners", () => {
           uri: "at://did:plc:author/app.bsky.feed.post/1",
           likeUri: null,
           createdAt: "2024-01-01T00:00:00Z",
+          savedAt: Date.now(),
           text: "Liked post without likeUri",
+          authorDid: "did:plc:author",
           authorHandle: "author.bsky.social",
+          authorDisplayName: "Author",
+          avatarUrl: null,
+          likeCount: 10,
+          repostCount: 5,
+          replyCount: 2,
+          quoteCount: 1,
         },
       ];
 
@@ -462,6 +478,10 @@ describe("Delete Job Runners", () => {
           id: 1,
           subjectUri: "at://did:plc:author/app.bsky.feed.post/1",
           postText: "Bookmarked post",
+          postCreatedAt: "2024-01-01T00:00:00Z",
+          postAuthorDid: "did:plc:author",
+          postAuthorHandle: "author.bsky.social",
+          savedAt: Date.now(),
         },
       ];
 
