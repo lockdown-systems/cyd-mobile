@@ -194,7 +194,9 @@ describe("CydAccountBar", () => {
     it("should show signed in email", () => {
       render(<CydAccountBar />);
 
-      expect(screen.getByText("Signed in as test@example.com")).toBeTruthy();
+      expect(
+        screen.getAllByText(/Signed in as test@example.com/).length,
+      ).toBeGreaterThan(0);
     });
 
     it("should show email in menu header", () => {
@@ -202,8 +204,8 @@ describe("CydAccountBar", () => {
 
       fireEvent.press(screen.getByText("☰"));
 
-      // Email should appear in menu
-      expect(screen.getByText("test@example.com")).toBeTruthy();
+      // Email should appear in menu as part of "Signed in as" text
+      expect(screen.getAllByText(/test@example.com/).length).toBeGreaterThan(0);
     });
 
     it("should show Manage my Cyd account option", () => {
@@ -219,7 +221,7 @@ describe("CydAccountBar", () => {
 
       fireEvent.press(screen.getByText("☰"));
 
-      expect(screen.getByText("Sign out")).toBeTruthy();
+      expect(screen.getByText("Sign out of Cyd account")).toBeTruthy();
     });
 
     it("should open dashboard URL when Manage my Cyd account is pressed", () => {
@@ -240,7 +242,7 @@ describe("CydAccountBar", () => {
       render(<CydAccountBar />);
 
       fireEvent.press(screen.getByText("☰"));
-      fireEvent.press(screen.getByText("Sign out"));
+      fireEvent.press(screen.getByText("Sign out of Cyd account"));
 
       expect(mockSignOut).toHaveBeenCalled();
     });
@@ -249,9 +251,9 @@ describe("CydAccountBar", () => {
       render(<CydAccountBar />);
 
       fireEvent.press(screen.getByText("☰"));
-      expect(screen.getByText("Sign out")).toBeTruthy();
+      expect(screen.getByText("Sign out of Cyd account")).toBeTruthy();
 
-      fireEvent.press(screen.getByText("Sign out"));
+      fireEvent.press(screen.getByText("Sign out of Cyd account"));
 
       // Verify signOut was called - this happens when menu item is pressed
       // The menu closes as part of handleSignOut
@@ -289,7 +291,7 @@ describe("CydAccountBar", () => {
       fireEvent.press(screen.getByText("☰"));
 
       expect(screen.getByText("Manage my Cyd account")).toBeTruthy();
-      expect(screen.getByText("Sign out")).toBeTruthy();
+      expect(screen.getByText("Sign out of Cyd account")).toBeTruthy();
     });
 
     it("should show different menu when signed out", () => {
@@ -354,10 +356,10 @@ describe("CydAccountBar", () => {
 
       // The text should be present (numberOfLines={1} handles truncation)
       expect(
-        screen.getByText(
+        screen.getAllByText(
           /Signed in as very.long.email.address.that.might.overflow@example.com/,
-        ),
-      ).toBeTruthy();
+        ).length,
+      ).toBeGreaterThan(0);
     });
   });
 });

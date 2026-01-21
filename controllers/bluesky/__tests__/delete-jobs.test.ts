@@ -292,7 +292,17 @@ describe("Delete Job Runners", () => {
           repostUri: "at://did:plc:test/app.bsky.feed.repost/1",
           repostCid: "cid1",
           createdAt: "2024-01-01T00:00:00Z",
+          savedAt: Date.now(),
           originalPostUri: "at://did:plc:author/app.bsky.feed.post/1",
+          text: "Original post text",
+          authorDid: "did:plc:author",
+          authorHandle: "author.bsky.social",
+          authorDisplayName: "Author Name",
+          avatarUrl: null,
+          likeCount: 5,
+          repostCount: 2,
+          replyCount: 1,
+          quoteCount: 0,
         },
       ];
 
