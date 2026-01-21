@@ -24,6 +24,7 @@ function Avatar({ uri, size = 48 }: { uri?: string | null; size?: number }) {
   }
   return (
     <Image
+      key={uri}
       source={{ uri }}
       style={[
         styles.avatar,

@@ -52,7 +52,7 @@ function Avatar({ uri }: { uri?: string | null }) {
   if (!uri) {
     return <View style={[styles.avatar, styles.avatarPlaceholder]} />;
   }
-  return <Image source={{ uri }} style={styles.avatar} />;
+  return <Image key={uri} source={{ uri }} style={styles.avatar} />;
 }
 
 function ImageGalleryModal({
@@ -81,7 +81,7 @@ function ImageGalleryModal({
         setCurrentIndex(newIndex);
       }
     },
-    [currentIndex, images.length]
+    [currentIndex, images.length],
   );
 
   const renderItem = useCallback(
@@ -94,7 +94,7 @@ function ImageGalleryModal({
         />
       </Pressable>
     ),
-    [onClose]
+    [onClose],
   );
 
   const keyExtractor = useCallback((item: ImageItem) => `${item.index}`, []);
@@ -105,7 +105,7 @@ function ImageGalleryModal({
       offset: SCREEN_WIDTH * index,
       index,
     }),
-    []
+    [],
   );
 
   return (
@@ -268,7 +268,7 @@ function ExternalEmbedCard({
             console.warn(
               "[ExternalEmbedCard] Image load error",
               thumbUri,
-              e.nativeEvent.error
+              e.nativeEvent.error,
             )
           }
         />
@@ -308,7 +308,7 @@ export function PostPreview({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [videoVisible, setVideoVisible] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<MediaAttachment | null>(
-    null
+    null,
   );
   const [quotedModalVisible, setQuotedModalVisible] = useState(false);
   const savedTimestamp: string = post.savedAt;
@@ -348,10 +348,10 @@ export function PostPreview({
     const spans: SpanItem[] = facets
       .map((facet): SpanItem | null => {
         const link = facet.features?.find(
-          (f) => f && typeof f === "object" && f.$type?.includes("#link")
+          (f) => f && typeof f === "object" && f.$type?.includes("#link"),
         );
         const mention = facet.features?.find(
-          (f) => f && typeof f === "object" && f.$type?.includes("#mention")
+          (f) => f && typeof f === "object" && f.$type?.includes("#mention"),
         );
         const byteStart = facet.index?.byteStart ?? null;
         const byteEnd = facet.index?.byteEnd ?? null;
@@ -389,7 +389,7 @@ export function PostPreview({
       const safeStart = Math.max(0, Math.min(span.byteStart, textBytes.length));
       const safeEnd = Math.max(
         safeStart,
-        Math.min(span.byteEnd, textBytes.length)
+        Math.min(span.byteEnd, textBytes.length),
       );
 
       if (safeStart > byteCursor) {
@@ -631,7 +631,7 @@ export function PostPreview({
             if (browseMode) {
               // Find the gallery index for this image
               const galleryIdx = galleryImages.findIndex(
-                (g) => g.uri === (item.fullsizeUrl ?? item.thumbUrl)
+                (g) => g.uri === (item.fullsizeUrl ?? item.thumbUrl),
               );
 
               return (
