@@ -83,6 +83,7 @@ function createMockController(overrides?: Partial<BlueskyAccountController>) {
     // Message-related
     getMessagesToDelete: jest.fn().mockReturnValue([]),
     deleteMessage: jest.fn().mockResolvedValue(undefined),
+    getProfilesByDids: jest.fn().mockReturnValue(new Map()),
     // Follow-related
     fetchFollowsFromApi: jest.fn().mockResolvedValue([]),
     unfollowUser: jest.fn().mockResolvedValue(undefined),
@@ -514,8 +515,10 @@ describe("Delete Job Runners", () => {
         {
           messageId: "msg1",
           convoId: "convo1",
+          senderDid: "did:plc:testuser",
           text: "Hello",
           sentAt: "2024-01-01T00:00:00Z",
+          memberDids: '["did:plc:testuser","did:plc:recipient"]',
         },
       ];
 

@@ -69,8 +69,10 @@ export interface LikeToDelete {
 export interface MessageToDelete {
   messageId: string;
   convoId: string;
+  senderDid: string;
   text: string;
   sentAt: string;
+  memberDids: string;
 }
 
 export interface BookmarkToDelete {
@@ -601,8 +603,9 @@ export function calculateMessagesToDelete(
   }
 
   return db.getAllSync<MessageToDelete>(
-    `SELECT m.messageId, m.convoId, m.text, m.sentAt
+    `SELECT m.messageId, m.convoId, m.senderDid, m.text, m.sentAt, c.memberDids
      FROM message m
+     JOIN conversation c ON m.convoId = c.convoId
      WHERE ${whereClause}
      ORDER BY m.sentAt ASC;`,
     params,

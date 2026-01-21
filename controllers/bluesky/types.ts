@@ -47,7 +47,7 @@ export interface BlueskyProgress {
  * Helper to create an initial progress segment
  */
 export function createProgressSegment(
-  unknownTotal: boolean = false
+  unknownTotal: boolean = false,
 ): JobProgressSegment {
   return { current: 0, total: null, unknownTotal };
 }
@@ -164,6 +164,8 @@ export type MessagePreviewData = {
   savedAt: string;
   deletedAt?: string | null;
   sender: ProfileData;
+  /** The other participant(s) in the conversation */
+  recipient?: ProfileData | null;
   embed?: Record<string, unknown> | null;
   facets?: unknown[] | null;
 };

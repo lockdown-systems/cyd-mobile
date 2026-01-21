@@ -8,7 +8,7 @@ import type {
 export async function runDeleteMessagesJob(
   controller: BlueskyAccountController,
   _job: BlueskyJobRecord,
-  emit: JobEmit
+  emit: JobEmit,
 ): Promise<void> {
   emit({
     speechText: "I'm deleting your chat messages",
@@ -54,11 +54,64 @@ export async function runDeleteMessagesJob(
   const userDisplayName = userProfile?.displayName;
   const userAvatarUrl = userProfile?.avatarUrl;
 
+  // Collect all member DIDs from all messages for batch profile lookup
+  const allMemberDids = new Set<string>();
+  for (const message of messagesToDelete) {
+    try {
+      const memberDids = JSON.parse(message.memberDids) as string[];
+      memberDids.forEach((did) => allMemberDids.add(did));
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  // Fetch all profiles at once
+  const profilesByDid = controller.getProfilesByDids(Array.from(allMemberDids));
+
   for (const message of messagesToDelete) {
     await controller.waitForPause();
 
     // Track this conversation for later cleanup check
     conversationIds.add(message.convoId);
+
+    // Find the recipient (the other person in the conversation, not the current user)
+    let recipient: {
+      did: string;
+      handle: string;
+      displayName?: string | null;
+      avatarUrl?: string | null;
+    } | null = null;
+    try {
+      const memberDids = JSON.parse(message.memberDids) as string[];
+      const recipientDid = memberDids.find((did) => did !== userDid);
+      if (recipientDid) {
+        const profile = profilesByDid.get(recipientDid);
+        recipient = profile ?? { did: recipientDid, handle: "unknown" };
+      }
+    } catch {
+      // ignore parse errors
+    }
+
+    // Get the actual sender's profile (could be the current user or the recipient)
+    let senderProfile: {
+      did: string;
+      handle: string;
+      displayName?: string | null;
+      avatarUrl?: string | null;
+    };
+    if (message.senderDid === userDid) {
+      // Message was sent by the current user
+      senderProfile = {
+        did: userDid,
+        handle: userHandle,
+        displayName: userDisplayName,
+        avatarUrl: userAvatarUrl,
+      };
+    } else {
+      // Message was sent by someone else (the recipient)
+      const profile = profilesByDid.get(message.senderDid);
+      senderProfile = profile ?? { did: message.senderDid, handle: "unknown" };
+    }
 
     // Build preview data for display
     const previewData: MessagePreviewData = {
@@ -67,12 +120,8 @@ export async function runDeleteMessagesJob(
       text: message.text,
       sentAt: message.sentAt,
       savedAt: message.sentAt,
-      sender: {
-        did: userDid,
-        handle: userHandle,
-        displayName: userDisplayName,
-        avatarUrl: userAvatarUrl,
-      },
+      sender: senderProfile,
+      recipient: recipient,
     };
 
     emit({
@@ -90,7 +139,7 @@ export async function runDeleteMessagesJob(
       console.warn(
         "[DeleteMessagesJob] Failed to delete message:",
         message.messageId,
-        err
+        err,
       );
       errors++;
       // Continue with next message despite error
@@ -128,7 +177,7 @@ export async function runDeleteMessagesJob(
       console.warn(
         "[DeleteMessagesJob] Failed to check/leave conversation:",
         convoId,
-        err
+        err,
       );
       // Continue with next conversation despite error
     }

@@ -48,7 +48,7 @@ function Avatar({ uri, size = 40 }: { uri?: string | null; size?: number }) {
 }
 
 function extractMediaFromEmbed(
-  value: Record<string, unknown>
+  value: Record<string, unknown>,
 ): MediaAttachment[] {
   const media: MediaAttachment[] = [];
 
@@ -122,7 +122,7 @@ function extractMediaFromEmbed(
 }
 
 export function MessagePreview({ message, palette }: MessagePreviewProps) {
-  const { sender, embed } = message;
+  const { sender, embed, recipient } = message;
   const displayName = sender?.displayName || sender?.handle || "Unknown";
   const handle = sender?.handle || "";
   const avatarUrl = sender?.avatarUrl;
@@ -202,7 +202,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
     const linkSpans = facets
       .map((facet) => {
         const link = facet.features?.find(
-          (f) => f && typeof f === "object" && f.$type?.includes("#link")
+          (f) => f && typeof f === "object" && f.$type?.includes("#link"),
         );
         const byteStart = facet.index?.byteStart ?? null;
         const byteEnd = facet.index?.byteEnd ?? null;
@@ -218,7 +218,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
       })
       .filter(
         (span): span is { byteStart: number; byteEnd: number; uri: string } =>
-          Boolean(span)
+          Boolean(span),
       )
       .sort((a, b) => a.byteStart - b.byteStart);
 
@@ -234,7 +234,7 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
       const safeStart = Math.max(0, Math.min(span.byteStart, textBytes.length));
       const safeEnd = Math.max(
         safeStart,
-        Math.min(span.byteEnd, textBytes.length)
+        Math.min(span.byteEnd, textBytes.length),
       );
       if (safeStart > byteCursor) {
         segments.push({
@@ -285,6 +285,30 @@ export function MessagePreview({ message, palette }: MessagePreviewProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.card }]}>
+      {/* Show recipient (conversation partner) if available */}
+      {recipient && (
+        <View style={styles.recipientRow}>
+          <Text style={[styles.recipientLabel, { color: palette.icon }]}>
+            Conversation with
+          </Text>
+          <View style={styles.recipientInfo}>
+            <Avatar uri={recipient.avatarUrl} size={24} />
+            <Text
+              style={[styles.recipientName, { color: palette.text }]}
+              numberOfLines={1}
+            >
+              {recipient.displayName || recipient.handle}
+            </Text>
+            <Text
+              style={[styles.recipientHandle, { color: palette.icon }]}
+              numberOfLines={1}
+            >
+              @{recipient.handle}
+            </Text>
+          </View>
+        </View>
+      )}
+
       <View style={styles.row}>
         <Avatar uri={avatarUrl} />
         <View style={styles.content}>
@@ -430,6 +454,26 @@ const styles = StyleSheet.create({
   },
   embeddedHint: {
     marginTop: 6,
+    fontSize: 13,
+  },
+  recipientRow: {
+    marginBottom: 12,
+    gap: 4,
+  },
+  recipientLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  recipientInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  recipientName: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  recipientHandle: {
     fontSize: 13,
   },
   timestampFull: {

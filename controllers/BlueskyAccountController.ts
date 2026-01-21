@@ -172,7 +172,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
        FROM account a
        INNER JOIN bsky_account b ON b.id = a.bskyAccountID
        WHERE a.id = ?;`,
-      [this.accountId]
+      [this.accountId],
     );
 
     if (!row) {
@@ -198,7 +198,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       "[BlueskyController] initAgent -> ready",
       this.accountId,
       this.did,
-      this.handle
+      this.handle,
     );
   }
 
@@ -287,6 +287,55 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
+   * Get profiles by DIDs from the local database
+   */
+  getProfilesByDids(dids: string[]): Map<
+    string,
+    {
+      did: string;
+      handle: string;
+      displayName?: string | null;
+      avatarUrl?: string | null;
+    }
+  > {
+    const result = new Map<
+      string,
+      {
+        did: string;
+        handle: string;
+        displayName?: string | null;
+        avatarUrl?: string | null;
+      }
+    >();
+
+    if (!this.db || dids.length === 0) {
+      return result;
+    }
+
+    const placeholders = dids.map(() => "?").join(",");
+    const profiles = this.db.getAllSync<{
+      did: string;
+      handle: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+    }>(
+      `SELECT did, handle, displayName, avatarUrl FROM profile WHERE did IN (${placeholders});`,
+      dids,
+    );
+
+    for (const profile of profiles) {
+      result.set(profile.did, {
+        did: profile.did,
+        handle: profile.handle,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+      });
+    }
+
+    return result;
+  }
+
+  /**
    * Check if the agent is initialized
    */
   isAgentReady(): boolean {
@@ -303,7 +352,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       `UPDATE bsky_account 
        SET sessionJson = ?, updatedAt = ?
        WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
-      [JSON.stringify(newSession), Date.now(), this.accountId]
+      [JSON.stringify(newSession), Date.now(), this.accountId],
     );
 
     const sessionFetch = newSession.fetchHandler.bind(newSession);
@@ -493,7 +542,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     for (const jobType of jobTypes) {
       const result = await db.runAsync(
         `INSERT INTO job (jobType, status, scheduledAt, progressJSON) VALUES (?, 'pending', ?, NULL);`,
-        [jobType, scheduledAt]
+        [jobType, scheduledAt],
       );
       const id = Number(result.lastInsertRowId);
       inserted.push({
@@ -511,14 +560,14 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     console.log(
       "[BlueskyController] defineSaveJobs -> inserted",
       this.accountId,
-      inserted.map((j) => j.jobType)
+      inserted.map((j) => j.jobType),
     );
 
     return inserted;
   }
 
   async defineDeleteJobs(
-    options: DeleteJobOptions
+    options: DeleteJobOptions,
   ): Promise<BlueskyJobRecord[]> {
     console.log(
       "[BlueskyController] defineDeleteJobs -> start",
@@ -526,7 +575,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       {
         settings: options.settings,
         counts: options.counts,
-      }
+      },
     );
     const db = this.requireDb();
     const scheduledAt = Date.now();
@@ -569,7 +618,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     for (const jobType of jobTypes) {
       const result = await db.runAsync(
         `INSERT INTO job (jobType, status, scheduledAt, progressJSON) VALUES (?, 'pending', ?, NULL);`,
-        [jobType, scheduledAt]
+        [jobType, scheduledAt],
       );
       const id = Number(result.lastInsertRowId);
       inserted.push({
@@ -587,7 +636,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     console.log(
       "[BlueskyController] defineDeleteJobs -> inserted",
       this.accountId,
-      inserted.map((j) => j.jobType)
+      inserted.map((j) => j.jobType),
     );
 
     return inserted;
@@ -599,7 +648,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Only one verifyAuthorization job is added at the start.
    */
   async defineSaveAndDeleteJobs(
-    options: SaveAndDeleteJobOptions
+    options: SaveAndDeleteJobOptions,
   ): Promise<BlueskyJobRecord[]> {
     console.log(
       "[BlueskyController] defineSaveAndDeleteJobs -> start",
@@ -608,7 +657,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         saveOptions: options.saveOptions,
         deleteSettings: options.deleteOptions.settings,
         deleteCounts: options.deleteOptions.counts,
-      }
+      },
     );
     const db = this.requireDb();
     const scheduledAt = Date.now();
@@ -661,7 +710,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     for (const jobType of jobTypes) {
       const result = await db.runAsync(
         `INSERT INTO job (jobType, status, scheduledAt, progressJSON) VALUES (?, 'pending', ?, NULL);`,
-        [jobType, scheduledAt]
+        [jobType, scheduledAt],
       );
       const id = Number(result.lastInsertRowId);
       inserted.push({
@@ -679,7 +728,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     console.log(
       "[BlueskyController] defineSaveAndDeleteJobs -> inserted",
       this.accountId,
-      inserted.map((j) => j.jobType)
+      inserted.map((j) => j.jobType),
     );
 
     return inserted;
@@ -691,7 +740,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       `SELECT id, jobType, status, scheduledAt, startedAt, finishedAt, progressJSON, error
        FROM job
        WHERE status IN ('pending', 'running')
-       ORDER BY scheduledAt ASC, id ASC;`
+       ORDER BY scheduledAt ASC, id ASC;`,
     );
     return (rows ?? []).map(mapJobRow);
   }
@@ -724,14 +773,14 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         "[BlueskyController] runJobs -> job start",
         this.accountId,
         job.id,
-        job.jobType
+        job.jobType,
       );
       const startedAt = Date.now();
       await this.updateJobStatus(job.id, "running", startedAt, null, null);
       jobs = jobs.map((existing) =>
         existing.id === job.id
           ? { ...existing, status: "running", startedAt, error: null }
-          : existing
+          : existing,
       );
       emit({ activeJobId: job.id });
 
@@ -740,7 +789,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           jobs = jobs.map((existing) =>
             existing.id === job.id
               ? { ...existing, progress: update.progress }
-              : existing
+              : existing,
           );
         }
 
@@ -760,7 +809,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         await runJob(
           this,
           { ...job, status: "running", startedAt },
-          emitForJob
+          emitForJob,
         );
         const finishedAt = Date.now();
         await this.updateJobStatus(
@@ -768,19 +817,19 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           "completed",
           job.startedAt ?? startedAt,
           finishedAt,
-          null
+          null,
         );
         jobs = jobs.map((existing) =>
           existing.id === job.id
             ? { ...existing, status: "completed", finishedAt, error: null }
-            : existing
+            : existing,
         );
         emit({ activeJobId: null });
         console.log(
           "[BlueskyController] runJobs -> job complete",
           this.accountId,
           job.id,
-          job.jobType
+          job.jobType,
         );
       } catch (err) {
         const finishedAt = Date.now();
@@ -790,17 +839,17 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           "failed",
           job.startedAt ?? startedAt,
           finishedAt,
-          message
+          message,
         );
         jobs = jobs.map((existing) =>
           existing.id === job.id
             ? { ...existing, status: "failed", finishedAt, error: message }
-            : existing
+            : existing,
         );
 
         // Cancel remaining jobs
         const remaining = jobs.filter(
-          (existing) => existing.status === "pending"
+          (existing) => existing.status === "pending",
         );
         for (const pendingJob of remaining) {
           await this.updateJobStatus(
@@ -808,7 +857,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
             "failed",
             pendingJob.startedAt ?? null,
             finishedAt,
-            "Cancelled due to previous failure"
+            "Cancelled due to previous failure",
           );
         }
         jobs = jobs.map((existing) =>
@@ -819,7 +868,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
                 finishedAt,
                 error: existing.error ?? "Cancelled due to previous failure",
               }
-            : existing
+            : existing,
         );
         emit({
           activeJobId: null,
@@ -831,7 +880,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           this.accountId,
           job.id,
           job.jobType,
-          message
+          message,
         );
         break;
       }
@@ -845,7 +894,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     status: BlueskyJobStatus,
     startedAt: number | null,
     finishedAt: number | null,
-    error: string | null
+    error: string | null,
   ): Promise<void> {
     const db = this.requireDb();
     await db.runAsync(
@@ -855,7 +904,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
            finishedAt = ?,
            error = ?
        WHERE id = ?;`,
-      [status, startedAt, finishedAt, error, jobId]
+      [status, startedAt, finishedAt, error, jobId],
     );
   }
 
@@ -941,7 +990,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * This is a lighter-weight version that just returns counts instead of full items.
    */
   getDeletionPreviewCounts(
-    settings: AccountDeleteSettings
+    settings: AccountDeleteSettings,
   ): DeletionPreviewCounts {
     const db = this.requireDb();
     const userDid = this.did;
@@ -967,7 +1016,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Get posts that will be deleted with full preview data for UI display
    */
   getPostsToDeleteWithPreview(
-    settings: AccountDeleteSettings
+    settings: AccountDeleteSettings,
   ): PostToDeletePreview[] {
     const db = this.requireDb();
     const userDid = this.did;
@@ -982,7 +1031,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * This allows users to toggle preservation status in the review modal.
    */
   getPostsForDeletionReview(
-    settings: AccountDeleteSettings
+    settings: AccountDeleteSettings,
   ): PostToDeletePreview[] {
     const db = this.requireDb();
     const userDid = this.did;
@@ -1075,7 +1124,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         repo: did,
         collection: "app.bsky.feed.post",
         rkey: postUri.split("/").pop() ?? "",
-      })
+      }),
     );
 
     // Mark as deleted in local DB
@@ -1100,7 +1149,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         repo: did,
         collection: "app.bsky.feed.repost",
         rkey: repostUri.split("/").pop() ?? "",
-      })
+      }),
     );
 
     // Mark as deleted in local DB
@@ -1127,7 +1176,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         repo: did,
         collection: "app.bsky.feed.like",
         rkey: likeUri.split("/").pop() ?? "",
-      })
+      }),
     );
 
     // Mark as deleted in local DB (update the post record's deletedLikeAt)
@@ -1147,7 +1196,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     // Get the subject URI (the URI of the bookmarked post)
     const bookmark = db.getFirstSync<{ subjectUri: string }>(
       `SELECT subjectUri FROM bookmark WHERE id = ?;`,
-      [bookmarkId]
+      [bookmarkId],
     );
 
     if (bookmark?.subjectUri) {
@@ -1185,8 +1234,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           convoId,
           messageId,
         },
-        { encoding: "application/json", headers: DM_SERVICE_HEADERS }
-      )
+        { encoding: "application/json", headers: DM_SERVICE_HEADERS },
+      ),
     );
 
     // Mark as deleted in local DB (store as epoch milliseconds)
@@ -1212,8 +1261,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           convoId,
           limit: 1,
         },
-        { headers: DM_SERVICE_HEADERS }
-      )
+        { headers: DM_SERVICE_HEADERS },
+      ),
     );
 
     return response.messages?.length ?? 0;
@@ -1233,8 +1282,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     await this.makeApiRequest(() =>
       agent.api.chat.bsky.convo.leaveConvo(
         { convoId },
-        { encoding: "application/json", headers: DM_SERVICE_HEADERS }
-      )
+        { encoding: "application/json", headers: DM_SERVICE_HEADERS },
+      ),
     );
 
     // Mark conversation as left in local DB
@@ -1277,7 +1326,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           actor: did,
           cursor,
           limit: pageSize,
-        })
+        }),
       );
 
       const pageFollows = response.follows ?? [];
@@ -1317,7 +1366,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           collection: "app.bsky.graph.follow",
           cursor,
           limit: pageSize,
-        })
+        }),
       );
 
       const records = response.records ?? [];
@@ -1354,7 +1403,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       subjectDid: string;
       handle: string;
       displayName: string | null;
-    }
+    },
   ): Promise<void> {
     const agent = this.requireAgent();
     const db = this.requireDb();
@@ -1367,7 +1416,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         repo: did,
         collection: "app.bsky.graph.follow",
         rkey: followUri.split("/").pop() ?? "",
-      })
+      }),
     );
 
     const now = new Date().toISOString();
@@ -1386,7 +1435,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           subjectInfo.displayName,
           nowTs,
           nowTs,
-        ]
+        ],
       );
 
       // Now insert the follow record (cid is required but we use empty string as placeholder)
@@ -1402,7 +1451,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           now,
           nowTs,
           nowTs, // Mark as unfollowed immediately since we just unfollowed
-        ]
+        ],
       );
     }
 
@@ -1439,7 +1488,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     const db = this.requireDb();
     const row = db.getFirstSync<{ preserve: number }>(
       `SELECT preserve FROM post WHERE uri = ?;`,
-      [postUri]
+      [postUri],
     );
     if (!row) {
       return null;
@@ -1461,7 +1510,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     const db = this.requireDb();
     const row = db.getFirstSync<{ preserve: number }>(
       `SELECT preserve FROM post WHERE uri = ?;`,
-      [postUri]
+      [postUri],
     );
     if (!row) {
       return null;
@@ -1509,7 +1558,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     await this.ensureAccountDirectory();
     const accountPaths = buildAccountPaths(
       this.getAccountType(),
-      this.getAccountUUID()
+      this.getAccountUUID(),
     );
     const safeName = encodeURIComponent(filename);
     const mediaDir = new Directory(accountPaths.mediaDir);
@@ -1532,7 +1581,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     try {
       const accountPaths = buildAccountPaths(
         this.getAccountType(),
-        this.getAccountUUID()
+        this.getAccountUUID(),
       );
 
       const deleteIfExists = (path: string) => {
@@ -1550,13 +1599,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
       // Clean up legacy paths that may still exist from earlier builds
       deleteIfExists(
-        `${accountPaths.base}bluesky-accounts/${this.getAccountUUID()}`
+        `${accountPaths.base}bluesky-accounts/${this.getAccountUUID()}`,
       );
       deleteIfExists(
-        `${accountPaths.base}SQLite/bluesky-accounts/${this.getAccountUUID()}`
+        `${accountPaths.base}SQLite/bluesky-accounts/${this.getAccountUUID()}`,
       );
       deleteIfExists(
-        `${accountPaths.base}SQLite/accounts/${this.getAccountType()}-${this.getAccountUUID()}`
+        `${accountPaths.base}SQLite/accounts/${this.getAccountType()}-${this.getAccountUUID()}`,
       );
     } catch (err) {
       console.warn("Failed to delete account storage", err);
@@ -1589,7 +1638,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
     const accountPaths = buildAccountPaths(
       this.getAccountType(),
-      this.getAccountUUID()
+      this.getAccountUUID(),
     );
 
     // Create a temporary directory for the archive contents
@@ -1615,7 +1664,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
             // Copy directories recursively
             this.copyDirectoryRecursive(
               item,
-              new Directory(tempDir, item.name)
+              new Directory(tempDir, item.name),
             );
           }
         }
@@ -1679,7 +1728,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           FROM account a
           INNER JOIN bsky_account b ON b.id = a.bskyAccountID
           WHERE a.id = ?;`,
-          [this.accountId]
+          [this.accountId],
         );
 
         if (accountData) {
