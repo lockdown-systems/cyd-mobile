@@ -21,7 +21,8 @@
     "production": {
       "ios": {
         "appleTeamId": "G762K6CH36",
-        "bundleIdentifier": "systems.lockdown.cyd-mobile"
+        "bundleIdentifier": "systems.lockdown.cyd-mobile",
+        "ascAppId": "6758054552"
       }
     }
   }
