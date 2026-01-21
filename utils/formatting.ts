@@ -1,10 +1,14 @@
 export function formatTimestampFull(
-  value?: string | number | Date | null
+  value?: string | number | Date | null,
 ): string {
-  if (value == null) return "";
+  if (value == null || value === "") return "";
 
   // Accept ISO strings, epoch milliseconds, or Date objects
   const date = value instanceof Date ? value : new Date(value);
+
+  // Check for invalid date
+  if (isNaN(date.getTime())) return "";
+
   return date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",

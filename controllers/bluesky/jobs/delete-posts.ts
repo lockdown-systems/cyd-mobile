@@ -4,7 +4,7 @@ import type { BlueskyJobRecord, JobEmit, PostPreviewData } from "../job-types";
 export async function runDeletePostsJob(
   controller: BlueskyAccountController,
   _job: BlueskyJobRecord,
-  emit: JobEmit
+  emit: JobEmit,
 ): Promise<void> {
   emit({
     speechText: "I'm deleting your posts",
@@ -49,7 +49,7 @@ export async function runDeletePostsJob(
       cid: post.cid,
       text: post.text,
       createdAt: post.createdAt,
-      savedAt: String(post.savedAt),
+      savedAt: new Date(post.savedAt).toISOString(),
       author: {
         did: post.authorDid,
         handle: post.authorHandle ?? "unknown",
