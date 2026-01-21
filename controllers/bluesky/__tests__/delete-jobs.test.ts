@@ -179,7 +179,7 @@ describe("Delete Job Runners", () => {
       const { emit } = createMockEmit();
 
       await expect(
-        runDeletePostsJob(controller, mockJob, emit)
+        runDeletePostsJob(controller, mockJob, emit),
       ).rejects.toThrow("Delete settings not found");
     });
 
@@ -256,7 +256,7 @@ describe("Delete Job Runners", () => {
       await runDeleteRepostsJob(
         controller,
         { ...mockJob, jobType: "deleteReposts" },
-        emit
+        emit,
       );
 
       expect(calls[0]).toMatchObject({
@@ -275,7 +275,7 @@ describe("Delete Job Runners", () => {
       await runDeleteRepostsJob(
         controller,
         { ...mockJob, jobType: "deleteReposts" },
-        emit
+        emit,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -303,11 +303,11 @@ describe("Delete Job Runners", () => {
       await runDeleteRepostsJob(
         controller,
         { ...mockJob, jobType: "deleteReposts" },
-        emit
+        emit,
       );
 
       expect(controller.deleteRepost).toHaveBeenCalledWith(
-        mockReposts[0].repostUri
+        mockReposts[0].repostUri,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -323,7 +323,7 @@ describe("Delete Job Runners", () => {
       await runDeleteLikesJob(
         controller,
         { ...mockJob, jobType: "deleteLikes" },
-        emit
+        emit,
       );
 
       expect(calls[0]).toMatchObject({
@@ -342,7 +342,7 @@ describe("Delete Job Runners", () => {
       await runDeleteLikesJob(
         controller,
         { ...mockJob, jobType: "deleteLikes" },
-        emit
+        emit,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -369,12 +369,12 @@ describe("Delete Job Runners", () => {
       await runDeleteLikesJob(
         controller,
         { ...mockJob, jobType: "deleteLikes" },
-        emit
+        emit,
       );
 
       expect(controller.deleteLike).toHaveBeenCalledWith(
         mockLikes[0].likeUri,
-        mockLikes[0].uri
+        mockLikes[0].uri,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -400,7 +400,7 @@ describe("Delete Job Runners", () => {
       await runDeleteLikesJob(
         controller,
         { ...mockJob, jobType: "deleteLikes" },
-        emit
+        emit,
       );
 
       expect(controller.deleteLike).not.toHaveBeenCalled();
@@ -418,7 +418,7 @@ describe("Delete Job Runners", () => {
       await runDeleteBookmarksJob(
         controller,
         { ...mockJob, jobType: "deleteBookmarks" },
-        emit
+        emit,
       );
 
       expect(calls[0]).toMatchObject({
@@ -437,7 +437,7 @@ describe("Delete Job Runners", () => {
       await runDeleteBookmarksJob(
         controller,
         { ...mockJob, jobType: "deleteBookmarks" },
-        emit
+        emit,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -462,11 +462,11 @@ describe("Delete Job Runners", () => {
       await runDeleteBookmarksJob(
         controller,
         { ...mockJob, jobType: "deleteBookmarks" },
-        emit
+        emit,
       );
 
       expect(controller.deleteBookmark).toHaveBeenCalledWith(
-        mockBookmarks[0].id
+        mockBookmarks[0].id,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -482,7 +482,7 @@ describe("Delete Job Runners", () => {
       await runDeleteMessagesJob(
         controller,
         { ...mockJob, jobType: "deleteMessages" },
-        emit
+        emit,
       );
 
       expect(calls[0]).toMatchObject({
@@ -501,7 +501,7 @@ describe("Delete Job Runners", () => {
       await runDeleteMessagesJob(
         controller,
         { ...mockJob, jobType: "deleteMessages" },
-        emit
+        emit,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -527,12 +527,12 @@ describe("Delete Job Runners", () => {
       await runDeleteMessagesJob(
         controller,
         { ...mockJob, jobType: "deleteMessages" },
-        emit
+        emit,
       );
 
       expect(controller.deleteMessage).toHaveBeenCalledWith(
         mockMessages[0].convoId,
-        mockMessages[0].messageId
+        mockMessages[0].messageId,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -548,7 +548,7 @@ describe("Delete Job Runners", () => {
       await runUnfollowUsersJob(
         controller,
         { ...mockJob, jobType: "unfollowUsers" },
-        emit
+        emit,
       );
 
       expect(calls[0]).toMatchObject({
@@ -568,7 +568,7 @@ describe("Delete Job Runners", () => {
       await runUnfollowUsersJob(
         controller,
         { ...mockJob, jobType: "unfollowUsers" },
-        emit
+        emit,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -593,7 +593,7 @@ describe("Delete Job Runners", () => {
       await runUnfollowUsersJob(
         controller,
         { ...mockJob, jobType: "unfollowUsers" },
-        emit
+        emit,
       );
 
       expect(controller.unfollowUser).toHaveBeenCalledWith(mockFollows[0].uri, {
@@ -604,7 +604,7 @@ describe("Delete Job Runners", () => {
 
       // Check that profile preview was emitted
       const previewCall = calls.find(
-        (call) => call.previewData?.type === "profile"
+        (call) => call.previewData?.type === "profile",
       );
       expect(previewCall).toBeDefined();
       expect(previewCall?.previewData?.data).toMatchObject({
@@ -647,7 +647,7 @@ describe("Delete Job Runners", () => {
       await runUnfollowUsersJob(
         controller,
         { ...mockJob, jobType: "unfollowUsers" },
-        emit
+        emit,
       );
 
       const lastCall = calls[calls.length - 1];
@@ -678,16 +678,19 @@ describe("Delete Job Runners", () => {
       await runUnfollowUsersJob(
         controller,
         { ...mockJob, jobType: "unfollowUsers" },
-        emit
+        emit,
       );
 
       // After fetching, we should have a determinate progress bar
       const readyCall = calls.find((call) =>
-        call.progressMessage?.includes("Ready to unfollow")
+        call.progressMessage?.includes("Ready to unfollow"),
       );
       expect(readyCall).toBeDefined();
       expect(readyCall?.unknownTotal).toBe(false);
-      expect(readyCall?.progress?.totalItems).toBe(2);
+      expect(
+        (readyCall?.progress as { totalItems?: number } | undefined)
+          ?.totalItems,
+      ).toBe(2);
     });
   });
 });

@@ -70,10 +70,8 @@ describe("DeleteAutomationModal", () => {
 
     it("should export DeleteAutomationModalState type via re-export", () => {
       // Type-only export check - we can verify the component accepts the state type
-      const validState: DeleteAutomationModalState = "ready";
-      expect(["ready", "running", "paused", "completed", "failed"]).toContain(
-        validState
-      );
+      const validState: DeleteAutomationModalState = "idle";
+      expect(["idle", "running", "completed", "failed"]).toContain(validState);
     });
   });
 
@@ -223,9 +221,8 @@ describe("DeleteAutomationModal", () => {
   describe("modal state types", () => {
     it("should support all modal states", () => {
       const states: DeleteAutomationModalState[] = [
-        "ready",
+        "idle",
         "running",
-        "paused",
         "completed",
         "failed",
       ];

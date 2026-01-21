@@ -84,6 +84,12 @@ describe("shared browse helpers", () => {
       authorDid: "did:plc:author123",
       text: "This is a test post",
       createdAt: "2024-01-15T10:00:00.000Z",
+      savedAt: 1705315200000,
+      deletedPostAt: null,
+      deletedRepostAt: null,
+      deletedLikeAt: null,
+      deletedBookmarkAt: null,
+      preserve: 0,
       facetsJSON: null,
       embedJSON: null,
       quotedPostUri: null,
@@ -92,6 +98,7 @@ describe("shared browse helpers", () => {
       replyCount: 25,
       quoteCount: 10,
       isRepost: 0,
+      isReply: 0,
       handle: "author.bsky.social",
       displayName: "Test Author",
       avatarUrl: "https://cdn.bsky.app/avatar.jpg",
@@ -214,7 +221,7 @@ describe("shared browse helpers", () => {
         baseRow,
         fallbackHandle,
         undefined,
-        externalEmbed
+        externalEmbed,
       );
 
       expect(result.externalEmbed).toEqual(externalEmbed);
@@ -241,7 +248,7 @@ describe("shared browse helpers", () => {
       expect(result.quotedPost).not.toBeNull();
       expect(result.quotedPost?.text).toBe("Quoted post content");
       expect(result.quotedPostUri).toBe(
-        "at://did:plc:quoted/app.bsky.feed.post/quoted123"
+        "at://did:plc:quoted/app.bsky.feed.post/quoted123",
       );
     });
 
@@ -272,7 +279,7 @@ describe("shared browse helpers", () => {
         fallbackHandle,
         undefined,
         undefined,
-        quotedPostExternalEmbed
+        quotedPostExternalEmbed,
       );
 
       expect(result.quotedPost?.externalEmbed).toEqual(quotedPostExternalEmbed);
@@ -378,7 +385,7 @@ describe("shared browse helpers", () => {
       const post2Media = result.get("at://did/post/2");
       expect(post2Media?.[0].type).toBe("video");
       expect(post2Media?.[0].playlistUrl).toBe(
-        "https://video.bsky.app/playlist.m3u8"
+        "https://video.bsky.app/playlist.m3u8",
       );
     });
 
@@ -523,7 +530,7 @@ describe("shared browse helpers", () => {
 
       expect(query).toContain("WHERE p.authorDid = ?");
       expect(query).toContain(
-        "(p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))"
+        "(p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))",
       );
       expect(query).toContain("ORDER BY p.createdAt DESC, p.id DESC");
     });
@@ -533,7 +540,7 @@ describe("shared browse helpers", () => {
 
       expect(query).toContain("WHERE p.viewerLiked = 1");
       expect(query).toContain(
-        "(p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))"
+        "(p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))",
       );
     });
 
@@ -542,7 +549,7 @@ describe("shared browse helpers", () => {
 
       expect(query).toContain("WHERE p.viewerBookmarked = 1");
       expect(query).toContain(
-        "(p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))"
+        "(p.createdAt < ? OR (p.createdAt = ? AND p.id < ?))",
       );
     });
   });

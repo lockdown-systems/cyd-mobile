@@ -20,6 +20,7 @@ const basePost: PostPreviewData = {
   cid: "bafyreicid123",
   text: "This is a test post with some content.",
   createdAt: "2024-01-15T10:00:00.000Z",
+  savedAt: "2024-01-15T10:00:00.000Z",
   author: {
     did: "did:plc:author123",
     handle: "author.bsky.social",
@@ -39,7 +40,7 @@ describe("PostPreview", () => {
     expect(screen.getByText("Test Author")).toBeTruthy();
     expect(screen.getByText("@author.bsky.social")).toBeTruthy();
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 
@@ -156,7 +157,7 @@ describe("PostPreview", () => {
 
     // Images should be rendered (can test for accessibilityLabel)
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 
@@ -178,7 +179,7 @@ describe("PostPreview", () => {
     render(<PostPreview post={post} palette={defaultPalette} />);
 
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 
@@ -208,6 +209,7 @@ describe("PostPreview", () => {
       cid: "bafyreiquoted",
       text: "This is the quoted post content",
       createdAt: "2024-01-14T08:00:00.000Z",
+      savedAt: "2024-01-14T08:00:00.000Z",
       author: {
         did: "did:plc:quoted",
         handle: "quoted.bsky.social",
@@ -232,11 +234,11 @@ describe("PostPreview", () => {
     expect(screen.getByText("Check out this quote!")).toBeTruthy();
     // Use getAllByText since the name may appear multiple times (once in author, possibly elsewhere)
     expect(screen.getAllByText("Quoted Author").length).toBeGreaterThanOrEqual(
-      1
+      1,
     );
     // The quoted post snippet may also appear in multiple places
     expect(
-      screen.getAllByText("This is the quoted post content").length
+      screen.getAllByText("This is the quoted post content").length,
     ).toBeGreaterThanOrEqual(1);
   });
 
@@ -246,6 +248,7 @@ describe("PostPreview", () => {
       cid: "bafyreiquoted",
       text: "Check out this article",
       createdAt: "2024-01-14T08:00:00.000Z",
+      savedAt: "2024-01-14T08:00:00.000Z",
       author: {
         did: "did:plc:quoted",
         handle: "quoted.bsky.social",
@@ -275,7 +278,7 @@ describe("PostPreview", () => {
     expect(screen.getByText("Quoting this article post")).toBeTruthy();
     // Title may appear multiple times, use getAllByText
     expect(screen.getAllByText("Nested Article").length).toBeGreaterThanOrEqual(
-      1
+      1,
     );
   });
 
@@ -289,7 +292,7 @@ describe("PostPreview", () => {
 
     // Should show repost indicator
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 
@@ -306,7 +309,7 @@ describe("PostPreview", () => {
 
     // Should still render the post
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 
@@ -322,7 +325,7 @@ describe("PostPreview", () => {
     render(<PostPreview post={post} palette={defaultPalette} />);
 
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 
@@ -339,7 +342,7 @@ describe("PostPreview", () => {
 
     // formatNumber should abbreviate large numbers
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 
@@ -360,7 +363,7 @@ describe("PostPreview", () => {
 
     // Component should render in browse mode
     expect(
-      screen.getByText("This is a test post with some content.")
+      screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
   });
 

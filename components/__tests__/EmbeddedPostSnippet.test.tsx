@@ -20,6 +20,7 @@ const basePost: PostPreviewData = {
   cid: "bafyreicid123",
   text: "This is the quoted post content.",
   createdAt: "2024-01-15T10:00:00.000Z",
+  savedAt: "2024-01-15T10:00:00.000Z",
   author: {
     did: "did:plc:author123",
     handle: "author.bsky.social",
@@ -38,7 +39,7 @@ describe("EmbeddedPostSnippet", () => {
 
   it("should return null for null post", () => {
     const { toJSON } = render(
-      <EmbeddedPostSnippet post={null} palette={defaultPalette} />
+      <EmbeddedPostSnippet post={null} palette={defaultPalette} />,
     );
 
     expect(toJSON()).toBeNull();
@@ -46,7 +47,7 @@ describe("EmbeddedPostSnippet", () => {
 
   it("should return null for undefined post", () => {
     const { toJSON } = render(
-      <EmbeddedPostSnippet post={undefined} palette={defaultPalette} />
+      <EmbeddedPostSnippet post={undefined} palette={defaultPalette} />,
     );
 
     expect(toJSON()).toBeNull();
@@ -94,7 +95,7 @@ describe("EmbeddedPostSnippet", () => {
         post={basePost}
         palette={defaultPalette}
         hint="Tap to view full post"
-      />
+      />,
     );
 
     expect(screen.getByText("Tap to view full post")).toBeTruthy();
@@ -106,7 +107,7 @@ describe("EmbeddedPostSnippet", () => {
         post={basePost}
         palette={defaultPalette}
         hint="Custom hint message"
-      />
+      />,
     );
 
     expect(screen.getByText("Custom hint message")).toBeTruthy();
@@ -133,7 +134,7 @@ describe("EmbeddedPostSnippet", () => {
         post={basePost}
         palette={defaultPalette}
         onPress={onPress}
-      />
+      />,
     );
 
     // Find and press the container - use UNSAFE_root to access the tree
@@ -203,13 +204,13 @@ describe("EmbeddedPostSnippet", () => {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { UNSAFE_root } = render(
-      <EmbeddedPostSnippet post={post} palette={defaultPalette} />
+      <EmbeddedPostSnippet post={post} palette={defaultPalette} />,
     );
 
     // Find the link card Pressable by traversing the tree
     // The Pressable containing the external embed has a specific structure
     const findPressableWithOnPress = (
-      node: { children?: unknown[]; props?: { onPress?: unknown } } | null
+      node: { children?: unknown[]; props?: { onPress?: unknown } } | null,
     ): { props: { onPress: (e: unknown) => void } } | null => {
       if (!node) return null;
       if (node.props?.onPress) {
@@ -218,7 +219,7 @@ describe("EmbeddedPostSnippet", () => {
       if (node.children && Array.isArray(node.children)) {
         for (const child of node.children) {
           const found = findPressableWithOnPress(
-            child as { children?: unknown[]; props?: { onPress?: unknown } }
+            child as { children?: unknown[]; props?: { onPress?: unknown } },
           );
           if (found) return found;
         }
@@ -230,7 +231,7 @@ describe("EmbeddedPostSnippet", () => {
       UNSAFE_root as unknown as {
         children?: unknown[];
         props?: { onPress?: unknown };
-      }
+      },
     );
     expect(pressable).not.toBeNull();
 
@@ -243,7 +244,7 @@ describe("EmbeddedPostSnippet", () => {
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(jest.mocked(Linking.canOpenURL)).toHaveBeenCalledWith(
-      "https://example.com/article"
+      "https://example.com/article",
     );
   });
 
@@ -304,7 +305,7 @@ describe("EmbeddedPostSnippet", () => {
     const customPalette: AccountTabPalette = Colors.dark;
 
     const renderResult = render(
-      <EmbeddedPostSnippet post={basePost} palette={customPalette} />
+      <EmbeddedPostSnippet post={basePost} palette={customPalette} />,
     );
 
     expect(renderResult.toJSON()).not.toBeNull();

@@ -31,16 +31,10 @@ const mockPalette: AccountTabPalette = {
 };
 
 const mockOptions: SaveJobOptions = {
-  skipPosts: false,
-  skipLikes: false,
-  skipReposts: false,
-  skipLists: false,
-  skipBookmarks: false,
-  skipFollows: false,
-  skipBlocks: false,
-  skipMutes: false,
-  skipConversations: false,
-  skipMessages: false,
+  posts: true,
+  likes: true,
+  bookmarks: true,
+  chat: true,
 };
 
 describe("SaveAutomationModal", () => {
@@ -52,10 +46,8 @@ describe("SaveAutomationModal", () => {
 
     it("should export SaveAutomationModalState type via re-export", () => {
       // Type-only export check - we can verify the component accepts the state type
-      const validState: SaveAutomationModalState = "ready";
-      expect(["ready", "running", "paused", "completed", "failed"]).toContain(
-        validState
-      );
+      const validState: SaveAutomationModalState = "idle";
+      expect(["idle", "running", "completed", "failed"]).toContain(validState);
     });
   });
 
@@ -96,18 +88,12 @@ describe("SaveAutomationModal", () => {
   });
 
   describe("props validation", () => {
-    it("should accept options with all skip flags", () => {
+    it("should accept options with all flags enabled", () => {
       const fullOptions: SaveJobOptions = {
-        skipPosts: true,
-        skipLikes: true,
-        skipReposts: true,
-        skipLists: true,
-        skipBookmarks: true,
-        skipFollows: true,
-        skipBlocks: true,
-        skipMutes: true,
-        skipConversations: true,
-        skipMessages: true,
+        posts: true,
+        likes: true,
+        bookmarks: true,
+        chat: true,
       };
 
       const props: SaveAutomationModalProps = {
@@ -122,22 +108,16 @@ describe("SaveAutomationModal", () => {
 
       const element = React.createElement(SaveAutomationModal, props);
       expect(element.props.options).toBe(fullOptions);
-      expect(element.props.options.skipPosts).toBe(true);
-      expect(element.props.options.skipMessages).toBe(true);
+      expect(element.props.options.posts).toBe(true);
+      expect(element.props.options.chat).toBe(true);
     });
 
-    it("should accept partial options with some skips enabled", () => {
-      const partialSkipOptions: SaveJobOptions = {
-        skipPosts: false,
-        skipLikes: true,
-        skipReposts: false,
-        skipLists: true,
-        skipBookmarks: false,
-        skipFollows: false,
-        skipBlocks: false,
-        skipMutes: false,
-        skipConversations: false,
-        skipMessages: true,
+    it("should accept partial options with some flags disabled", () => {
+      const partialOptions: SaveJobOptions = {
+        posts: true,
+        likes: false,
+        bookmarks: true,
+        chat: false,
       };
 
       const props: SaveAutomationModalProps = {
@@ -145,15 +125,15 @@ describe("SaveAutomationModal", () => {
         accountId: 2,
         accountUUID: "another-uuid",
         palette: mockPalette,
-        options: partialSkipOptions,
+        options: partialOptions,
         onFinished: jest.fn(),
         onClose: jest.fn(),
       };
 
       const element = React.createElement(SaveAutomationModal, props);
-      expect(element.props.options.skipPosts).toBe(false);
-      expect(element.props.options.skipLikes).toBe(true);
-      expect(element.props.options.skipMessages).toBe(true);
+      expect(element.props.options.posts).toBe(true);
+      expect(element.props.options.likes).toBe(false);
+      expect(element.props.options.chat).toBe(false);
     });
   });
 
@@ -198,9 +178,8 @@ describe("SaveAutomationModal", () => {
   describe("modal state types", () => {
     it("should support all modal states", () => {
       const states: SaveAutomationModalState[] = [
-        "ready",
+        "idle",
         "running",
-        "paused",
         "completed",
         "failed",
       ];
