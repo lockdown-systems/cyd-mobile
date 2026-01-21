@@ -142,7 +142,7 @@ export function CydAccountBar() {
           {
             backgroundColor: palette.card,
             borderTopColor: palette.icon + "22",
-            paddingBottom: bottomInset,
+            paddingBottom: 8,
           },
         ]}
       >

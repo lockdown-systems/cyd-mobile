@@ -66,10 +66,10 @@ export default function AccountPlaceholderScreen() {
   const { accounts, loading, error } = useAccounts();
   const account = useMemo(
     () => accounts.find((item) => item.uuid === accountId),
-    [accounts, accountId]
+    [accounts, accountId],
   );
   const [activeTab, setActiveTab] = useState<AccountTabKey>(
-    initialTab ?? "dashboard"
+    initialTab ?? "dashboard",
   );
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [authStatus, setAuthStatus] = useState<
@@ -84,7 +84,7 @@ export default function AccountPlaceholderScreen() {
     if (initialTab) {
       console.log(
         "[AccountScreen] setting initial tab from deep link:",
-        initialTab
+        initialTab,
       );
       setActiveTab(initialTab);
     }
@@ -105,7 +105,7 @@ export default function AccountPlaceholderScreen() {
   const handleSignOut = useCallback(async () => {
     if (!account) {
       throw new Error(
-        "Account information is not available yet. Please try again in a moment."
+        "Account information is not available yet. Please try again in a moment.",
       );
     }
 
@@ -114,16 +114,16 @@ export default function AccountPlaceholderScreen() {
       await revokeBlueskyAuthorization(account.id);
       console.log(
         "[AccountScreen] revokeBlueskyAuthorization complete",
-        account.id
+        account.id,
       );
       setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
       const nextStatus = await runWithAccountController(account, (controller) =>
-        verifyBlueskyAccountAuthStatus(controller, account)
+        verifyBlueskyAccountAuthStatus(controller, account),
       );
       console.log(
         "[AccountScreen] handleSignOut -> verified",
         account.id,
-        nextStatus
+        nextStatus,
       );
       setAuthStatus(nextStatus);
     } catch (err) {
@@ -137,7 +137,7 @@ export default function AccountPlaceholderScreen() {
   const handleReauthenticate = useCallback(async () => {
     if (!account) {
       throw new Error(
-        "Account information is not available yet. Please try again in a moment."
+        "Account information is not available yet. Please try again in a moment.",
       );
     }
 
@@ -146,22 +146,22 @@ export default function AccountPlaceholderScreen() {
       await authenticateBlueskyAccount(account.handle);
       console.log(
         "[AccountScreen] authenticateBlueskyAccount -> success",
-        account.id
+        account.id,
       );
       const nextStatus = await runWithAccountController(account, (controller) =>
-        verifyBlueskyAccountAuthStatus(controller, account, { force: true })
+        verifyBlueskyAccountAuthStatus(controller, account, { force: true }),
       );
       console.log(
         "[AccountScreen] handleReauthenticate -> verified",
         account.id,
-        nextStatus
+        nextStatus,
       );
       setAuthStatus(nextStatus);
     } catch (err) {
       console.warn(
         "[AccountScreen] handleReauthenticate -> error",
         account?.id,
-        err
+        err,
       );
       throw err instanceof Error
         ? err
@@ -172,7 +172,7 @@ export default function AccountPlaceholderScreen() {
   const handleRemoveAccount = useCallback(async () => {
     if (!account) {
       throw new Error(
-        "Account information is not available yet. Please try again in a moment."
+        "Account information is not available yet. Please try again in a moment.",
       );
     }
 
@@ -203,7 +203,7 @@ export default function AccountPlaceholderScreen() {
   const handleExportArchive = useCallback(async () => {
     if (!account) {
       throw new Error(
-        "Account information is not available yet. Please try again in a moment."
+        "Account information is not available yet. Please try again in a moment.",
       );
     }
 
@@ -227,12 +227,12 @@ export default function AccountPlaceholderScreen() {
       try {
         await controller.initDB();
         const storedStatus = await controller.getConfig(
-          ACCOUNT_CONFIG_KEYS.authStatus
+          ACCOUNT_CONFIG_KEYS.authStatus,
         );
         console.log(
           "[AccountScreen] useEffect -> stored status",
           account.id,
-          storedStatus
+          storedStatus,
         );
         if (!cancelled) {
           if (storedStatus === ACCOUNT_AUTH_STATUS.authenticated) {
@@ -255,7 +255,7 @@ export default function AccountPlaceholderScreen() {
         } catch (cleanupErr) {
           console.warn(
             "Failed to cleanup controller after reading status",
-            cleanupErr
+            cleanupErr,
           );
         }
       }
@@ -281,7 +281,7 @@ export default function AccountPlaceholderScreen() {
         try {
           const nextStatus = await runWithAccountController(
             account,
-            (controller) => verifyBlueskyAccountAuthStatus(controller, account)
+            (controller) => verifyBlueskyAccountAuthStatus(controller, account),
           );
           if (!cancelled) {
             setAuthStatus(nextStatus);
@@ -301,7 +301,7 @@ export default function AccountPlaceholderScreen() {
       return () => {
         cancelled = true;
       };
-    }, [account])
+    }, [account]),
   );
 
   const avatarUri = account?.avatarUrl ?? null;
@@ -351,7 +351,7 @@ export default function AccountPlaceholderScreen() {
 
     Alert.alert(
       "Authenticated with Bluesky",
-      "Cyd is currently authorized to control your Bluesky account."
+      "Cyd is currently authorized to control your Bluesky account.",
     );
   }, [handleReauthenticate, showWarning, statusActionPending]);
 
@@ -491,9 +491,7 @@ export default function AccountPlaceholderScreen() {
               />
             ) : null}
           </View>
-          <View
-            style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}
-          >
+          <View style={styles.tabBarContainer}>
             <View
               style={[
                 styles.tabBar,
@@ -576,7 +574,7 @@ const TAB_COMPONENTS: Record<AccountTabKey, ComponentType<AccountTabProps>> = {
 
 async function runWithAccountController<T>(
   account: AccountListItem,
-  fn: (controller: BlueskyAccountController) => Promise<T>
+  fn: (controller: BlueskyAccountController) => Promise<T>,
 ): Promise<T> {
   console.log("[AccountScreen] runWithAccountController -> start", account.id);
   const controller = new BlueskyAccountController(account.id, account.uuid);
@@ -584,7 +582,7 @@ async function runWithAccountController<T>(
     await controller.initDB();
     console.log(
       "[AccountScreen] runWithAccountController -> initDB",
-      account.id
+      account.id,
     );
     return await fn(controller);
   } finally {
@@ -592,7 +590,7 @@ async function runWithAccountController<T>(
       await controller.cleanup();
       console.log(
         "[AccountScreen] runWithAccountController -> cleanup",
-        account.id
+        account.id,
       );
     } catch (cleanupErr) {
       console.warn("Failed to cleanup controller", cleanupErr);
@@ -604,6 +602,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingTop: 20,
+    paddingBottom: 10,
   },
   container: {
     flex: 1,
