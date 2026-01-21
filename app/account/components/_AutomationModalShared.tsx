@@ -20,7 +20,7 @@ export type AutomationModalBaseProps = {
   palette: AccountTabPalette;
   onFinished: (
     result: "completed" | "failed",
-    jobs: BlueskyJobRecord[]
+    jobs: BlueskyJobRecord[],
   ) => void;
   onClose: () => void;
   onRestart?: () => void;
@@ -30,7 +30,7 @@ export type AutomationModalBaseProps = {
  * Status icon helper function.
  */
 export function getStatusIcon(
-  status: BlueskyJobRecord["status"]
+  status: BlueskyJobRecord["status"],
 ): "check-circle" | "play-circle" | "error-outline" | "schedule" {
   if (status === "completed") return "check-circle";
   if (status === "running") return "play-circle";
@@ -43,7 +43,7 @@ export function getStatusIcon(
  */
 export function getStatusColor(
   status: BlueskyJobRecord["status"],
-  palette: AccountTabPalette
+  palette: AccountTabPalette,
 ): string {
   if (status === "failed") return palette.warning ?? palette.tint;
   if (status === "completed") return palette.tint;
@@ -318,10 +318,12 @@ export const styles = StyleSheet.create({
   progressCard: {
     alignItems: "center",
     paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   progressCardWithCount: {
     alignItems: "center",
     paddingVertical: 8,
+    paddingHorizontal: 16,
     gap: 4,
   },
   previewScrollView: {
@@ -336,6 +338,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     textAlign: "center",
+    flexWrap: "wrap",
   },
   errorCard: {
     flexDirection: "row",
