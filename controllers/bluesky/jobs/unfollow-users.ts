@@ -4,7 +4,7 @@ import type { BlueskyJobRecord, JobEmit, ProfileData } from "../job-types";
 export async function runUnfollowUsersJob(
   controller: BlueskyAccountController,
   _job: BlueskyJobRecord,
-  emit: JobEmit
+  emit: JobEmit,
 ): Promise<void> {
   emit({
     speechText: "I'm unfollowing users for you",
@@ -63,7 +63,7 @@ export async function runUnfollowUsersJob(
     };
 
     emit({
-      progressMessage: `Unfollowing ${follow.handle} (${unfollowed + 1} of ${total})…`,
+      progressMessage: `Unfollowing ${follow.handle} (${(unfollowed + 1).toLocaleString()} of ${total.toLocaleString()})…`,
       progressPercent: unfollowed / total,
       unknownTotal: false,
       previewData: { type: "profile", data: previewData },
@@ -81,7 +81,7 @@ export async function runUnfollowUsersJob(
       console.warn(
         "[UnfollowUsersJob] Failed to unfollow:",
         follow.handle,
-        err
+        err,
       );
       errors++;
       // Continue with next user despite error
@@ -89,7 +89,7 @@ export async function runUnfollowUsersJob(
   }
 
   emit({
-    progressMessage: `Unfollowed ${unfollowed} users${errors > 0 ? ` (${errors} failed)` : ""}`,
+    progressMessage: `Unfollowed ${unfollowed.toLocaleString()} users${errors > 0 ? ` (${errors.toLocaleString()} failed)` : ""}`,
     progressPercent: 1,
     unknownTotal: false,
     progress: { currentItemIndex: unfollowed, totalItems: total },

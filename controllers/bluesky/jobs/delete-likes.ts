@@ -4,7 +4,7 @@ import type { BlueskyJobRecord, JobEmit, PostPreviewData } from "../job-types";
 export async function runDeleteLikesJob(
   controller: BlueskyAccountController,
   _job: BlueskyJobRecord,
-  emit: JobEmit
+  emit: JobEmit,
 ): Promise<void> {
   emit({
     speechText: "I'm deleting your likes",
@@ -57,7 +57,7 @@ export async function runDeleteLikesJob(
     };
 
     emit({
-      progressMessage: `Deleting like ${deleted + 1} of ${total}…`,
+      progressMessage: `Deleting like ${(deleted + 1).toLocaleString()} of ${total.toLocaleString()}…`,
       progressPercent: deleted / total,
       unknownTotal: false,
       previewData: { type: "post", data: previewData },
@@ -78,7 +78,7 @@ export async function runDeleteLikesJob(
       console.warn(
         "[DeleteLikesJob] Failed to delete like:",
         like.likeUri,
-        err
+        err,
       );
       errors++;
       // Continue with next like despite error
@@ -86,7 +86,7 @@ export async function runDeleteLikesJob(
   }
 
   emit({
-    progressMessage: `Deleted ${deleted} likes${errors > 0 ? ` (${errors} failed)` : ""}`,
+    progressMessage: `Deleted ${deleted.toLocaleString()} likes${errors > 0 ? ` (${errors.toLocaleString()} failed)` : ""}`,
     progressPercent: 1,
     unknownTotal: false,
     progress: { currentItemIndex: deleted, totalItems: total },

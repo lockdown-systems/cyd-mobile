@@ -4,7 +4,7 @@ import type { BlueskyJobRecord, JobEmit, PostPreviewData } from "../job-types";
 export async function runDeleteBookmarksJob(
   controller: BlueskyAccountController,
   _job: BlueskyJobRecord,
-  emit: JobEmit
+  emit: JobEmit,
 ): Promise<void> {
   emit({
     speechText: "I'm deleting your bookmarks",
@@ -57,7 +57,7 @@ export async function runDeleteBookmarksJob(
     };
 
     emit({
-      progressMessage: `Deleting bookmark ${deleted + 1} of ${total}…`,
+      progressMessage: `Deleting bookmark ${(deleted + 1).toLocaleString()} of ${total.toLocaleString()}…`,
       progressPercent: deleted / total,
       unknownTotal: false,
       previewData: { type: "post", data: previewData },
@@ -71,7 +71,7 @@ export async function runDeleteBookmarksJob(
       console.warn(
         "[DeleteBookmarksJob] Failed to delete bookmark:",
         bookmark.id,
-        err
+        err,
       );
       errors++;
       // Continue with next bookmark despite error
@@ -79,7 +79,7 @@ export async function runDeleteBookmarksJob(
   }
 
   emit({
-    progressMessage: `Deleted ${deleted} bookmarks${errors > 0 ? ` (${errors} failed)` : ""}`,
+    progressMessage: `Deleted ${deleted.toLocaleString()} bookmarks${errors > 0 ? ` (${errors.toLocaleString()} failed)` : ""}`,
     progressPercent: 1,
     unknownTotal: false,
     progress: { currentItemIndex: deleted, totalItems: total },

@@ -125,7 +125,7 @@ export async function runDeleteMessagesJob(
     };
 
     emit({
-      progressMessage: `Deleting message ${deleted + 1} of ${total}…`,
+      progressMessage: `Deleting message ${(deleted + 1).toLocaleString()} of ${total.toLocaleString()}…`,
       progressPercent: deleted / total,
       unknownTotal: false,
       previewData: { type: "message", data: previewData },
@@ -154,7 +154,7 @@ export async function runDeleteMessagesJob(
     await controller.waitForPause();
 
     emit({
-      progressMessage: `Checking conversation ${conversationsLeft + 1} of ${conversationArray.length} for cleanup…`,
+      progressMessage: `Checking conversation ${(conversationsLeft + 1).toLocaleString()} of ${conversationArray.length.toLocaleString()} for cleanup…`,
       progressPercent: 1,
       unknownTotal: false,
     });
@@ -165,7 +165,7 @@ export async function runDeleteMessagesJob(
 
       if (messageCount === 0) {
         emit({
-          progressMessage: `Leaving empty conversation ${conversationsLeft + 1} of ${conversationArray.length}…`,
+          progressMessage: `Leaving empty conversation ${(conversationsLeft + 1).toLocaleString()} of ${conversationArray.length.toLocaleString()}…`,
           progressPercent: 1,
           unknownTotal: false,
         });
@@ -185,11 +185,11 @@ export async function runDeleteMessagesJob(
 
   const conversationMessage =
     conversationsLeft > 0
-      ? `, left ${conversationsLeft} empty conversation${conversationsLeft > 1 ? "s" : ""}`
+      ? `, left ${conversationsLeft.toLocaleString()} empty conversation${conversationsLeft > 1 ? "s" : ""}`
       : "";
 
   emit({
-    progressMessage: `Deleted ${deleted} messages${errors > 0 ? ` (${errors} failed)` : ""}${conversationMessage}`,
+    progressMessage: `Deleted ${deleted.toLocaleString()} messages${errors > 0 ? ` (${errors.toLocaleString()} failed)` : ""}${conversationMessage}`,
     progressPercent: 1,
     unknownTotal: false,
     progress: { currentItemIndex: deleted, totalItems: total },

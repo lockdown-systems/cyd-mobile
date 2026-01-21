@@ -64,7 +64,7 @@ export async function runDeletePostsJob(
     };
 
     emit({
-      progressMessage: `Deleting post ${deleted + 1} of ${total}…`,
+      progressMessage: `Deleting post ${(deleted + 1).toLocaleString()} of ${total.toLocaleString()}…`,
       progressPercent: deleted / total,
       unknownTotal: false,
       previewData: { type: "post", data: previewData },
@@ -82,7 +82,7 @@ export async function runDeletePostsJob(
   }
 
   emit({
-    progressMessage: `Deleted ${deleted} posts${errors > 0 ? ` (${errors} failed)` : ""}`,
+    progressMessage: `Deleted ${deleted.toLocaleString()} posts${errors > 0 ? ` (${errors.toLocaleString()} failed)` : ""}`,
     progressPercent: 1,
     unknownTotal: false,
     progress: { currentItemIndex: deleted, totalItems: total },

@@ -67,8 +67,8 @@ export class ChatIndexer {
               cursor,
               limit: 50,
             },
-            { headers: DM_SERVICE_HEADERS }
-          )
+            { headers: DM_SERVICE_HEADERS },
+          ),
         );
 
         const convos = response.convos ?? [];
@@ -79,7 +79,7 @@ export class ChatIndexer {
             totalSaved++;
             const previewData = this.buildConversationPreview(convo);
             this.deps.updateProgress({
-              currentAction: `Saved ${totalSaved} conversations`,
+              currentAction: `Saved ${totalSaved.toLocaleString()} conversations`,
               conversationsProgress: {
                 current: totalSaved,
                 total: null,
@@ -132,7 +132,7 @@ export class ChatIndexer {
     try {
       // Get all conversation IDs from the database
       const convos = await db.getAllAsync<{ convoId: string }>(
-        `SELECT convoId FROM conversation ORDER BY updatedAt DESC`
+        `SELECT convoId FROM conversation ORDER BY updatedAt DESC`,
       );
 
       if (convos.length === 0) {
@@ -167,8 +167,8 @@ export class ChatIndexer {
                 cursor,
                 limit: 100,
               },
-              { headers: DM_SERVICE_HEADERS }
-            )
+              { headers: DM_SERVICE_HEADERS },
+            ),
           );
 
           const messages = response.messages ?? [];
@@ -180,10 +180,10 @@ export class ChatIndexer {
               const previewData = await this.buildMessagePreview(
                 db,
                 convoId,
-                message
+                message,
               );
               this.deps.updateProgress({
-                currentAction: `Saved ${totalSaved} messages (${convoIndex}/${convos.length} conversations)`,
+                currentAction: `Saved ${totalSaved.toLocaleString()} messages (${convoIndex.toLocaleString()}/${convos.length.toLocaleString()} conversations)`,
                 messagesProgress: {
                   current: totalSaved,
                   total: null,
@@ -227,8 +227,8 @@ export class ChatIndexer {
     db: SQLiteDatabase,
     convos: ChatBskyConvoListConvos.OutputSchema["convos"],
     onConvoSaved?: (
-      convo: ChatBskyConvoListConvos.OutputSchema["convos"][0]
-    ) => void
+      convo: ChatBskyConvoListConvos.OutputSchema["convos"][0],
+    ) => void,
   ): Promise<number> {
     let savedCount = 0;
     const now = Date.now();
@@ -265,7 +265,7 @@ export class ChatIndexer {
           now,
           lastMsg?.sentAt ? new Date(lastMsg.sentAt).getTime() : now,
           null,
-        ]
+        ],
       );
 
       // Save profile information for each member
@@ -279,7 +279,7 @@ export class ChatIndexer {
           // Member only has DID, check if we need to fetch profile
           const existingProfile = await db.getFirstAsync<{ did: string }>(
             `SELECT did FROM profile WHERE did = ?`,
-            [memberProfile.did]
+            [memberProfile.did],
           );
 
           if (!existingProfile) {
@@ -287,16 +287,16 @@ export class ChatIndexer {
             try {
               const agent = this.requireAgent();
               const profileResponse = await this.deps.makeApiRequest(() =>
-                agent.getProfile({ actor: memberProfile.did })
+                agent.getProfile({ actor: memberProfile.did }),
               );
               await this.postPersistence.upsertProfile(
                 db,
-                profileResponse as AppBskyActorDefs.ProfileViewBasic
+                profileResponse as AppBskyActorDefs.ProfileViewBasic,
               );
             } catch (error) {
               console.warn(
                 `[ChatIndexer] Failed to fetch profile for member ${memberProfile.did}`,
-                error
+                error,
               );
             }
           }
@@ -319,8 +319,8 @@ export class ChatIndexer {
     convoId: string,
     messages: ChatBskyConvoGetMessages.OutputSchema["messages"],
     onMessageSaved?: (
-      message: ChatBskyConvoGetMessages.OutputSchema["messages"][0]
-    ) => Promise<void>
+      message: ChatBskyConvoGetMessages.OutputSchema["messages"][0],
+    ) => Promise<void>,
   ): Promise<number> {
     let savedCount = 0;
     const now = Date.now();
@@ -359,7 +359,7 @@ export class ChatIndexer {
           msg.sentAt ?? null,
           now,
           null,
-        ]
+        ],
       );
 
       // Save sender profile. If the sender object includes handle, save it directly.
@@ -373,7 +373,7 @@ export class ChatIndexer {
           // Sender only has DID. Check if we already have the profile.
           const existingProfile = await db.getFirstAsync<{ did: string }>(
             `SELECT did FROM profile WHERE did = ?`,
-            [senderWithProfile.did]
+            [senderWithProfile.did],
           );
 
           if (!existingProfile) {
@@ -381,18 +381,18 @@ export class ChatIndexer {
             try {
               const agent = this.requireAgent();
               const profileResponse = await this.deps.makeApiRequest(() =>
-                agent.getProfile({ actor: senderWithProfile.did })
+                agent.getProfile({ actor: senderWithProfile.did }),
               );
 
               await this.postPersistence.upsertProfile(
                 db,
-                profileResponse as AppBskyActorDefs.ProfileViewBasic
+                profileResponse as AppBskyActorDefs.ProfileViewBasic,
               );
             } catch (error) {
               // Log but don't fail the whole job if profile fetch fails
               console.warn(
                 `[ChatIndexer] Failed to fetch profile for ${senderWithProfile.did}`,
-                error
+                error,
               );
             }
           }
@@ -430,7 +430,7 @@ export class ChatIndexer {
    * Build a conversation preview from a convo object
    */
   private buildConversationPreview(
-    convo: ChatBskyConvoListConvos.OutputSchema["convos"][0]
+    convo: ChatBskyConvoListConvos.OutputSchema["convos"][0],
   ): ConversationPreviewData | null {
     if (!convo) return null;
 
@@ -460,7 +460,7 @@ export class ChatIndexer {
   private async buildMessagePreview(
     db: SQLiteDatabase,
     convoId: string,
-    message: ChatBskyConvoGetMessages.OutputSchema["messages"][0]
+    message: ChatBskyConvoGetMessages.OutputSchema["messages"][0],
   ): Promise<MessagePreviewData | null> {
     const msg = message as
       | {
@@ -485,7 +485,7 @@ export class ChatIndexer {
       avatarUrl: string | null;
     }>(
       `SELECT did, handle, displayName, avatarUrl FROM profile WHERE did = ?`,
-      [msg.sender.did]
+      [msg.sender.did],
     );
 
     const sender: ProfileData = {
