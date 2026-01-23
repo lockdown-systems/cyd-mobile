@@ -10,6 +10,10 @@ import { StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 
 import { CydAccountBar } from "@/components/CydAccountBar";
+import {
+  OnboardingModal,
+  useOnboardingModal,
+} from "@/components/OnboardingModal";
 import { CydAccountProvider } from "@/contexts/CydAccountProvider";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationHandler } from "@/hooks/use-notification-handler";
@@ -18,6 +22,8 @@ import { PlausibleEvents } from "@/types/analytics";
 
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
+  const { visible, hideOnboarding, showOnboarding, hasChecked } =
+    useOnboardingModal();
 
   // Set up notification handling
   useNotificationHandler();
@@ -26,6 +32,11 @@ function RootLayoutContent() {
     // Track app opened event on initial load
     trackEvent(PlausibleEvents.APP_OPENED);
   }, []);
+
+  // Wait for onboarding check to complete before rendering
+  if (!hasChecked) {
+    return null;
+  }
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
@@ -43,8 +54,9 @@ function RootLayoutContent() {
             />
           </Stack>
         </View>
-        <CydAccountBar />
+        <CydAccountBar onShowOnboarding={showOnboarding} />
       </View>
+      <OnboardingModal visible={visible} onClose={hideOnboarding} />
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </ThemeProvider>
   );

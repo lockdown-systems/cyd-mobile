@@ -13,6 +13,7 @@ declare module "react-native-markdown-display" {
   export type MarkdownProps = TextProps & {
     children: string | ReactNode;
     style?: MarkdownStyle;
+    onLinkPress?: (url: string) => boolean;
   };
 
   const MarkdownDisplay: ComponentType<MarkdownProps>;

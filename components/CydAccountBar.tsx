@@ -25,7 +25,11 @@ import {
 
 import { CydSignInModal } from "./CydSignInModal";
 
-export function CydAccountBar() {
+type CydAccountBarProps = {
+  onShowOnboarding?: () => void;
+};
+
+export function CydAccountBar({ onShowOnboarding }: CydAccountBarProps) {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom;
   const colorScheme = useColorScheme() ?? "light";
@@ -66,6 +70,11 @@ export function CydAccountBar() {
     setMenuVisible(false);
     void signOut();
   }, [signOut]);
+
+  const handleShowOnboarding = useCallback(() => {
+    setMenuVisible(false);
+    onShowOnboarding?.();
+  }, [onShowOnboarding]);
 
   const handleImportBlueskyAccount = useCallback(async () => {
     if (isImporting) return;
@@ -308,6 +317,28 @@ export function CydAccountBar() {
                 </Pressable>
               </>
             )}
+            <View
+              style={[
+                styles.sheetSeparator,
+                { borderColor: palette.icon + "22" },
+              ]}
+            />
+            <Pressable
+              onPress={handleShowOnboarding}
+              style={({ pressed }) => [
+                styles.sheetActionButton,
+                {
+                  borderColor: palette.icon + "22",
+                  backgroundColor: palette.background,
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.sheetActionText, { color: palette.text }]}>
+                Show Cyd onboarding
+              </Text>
+            </Pressable>
           </View>
         </View>
       </Modal>

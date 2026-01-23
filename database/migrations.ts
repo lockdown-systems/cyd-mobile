@@ -91,4 +91,11 @@ export const migrations: Migration[] = [
       `ALTER TABLE bsky_account ADD COLUMN settingScheduleDeletionTime TEXT DEFAULT '10:00';`,
     ],
   },
+  {
+    version: 5,
+    name: "add onboarding shown flag",
+    statements: [
+      `ALTER TABLE cyd_account ADD COLUMN onboardingShown INTEGER DEFAULT 0;`,
+    ],
+  },
 ];
