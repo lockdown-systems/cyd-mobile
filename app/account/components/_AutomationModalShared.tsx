@@ -22,8 +22,8 @@ export type AutomationModalBaseProps = {
     result: "completed" | "failed",
     jobs: BlueskyJobRecord[],
   ) => void;
-  onClose: () => void;
-  onRestart?: () => void;
+  onClose: (jobs: BlueskyJobRecord[]) => void;
+  onRestart?: (jobs: BlueskyJobRecord[]) => void;
 };
 
 /**

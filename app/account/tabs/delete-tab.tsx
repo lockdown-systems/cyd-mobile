@@ -1,11 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -79,7 +73,6 @@ export function DeleteTab({
     follows: number;
   } | null>(null);
   const [automationKey, setAutomationKey] = useState(0);
-  const automationCancelledRef = useRef(false);
 
   // Finished modal state
   const [finishedModalVisible, setFinishedModalVisible] = useState(false);
@@ -151,12 +144,12 @@ export function DeleteTab({
   const updateSetting = useCallback(
     <K extends keyof AccountDeleteSettings>(
       key: K,
-      value: AccountDeleteSettings[K]
+      value: AccountDeleteSettings[K],
     ) => {
       setPersistError(null);
       setState((prev) => (prev ? { ...prev, [key]: value } : prev));
     },
-    []
+    [],
   );
 
   const canContinue = useMemo(() => {
@@ -207,7 +200,7 @@ export function DeleteTab({
       setPendingDeleteCounts(counts);
       setPremiumModalVisible(true);
     },
-    []
+    [],
   );
 
   const handlePremiumDismiss = useCallback(() => {
@@ -222,7 +215,6 @@ export function DeleteTab({
     setPremiumModalVisible(false);
     // Start deletion with the pending settings and counts
     if (pendingDeleteSettings && pendingDeleteCounts) {
-      automationCancelledRef.current = false;
       setAutomationSettings(pendingDeleteSettings);
       setAutomationCounts({
         posts: pendingDeleteCounts.posts,
@@ -241,7 +233,6 @@ export function DeleteTab({
 
   const handleStartDelete = useCallback(
     (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
-      automationCancelledRef.current = false;
       setAutomationSettings(settings);
       setAutomationCounts({
         posts: counts.posts,
@@ -254,31 +245,41 @@ export function DeleteTab({
       setAutomationKey((prev) => prev + 1);
       setAutomationVisible(true);
     },
-    []
+    [],
   );
 
-  const handleAutomationFinished = useCallback(
-    (result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
+  const showFinishedModalWithJobs = useCallback(
+    (jobs: BlueskyJobRecord[]) => {
       // Submit progress to the server regardless of success/failure
       void submitBlueskyProgress(apiClient, accountId, accountUUID);
 
-      // Update last deleted timestamp on successful completion
-      if (result === "completed") {
+      // Update last deleted timestamp if any delete jobs completed
+      const hadDeleteJobs = jobs.some(
+        (j) =>
+          (j.jobType.startsWith("delete") || j.jobType === "unfollowUsers") &&
+          j.status === "completed",
+      );
+      if (hadDeleteJobs) {
         void setLastDeletedAt(accountId, Date.now());
       }
 
-      if (!automationCancelledRef.current) {
-        setAutomationVisible(false);
-        // Delay showing the FinishedModal to allow the DeleteAutomationModal to fully dismiss
-        setTimeout(() => {
-          setFinishedJobs(jobs);
-          setFinishedModalVisible(true);
-        }, 350);
-        // Refresh the review screen counts
-        setRefreshKey((prev) => prev + 1);
-      }
+      setAutomationVisible(false);
+      // Delay showing the FinishedModal to allow the DeleteAutomationModal to fully dismiss
+      setTimeout(() => {
+        setFinishedJobs(jobs);
+        setFinishedModalVisible(true);
+      }, 350);
+      // Refresh the review screen counts
+      setRefreshKey((prev) => prev + 1);
     },
-    [apiClient, accountId, accountUUID]
+    [apiClient, accountId, accountUUID],
+  );
+
+  const handleAutomationFinished = useCallback(
+    (_result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
+      showFinishedModalWithJobs(jobs);
+    },
+    [showFinishedModalWithJobs],
   );
 
   const closeFinishedModal = useCallback(() => {
@@ -293,16 +294,27 @@ export function DeleteTab({
     onSelectTab?.("browse");
   }, [onSelectTab]);
 
-  const handleAutomationClose = useCallback(() => {
-    automationCancelledRef.current = true;
-    setAutomationVisible(false);
-  }, []);
+  const handleAutomationClose = useCallback(
+    (jobs: BlueskyJobRecord[]) => {
+      showFinishedModalWithJobs(jobs);
+    },
+    [showFinishedModalWithJobs],
+  );
 
-  const handleAutomationRestart = useCallback(() => {
-    automationCancelledRef.current = true;
-    setAutomationVisible(false);
-    resetToForm();
-  }, [resetToForm]);
+  const handleAutomationRestart = useCallback(
+    (jobs: BlueskyJobRecord[]) => {
+      const hasCompletedWork = jobs.some(
+        (j) => j.jobType !== "verifyAuthorization" && j.status === "completed",
+      );
+      if (hasCompletedWork) {
+        showFinishedModalWithJobs(jobs);
+      } else {
+        setAutomationVisible(false);
+        resetToForm();
+      }
+    },
+    [showFinishedModalWithJobs, resetToForm],
+  );
 
   return (
     <View style={styles.container}>
@@ -378,7 +390,7 @@ type DeleteOptionsFormProps = {
   onRetry: () => void | Promise<void>;
   onUpdate: <K extends keyof AccountDeleteSettings>(
     key: K,
-    value: AccountDeleteSettings[K]
+    value: AccountDeleteSettings[K],
   ) => void;
   onContinue: () => void | Promise<void>;
   canContinue: boolean;
@@ -405,7 +417,7 @@ function DeleteOptionsForm({
   refreshKey,
 }: DeleteOptionsFormProps) {
   const [lastSavedAt, setLastSavedAt] = useState<number | null | undefined>(
-    undefined
+    undefined,
   );
 
   useEffect(() => {
@@ -731,11 +743,11 @@ type DeleteReviewScreenProps = {
   onBack: () => void;
   onConfirm: (
     settings: AccountDeleteSettings,
-    counts: DeletionPreviewCounts
+    counts: DeletionPreviewCounts,
   ) => void;
   onPremiumRequired: (
     settings: AccountDeleteSettings,
-    counts: DeletionPreviewCounts
+    counts: DeletionPreviewCounts,
   ) => void;
   refreshKey: number;
 };
@@ -781,7 +793,7 @@ function DeleteReviewScreen({
       } catch (err) {
         if (!cancelled) {
           setCountsError(
-            err instanceof Error ? err.message : "Failed to calculate counts"
+            err instanceof Error ? err.message : "Failed to calculate counts",
           );
         }
       } finally {

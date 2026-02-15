@@ -50,10 +50,10 @@ export type DeleteAutomationModalProps = {
   };
   onFinished: (
     result: "completed" | "failed",
-    jobs: BlueskyJobRecord[]
+    jobs: BlueskyJobRecord[],
   ) => void;
-  onClose: () => void;
-  onRestart?: () => void;
+  onClose: (jobs: BlueskyJobRecord[]) => void;
+  onRestart?: (jobs: BlueskyJobRecord[]) => void;
 };
 
 export function DeleteAutomationModal({
@@ -84,6 +84,15 @@ export function DeleteAutomationModal({
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
 
+  const handleClose = useCallback(() => {
+    onClose(latestJobsRef.current);
+  }, [onClose]);
+
+  const handleRestart = useMemo(
+    () => (onRestart ? () => onRestart(latestJobsRef.current) : undefined),
+    [onRestart],
+  );
+
   // Calculate total items to delete
   const totalItemsToDelete = useMemo(() => {
     let total = 0;
@@ -113,7 +122,7 @@ export function DeleteAutomationModal({
     }
     console.log(
       "[DeleteAutomationModal] ensureController -> create",
-      accountId
+      accountId,
     );
     const controller = new BlueskyAccountController(accountId, accountUUID);
     controllerRef.current = controller;
@@ -125,14 +134,14 @@ export function DeleteAutomationModal({
       await controller.initAgent();
       console.log(
         "[DeleteAutomationModal] ensureController -> ready",
-        accountId
+        accountId,
       );
     } catch (err) {
       if (err instanceof Error && err.name === "MissingBlueskySessionError") {
         // Expected when user is signed out; verifyAuthorization job will reauth.
         console.log(
           "[DeleteAutomationModal] ensureController -> missing session (signed out)",
-          accountId
+          accountId,
         );
       } else {
         throw err;
@@ -163,7 +172,7 @@ export function DeleteAutomationModal({
             return jobType;
         }
       },
-    []
+    [],
   );
 
   useEffect(() => {
@@ -186,7 +195,7 @@ export function DeleteAutomationModal({
         console.log(
           "[DeleteAutomationModal] jobs defined",
           accountId,
-          definedJobs.length
+          definedJobs.length,
         );
         latestJobsRef.current = definedJobs;
         setJobs(definedJobs);
@@ -203,7 +212,7 @@ export function DeleteAutomationModal({
             }
             if (update.progressMessage !== undefined) {
               setProgressMessage(
-                (update.progressMessage as string | undefined) ?? null
+                (update.progressMessage as string | undefined) ?? null,
               );
             }
             if (update.previewData !== undefined) {
@@ -227,12 +236,12 @@ export function DeleteAutomationModal({
         if (cancelled) return;
 
         const failed = latestJobsRef.current.some(
-          (job) => job.status === "failed"
+          (job) => job.status === "failed",
         );
         setState(failed ? "failed" : "completed");
         if (failed) {
           const firstFail = latestJobsRef.current.find(
-            (job) => job.status === "failed"
+            (job) => job.status === "failed",
           );
           setError(firstFail?.error ?? "Deletion failed");
           onFinished("failed", latestJobsRef.current);
@@ -242,7 +251,7 @@ export function DeleteAutomationModal({
         console.log(
           "[DeleteAutomationModal] run -> finished",
           accountId,
-          failed ? "failed" : "completed"
+          failed ? "failed" : "completed",
         );
       } catch (err) {
         if (cancelled) return;
@@ -312,7 +321,7 @@ export function DeleteAutomationModal({
 
   const totalJobs = jobs.length;
   const completedCount = jobs.filter(
-    (job) => job.status === "completed"
+    (job) => job.status === "completed",
   ).length;
   const runningJob = jobs.find((job) => job.status === "running");
   const activeJob = (() => {
@@ -367,7 +376,7 @@ export function DeleteAutomationModal({
       animationType="slide"
       presentationStyle="fullScreen"
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View
         style={[styles.modalContainer, { backgroundColor: palette.background }]}
@@ -429,8 +438,8 @@ export function DeleteAutomationModal({
           palette={palette}
           onPause={handlePause}
           onResume={handleResume}
-          onRestart={onRestart}
-          onClose={onClose}
+          onRestart={handleRestart}
+          onClose={handleClose}
           restartLabel="Back to Delete Options"
         />
       </View>

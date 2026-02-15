@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Localization from "expo-localization";
 import { useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -111,7 +111,6 @@ export function ScheduleTab({
   const [automationOptions, setAutomationOptions] =
     useState<SaveAndDeleteJobOptions | null>(null);
   const [automationKey, setAutomationKey] = useState(0);
-  const automationCancelledRef = useRef(false);
 
   // Finished modal state
   const [finishedModalVisible, setFinishedModalVisible] = useState(false);
@@ -314,7 +313,6 @@ export function ScheduleTab({
 
   const handleStartAutomation = useCallback(
     (options: SaveAndDeleteJobOptions) => {
-      automationCancelledRef.current = false;
       setAutomationOptions(options);
       setAutomationKey((prev) => prev + 1);
       setAutomationVisible(true);
@@ -322,39 +320,40 @@ export function ScheduleTab({
     [],
   );
 
-  const handleAutomationFinished = useCallback(
-    (result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
-      // Update timestamps on successful completion
-      if (result === "completed") {
-        const now = Date.now();
-        // Check if we had any save jobs
-        const hadSaveJobs = jobs.some(
-          (j) => j.jobType.startsWith("save") && j.status === "completed",
-        );
-        // Check if we had any delete jobs
-        const hadDeleteJobs = jobs.some(
-          (j) =>
-            (j.jobType.startsWith("delete") || j.jobType === "unfollowUsers") &&
-            j.status === "completed",
-        );
-        if (hadSaveJobs) {
-          void setLastSavedAt(accountId, now);
-        }
-        if (hadDeleteJobs) {
-          void setLastDeletedAt(accountId, now);
-        }
+  const showFinishedModalWithJobs = useCallback(
+    (jobs: BlueskyJobRecord[]) => {
+      // Update timestamps based on completed jobs
+      const now = Date.now();
+      const hadSaveJobs = jobs.some(
+        (j) => j.jobType.startsWith("save") && j.status === "completed",
+      );
+      const hadDeleteJobs = jobs.some(
+        (j) =>
+          (j.jobType.startsWith("delete") || j.jobType === "unfollowUsers") &&
+          j.status === "completed",
+      );
+      if (hadSaveJobs) {
+        void setLastSavedAt(accountId, now);
+      }
+      if (hadDeleteJobs) {
+        void setLastDeletedAt(accountId, now);
       }
 
-      if (!automationCancelledRef.current) {
-        setAutomationVisible(false);
-        // Delay showing the FinishedModal
-        setTimeout(() => {
-          setFinishedJobs(jobs);
-          setFinishedModalVisible(true);
-        }, 350);
-      }
+      setAutomationVisible(false);
+      // Delay showing the FinishedModal
+      setTimeout(() => {
+        setFinishedJobs(jobs);
+        setFinishedModalVisible(true);
+      }, 350);
     },
     [accountId],
+  );
+
+  const handleAutomationFinished = useCallback(
+    (_result: "completed" | "failed", jobs: BlueskyJobRecord[]) => {
+      showFinishedModalWithJobs(jobs);
+    },
+    [showFinishedModalWithJobs],
   );
 
   const closeFinishedModal = useCallback(() => {
@@ -369,16 +368,27 @@ export function ScheduleTab({
     onSelectTab?.("browse");
   }, [onSelectTab]);
 
-  const handleAutomationClose = useCallback(() => {
-    automationCancelledRef.current = true;
-    setAutomationVisible(false);
-  }, []);
+  const handleAutomationClose = useCallback(
+    (jobs: BlueskyJobRecord[]) => {
+      showFinishedModalWithJobs(jobs);
+    },
+    [showFinishedModalWithJobs],
+  );
 
-  const handleAutomationRestart = useCallback(() => {
-    automationCancelledRef.current = true;
-    setAutomationVisible(false);
-    resetToForm();
-  }, [resetToForm]);
+  const handleAutomationRestart = useCallback(
+    (jobs: BlueskyJobRecord[]) => {
+      const hasCompletedWork = jobs.some(
+        (j) => j.jobType !== "verifyAuthorization" && j.status === "completed",
+      );
+      if (hasCompletedWork) {
+        showFinishedModalWithJobs(jobs);
+      } else {
+        setAutomationVisible(false);
+        resetToForm();
+      }
+    },
+    [showFinishedModalWithJobs, resetToForm],
+  );
 
   return (
     <View style={styles.container}>
@@ -709,7 +719,6 @@ function ScheduleReviewScreen({
       },
       deleteOptions: {
         settings: deleteSettings,
-        counts: null,
       },
     };
 

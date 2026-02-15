@@ -47,10 +47,10 @@ export type ScheduledAutomationModalProps = {
   totalDeleteItems: number;
   onFinished: (
     result: "completed" | "failed",
-    jobs: BlueskyJobRecord[]
+    jobs: BlueskyJobRecord[],
   ) => void;
-  onClose: () => void;
-  onRestart?: () => void;
+  onClose: (jobs: BlueskyJobRecord[]) => void;
+  onRestart?: (jobs: BlueskyJobRecord[]) => void;
 };
 
 export function ScheduledAutomationModal({
@@ -83,6 +83,15 @@ export function ScheduledAutomationModal({
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
 
+  const handleClose = useCallback(() => {
+    onClose(latestJobsRef.current);
+  }, [onClose]);
+
+  const handleRestart = useMemo(
+    () => (onRestart ? () => onRestart(latestJobsRef.current) : undefined),
+    [onRestart],
+  );
+
   const resetUi = useCallback(() => {
     setSpeech(null);
     setProgressMessage(null);
@@ -101,7 +110,7 @@ export function ScheduledAutomationModal({
     }
     console.log(
       "[ScheduledAutomationModal] ensureController -> create",
-      accountId
+      accountId,
     );
     const controller = new BlueskyAccountController(accountId, accountUUID);
     controllerRef.current = controller;
@@ -113,14 +122,14 @@ export function ScheduledAutomationModal({
       await controller.initAgent();
       console.log(
         "[ScheduledAutomationModal] ensureController -> ready",
-        accountId
+        accountId,
       );
     } catch (err) {
       if (err instanceof Error && err.name === "MissingBlueskySessionError") {
         // Expected when user is signed out; verifyAuthorization job will reauth.
         console.log(
           "[ScheduledAutomationModal] ensureController -> missing session (signed out)",
-          accountId
+          accountId,
         );
       } else {
         throw err;
@@ -163,7 +172,7 @@ export function ScheduledAutomationModal({
             return jobType;
         }
       },
-    []
+    [],
   );
 
   const isPreviewPost = (value: unknown): value is PostPreviewData => {
@@ -199,7 +208,7 @@ export function ScheduledAutomationModal({
         console.log(
           "[ScheduledAutomationModal] jobs defined",
           accountId,
-          definedJobs.length
+          definedJobs.length,
         );
         latestJobsRef.current = definedJobs;
         setJobs(definedJobs);
@@ -216,7 +225,7 @@ export function ScheduledAutomationModal({
             }
             if (update.progressMessage !== undefined) {
               setProgressMessage(
-                (update.progressMessage as string | undefined) ?? null
+                (update.progressMessage as string | undefined) ?? null,
               );
             }
             if (update.progressPercent !== undefined) {
@@ -227,7 +236,7 @@ export function ScheduledAutomationModal({
             }
             if (update.previewPost !== undefined) {
               setPreviewPost(
-                isPreviewPost(update.previewPost) ? update.previewPost : null
+                isPreviewPost(update.previewPost) ? update.previewPost : null,
               );
             }
             if (update.previewData !== undefined) {
@@ -238,12 +247,12 @@ export function ScheduledAutomationModal({
         if (cancelled) return;
 
         const failed = latestJobsRef.current.some(
-          (job) => job.status === "failed"
+          (job) => job.status === "failed",
         );
         setState(failed ? "failed" : "completed");
         if (failed) {
           const firstFail = latestJobsRef.current.find(
-            (job) => job.status === "failed"
+            (job) => job.status === "failed",
           );
           setError(firstFail?.error ?? "Automation failed");
           onFinished("failed", latestJobsRef.current);
@@ -253,7 +262,7 @@ export function ScheduledAutomationModal({
         console.log(
           "[ScheduledAutomationModal] run -> finished",
           accountId,
-          failed ? "failed" : "completed"
+          failed ? "failed" : "completed",
         );
       } catch (err) {
         if (cancelled) return;
@@ -317,7 +326,7 @@ export function ScheduledAutomationModal({
 
   const totalJobs = jobs.length;
   const completedCount = jobs.filter(
-    (job) => job.status === "completed"
+    (job) => job.status === "completed",
   ).length;
   const runningJob = jobs.find((job) => job.status === "running");
   const activeJob = (() => {
@@ -376,7 +385,7 @@ export function ScheduledAutomationModal({
       animationType="slide"
       presentationStyle="fullScreen"
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View
         style={[styles.modalContainer, { backgroundColor: palette.background }]}
@@ -450,8 +459,8 @@ export function ScheduledAutomationModal({
           palette={palette}
           onPause={handlePause}
           onResume={handleResume}
-          onRestart={onRestart}
-          onClose={onClose}
+          onRestart={handleRestart}
+          onClose={handleClose}
           restartLabel="Back to Schedule Options"
         />
       </View>

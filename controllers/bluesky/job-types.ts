@@ -86,8 +86,8 @@ export type SaveJobOptions = {
  */
 export type DeleteJobOptions = {
   settings: AccountDeleteSettings;
-  /** Pre-calculated counts for each type of data to delete */
-  counts: {
+  /** Pre-calculated counts for each type of data to delete (optional for scheduled jobs) */
+  counts?: {
     posts: number;
     reposts: number;
     likes: number;

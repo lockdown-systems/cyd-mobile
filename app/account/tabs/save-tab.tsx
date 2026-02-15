@@ -1,5 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -104,7 +104,6 @@ export function SaveTab({
   const [automationKey, setAutomationKey] = useState(0);
   const [finishedModalVisible, setFinishedModalVisible] = useState(false);
   const [finishedJobs, setFinishedJobs] = useState<BlueskyJobRecord[]>([]);
-  const automationCancelledRef = useRef(false);
 
   const selectedOptions = useMemo(() => {
     if (!state) {
@@ -114,7 +113,7 @@ export function SaveTab({
   }, [state]);
 
   const canContinue = Boolean(
-    !loading && !error && state && selectedOptions.length > 0
+    !loading && !error && state && selectedOptions.length > 0,
   );
 
   const goToBrowse = useCallback(() => {
@@ -182,7 +181,7 @@ export function SaveTab({
       console.log("[SaveTab] push screen", accountId, next);
       setScreenStack((prev) => [...prev, next]);
     },
-    [accountId]
+    [accountId],
   );
 
   const popScreen = useCallback(() => {
@@ -224,7 +223,6 @@ export function SaveTab({
   const handleConfirm = useCallback(() => {
     if (!state) return;
     console.log("[SaveTab] confirm automation", accountId);
-    automationCancelledRef.current = false;
     setFinishedModalVisible(false);
     setFinishedJobs([]);
     setAutomationOptions(state);
@@ -282,27 +280,59 @@ export function SaveTab({
         accountUUID={accountUUID}
         palette={palette}
         options={mapStateToJobOptions(
-          automationOptions ?? state ?? DEFAULT_STATE
+          automationOptions ?? state ?? DEFAULT_STATE,
         )}
-        onFinished={(result, jobs) => {
+        onFinished={(_result, jobs) => {
           // Submit progress to the server regardless of success/failure
           void submitBlueskyProgress(apiClient, accountId, accountUUID);
 
-          if (result === "completed" && !automationCancelledRef.current) {
+          const hadSaveJobs = jobs.some(
+            (j) => j.jobType.startsWith("save") && j.status === "completed",
+          );
+          if (hadSaveJobs) {
+            void setLastSavedAt(accountId, Date.now());
+          }
+
+          setAutomationVisible(false);
+          setFinishedJobs(jobs);
+          setFinishedModalVisible(true);
+        }}
+        onClose={(jobs) => {
+          // Submit progress to the server regardless of success/failure
+          void submitBlueskyProgress(apiClient, accountId, accountUUID);
+
+          const hadSaveJobs = jobs.some(
+            (j) => j.jobType.startsWith("save") && j.status === "completed",
+          );
+          if (hadSaveJobs) {
+            void setLastSavedAt(accountId, Date.now());
+          }
+
+          setAutomationVisible(false);
+          setFinishedJobs(jobs);
+          setFinishedModalVisible(true);
+        }}
+        onRestart={(jobs) => {
+          void submitBlueskyProgress(apiClient, accountId, accountUUID);
+
+          const hasCompletedWork = jobs.some(
+            (j) =>
+              j.jobType !== "verifyAuthorization" && j.status === "completed",
+          );
+          if (hasCompletedWork) {
+            const hadSaveJobs = jobs.some(
+              (j) => j.jobType.startsWith("save") && j.status === "completed",
+            );
+            if (hadSaveJobs) {
+              void setLastSavedAt(accountId, Date.now());
+            }
             setAutomationVisible(false);
             setFinishedJobs(jobs);
-            void setLastSavedAt(accountId, Date.now());
             setFinishedModalVisible(true);
+          } else {
+            setAutomationVisible(false);
+            resetToForm();
           }
-        }}
-        onClose={() => {
-          automationCancelledRef.current = true;
-          setAutomationVisible(false);
-        }}
-        onRestart={() => {
-          automationCancelledRef.current = true;
-          setAutomationVisible(false);
-          resetToForm();
         }}
       />
       <FinishedModal
@@ -489,7 +519,7 @@ function SaveReviewScreen({
   onConfirm,
 }: SaveReviewScreenProps) {
   const chosen = SAVE_OPTION_DEFINITIONS.filter(
-    (option) => selections[option.key]
+    (option) => selections[option.key],
   );
 
   return (

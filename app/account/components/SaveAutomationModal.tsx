@@ -41,10 +41,10 @@ export type SaveAutomationModalProps = {
   options: SaveJobOptions;
   onFinished: (
     result: "completed" | "failed",
-    jobs: BlueskyJobRecord[]
+    jobs: BlueskyJobRecord[],
   ) => void;
-  onClose: () => void;
-  onRestart?: () => void;
+  onClose: (jobs: BlueskyJobRecord[]) => void;
+  onRestart?: (jobs: BlueskyJobRecord[]) => void;
 };
 
 export function SaveAutomationModal({
@@ -74,6 +74,15 @@ export function SaveAutomationModal({
   const controllerRef = useRef<BlueskyAccountController | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
+
+  const handleClose = useCallback(() => {
+    onClose(latestJobsRef.current);
+  }, [onClose]);
+
+  const handleRestart = useMemo(
+    () => (onRestart ? () => onRestart(latestJobsRef.current) : undefined),
+    [onRestart],
+  );
 
   const resetUi = () => {
     setSpeech(null);
@@ -105,7 +114,7 @@ export function SaveAutomationModal({
         // Expected when user is signed out; verifyAuthorization job will reauth.
         console.log(
           "[SaveAutomationModal] ensureController -> missing session (signed out)",
-          accountId
+          accountId,
         );
       } else {
         throw err;
@@ -134,7 +143,7 @@ export function SaveAutomationModal({
             return jobType;
         }
       },
-    []
+    [],
   );
 
   const isPreviewPost = (value: unknown): value is PostPreviewData => {
@@ -170,7 +179,7 @@ export function SaveAutomationModal({
         console.log(
           "[SaveAutomationModal] jobs defined",
           accountId,
-          definedJobs.length
+          definedJobs.length,
         );
         latestJobsRef.current = definedJobs;
         setJobs(definedJobs);
@@ -187,7 +196,7 @@ export function SaveAutomationModal({
             }
             if (update.progressMessage !== undefined) {
               setProgressMessage(
-                (update.progressMessage as string | undefined) ?? null
+                (update.progressMessage as string | undefined) ?? null,
               );
             }
             if (update.progressPercent !== undefined) {
@@ -198,7 +207,7 @@ export function SaveAutomationModal({
             }
             if (update.previewPost !== undefined) {
               setPreviewPost(
-                isPreviewPost(update.previewPost) ? update.previewPost : null
+                isPreviewPost(update.previewPost) ? update.previewPost : null,
               );
             }
             if (update.previewData !== undefined) {
@@ -209,12 +218,12 @@ export function SaveAutomationModal({
         if (cancelled) return;
 
         const failed = latestJobsRef.current.some(
-          (job) => job.status === "failed"
+          (job) => job.status === "failed",
         );
         setState(failed ? "failed" : "completed");
         if (failed) {
           const firstFail = latestJobsRef.current.find(
-            (job) => job.status === "failed"
+            (job) => job.status === "failed",
           );
           setError(firstFail?.error ?? "Automation failed");
           onFinished("failed", latestJobsRef.current);
@@ -224,7 +233,7 @@ export function SaveAutomationModal({
         console.log(
           "[SaveAutomationModal] run -> finished",
           accountId,
-          failed ? "failed" : "completed"
+          failed ? "failed" : "completed",
         );
       } catch (err) {
         if (cancelled) return;
@@ -288,7 +297,7 @@ export function SaveAutomationModal({
 
   const totalJobs = jobs.length;
   const completedCount = jobs.filter(
-    (job) => job.status === "completed"
+    (job) => job.status === "completed",
   ).length;
   const runningJob = jobs.find((job) => job.status === "running");
   const activeJob = (() => {
@@ -337,7 +346,7 @@ export function SaveAutomationModal({
       animationType="slide"
       presentationStyle="fullScreen"
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View
         style={[styles.modalContainer, { backgroundColor: palette.background }]}
@@ -409,8 +418,8 @@ export function SaveAutomationModal({
           palette={palette}
           onPause={handlePause}
           onResume={handleResume}
-          onRestart={onRestart}
-          onClose={onClose}
+          onRestart={handleRestart}
+          onClose={handleClose}
           restartLabel="Back to Save Options"
         />
       </View>
