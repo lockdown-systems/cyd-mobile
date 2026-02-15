@@ -22,8 +22,6 @@ import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveAndDeleteStatusBanner } from "@/components/SaveAndDeleteStatusBanner";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
-import { BlueskyAccountController } from "@/controllers";
-import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import type {
   BlueskyJobRecord,
   SaveAndDeleteJobOptions,
@@ -103,7 +101,7 @@ export function ScheduleTab({
 
   // Save and delete settings for review screen
   const [saveSettings, setSaveSettings] = useState<AccountSaveSettings | null>(
-    null
+    null,
   );
   const [deleteSettings, setDeleteSettings] =
     useState<AccountDeleteSettings | null>(null);
@@ -177,7 +175,7 @@ export function ScheduleTab({
         console.error("Failed to sync schedule to server:", err);
       }
     },
-    [apiClient, accountUUID, cydState.isSignedIn]
+    [apiClient, accountUUID, cydState.isSignedIn],
   );
 
   /**
@@ -189,7 +187,7 @@ export function ScheduleTab({
         Alert.alert(
           "Sign In Required",
           "Please sign in to your Cyd account to receive push notifications.",
-          [{ text: "OK" }]
+          [{ text: "OK" }],
         );
         return false;
       }
@@ -205,7 +203,7 @@ export function ScheduleTab({
           Alert.alert(
             "Notifications Disabled",
             "Push notifications are disabled. Please enable them in your device settings to receive deletion reminders.",
-            [{ text: "OK" }]
+            [{ text: "OK" }],
           );
         } else if (result.error?.includes("simulator")) {
           // Silently skip on simulator
@@ -214,7 +212,7 @@ export function ScheduleTab({
           Alert.alert(
             "Notification Error",
             "Could not enable push notifications. Please try again later.",
-            [{ text: "OK" }]
+            [{ text: "OK" }],
           );
         }
         return false;
@@ -240,7 +238,7 @@ export function ScheduleTab({
   const updateSetting = useCallback(
     async <K extends keyof AccountScheduleSettings>(
       key: K,
-      value: AccountScheduleSettings[K]
+      value: AccountScheduleSettings[K],
     ) => {
       if (!state) return;
 
@@ -278,7 +276,7 @@ export function ScheduleTab({
       state,
       registerPushNotificationsForAccount,
       syncScheduleToServer,
-    ]
+    ],
   );
 
   const pushScreen = useCallback((next: ScheduleFlowScreen) => {
@@ -321,7 +319,7 @@ export function ScheduleTab({
       setAutomationKey((prev) => prev + 1);
       setAutomationVisible(true);
     },
-    []
+    [],
   );
 
   const handleAutomationFinished = useCallback(
@@ -331,13 +329,13 @@ export function ScheduleTab({
         const now = Date.now();
         // Check if we had any save jobs
         const hadSaveJobs = jobs.some(
-          (j) => j.jobType.startsWith("save") && j.status === "completed"
+          (j) => j.jobType.startsWith("save") && j.status === "completed",
         );
         // Check if we had any delete jobs
         const hadDeleteJobs = jobs.some(
           (j) =>
             (j.jobType.startsWith("delete") || j.jobType === "unfollowUsers") &&
-            j.status === "completed"
+            j.status === "completed",
         );
         if (hadSaveJobs) {
           void setLastSavedAt(accountId, now);
@@ -356,7 +354,7 @@ export function ScheduleTab({
         }, 350);
       }
     },
-    [accountId]
+    [accountId],
   );
 
   const closeFinishedModal = useCallback(() => {
@@ -453,7 +451,7 @@ type ScheduleOptionsFormProps = {
   onRetry: () => void | Promise<void>;
   onUpdateSetting: <K extends keyof AccountScheduleSettings>(
     key: K,
-    value: AccountScheduleSettings[K]
+    value: AccountScheduleSettings[K],
   ) => Promise<void>;
   onContinue: () => void;
 };
@@ -472,10 +470,10 @@ function ScheduleOptionsForm({
   onContinue,
 }: ScheduleOptionsFormProps) {
   const [lastSavedAt, setLastSavedAt] = useState<number | null | undefined>(
-    undefined
+    undefined,
   );
   const [lastDeletedAt, setLastDeletedAt] = useState<number | null | undefined>(
-    undefined
+    undefined,
   );
 
   useEffect(() => {
@@ -608,7 +606,7 @@ function ScheduleOptionsForm({
                         onChange={(value) =>
                           void onUpdateSetting(
                             "scheduleDeletionDayOfMonth",
-                            value
+                            value,
                           )
                         }
                       />
@@ -621,7 +619,7 @@ function ScheduleOptionsForm({
                         onChange={(value) =>
                           void onUpdateSetting(
                             "scheduleDeletionDayOfWeek",
-                            value
+                            value,
                           )
                         }
                       />
@@ -701,47 +699,7 @@ function ScheduleReviewScreen({
   onSelectTab,
   onStartAutomation,
 }: ScheduleReviewScreenProps) {
-  const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
-  const [countsLoading, setCountsLoading] = useState(true);
-  const [countsError, setCountsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCounts() {
-      setCountsLoading(true);
-      setCountsError(null);
-      try {
-        const controller = new BlueskyAccountController(accountId, accountUUID);
-        await controller.initDB();
-        await controller.initAgent();
-        const result = controller.getDeletionPreviewCounts(deleteSettings);
-        if (!cancelled) {
-          setCounts(result);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setCountsError(
-            err instanceof Error ? err.message : "Failed to calculate counts"
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setCountsLoading(false);
-        }
-      }
-    }
-
-    void loadCounts();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accountId, accountUUID, deleteSettings]);
-
   const handleSaveAndDelete = useCallback(() => {
-    if (!counts) return;
-
     const options: SaveAndDeleteJobOptions = {
       saveOptions: {
         posts: saveSettings.posts,
@@ -751,21 +709,12 @@ function ScheduleReviewScreen({
       },
       deleteOptions: {
         settings: deleteSettings,
-        counts: {
-          posts: counts.posts,
-          reposts: counts.reposts,
-          likes: counts.likes,
-          bookmarks: counts.bookmarks,
-          messages: counts.messages,
-          follows: counts.follows,
-        },
+        counts: null,
       },
     };
 
     onStartAutomation(options);
-  }, [counts, saveSettings, deleteSettings, onStartAutomation]);
-
-  const canStart = !countsLoading && !countsError && counts !== null;
+  }, [saveSettings, deleteSettings, onStartAutomation]);
 
   return (
     <View style={styles.stackScreen}>
@@ -818,36 +767,6 @@ function ScheduleReviewScreen({
           </Text>
           .
         </Text>
-
-        {countsLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={palette.tint} size="small" />
-            <Text style={[styles.loadingText, { color: palette.icon }]}>
-              Calculating items to process…
-            </Text>
-          </View>
-        )}
-
-        {countsError && (
-          <View
-            style={[
-              styles.errorContainer,
-              {
-                borderColor: palette.icon + "22",
-                backgroundColor: palette.card,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name="error-outline"
-              size={20}
-              color={palette.tint}
-            />
-            <Text style={[styles.errorText, { color: palette.icon }]}>
-              {countsError}
-            </Text>
-          </View>
-        )}
       </ScrollView>
       <View
         style={[
@@ -866,7 +785,6 @@ function ScheduleReviewScreen({
         <PrimaryButton
           label="Save and Delete Data Now"
           onPress={handleSaveAndDelete}
-          disabled={!canStart}
           palette={palette}
         />
       </View>
