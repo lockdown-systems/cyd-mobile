@@ -13,7 +13,7 @@ import {
 import {
   fetchExternalEmbedsForPosts,
   fetchMediaForPosts,
-} from "@/app/account/tabs/browse/_shared";
+} from "@/components/account/browse-shared";
 import { PostPreview } from "@/components/PostPreview";
 import { BlueskyAccountController } from "@/controllers";
 import type { PostToDeletePreview } from "@/controllers/bluesky/deletion-calculator";
@@ -58,7 +58,7 @@ export function PostsToDeleteReviewModal({
         return null;
       }
     },
-    []
+    [],
   );
 
   // Helper to map PostToDeletePreview to PostPreviewData
@@ -67,12 +67,12 @@ export function PostsToDeleteReviewModal({
       post: PostToDeletePreview,
       mediaMap: Map<string, MediaAttachment[]>,
       externalMap: Map<string, ExternalEmbed>,
-      quotedPostExternalMap: Map<string, ExternalEmbed>
+      quotedPostExternalMap: Map<string, ExternalEmbed>,
     ): PostPreviewData => {
       // Parse quoted post from embed JSON
       let quotedPost = extractEmbeddedPostFromJson(
         post.embedJSON,
-        post.createdAt
+        post.createdAt,
       );
 
       // Apply external embed to quoted post if available
@@ -109,7 +109,7 @@ export function PostsToDeleteReviewModal({
         facets: parseFacets(post.facetsJSON),
       };
     },
-    [parseFacets]
+    [parseFacets],
   );
 
   // Load posts when modal becomes visible
@@ -145,8 +145,8 @@ export function PostsToDeleteReviewModal({
 
         setPostsToDelete(
           posts.map((p) =>
-            mapToPreviewData(p, mediaMap, externalMap, quotedPostExternalMap)
-          )
+            mapToPreviewData(p, mediaMap, externalMap, quotedPostExternalMap),
+          ),
         );
       } catch (err) {
         console.error("Failed to load posts to delete:", err);
@@ -175,14 +175,14 @@ export function PostsToDeleteReviewModal({
         // Update local state to reflect the change
         setPostsToDelete((prev) =>
           prev.map((p) =>
-            p.uri === postUri ? { ...p, preserve: newPreserveState } : p
-          )
+            p.uri === postUri ? { ...p, preserve: newPreserveState } : p,
+          ),
         );
       } catch (err) {
         console.error("Failed to toggle preserve:", err);
       }
     },
-    [postsToDelete]
+    [postsToDelete],
   );
 
   // Handle close

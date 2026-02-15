@@ -18,6 +18,16 @@ import { DeleteReviewList } from "@/app/account/components/DeleteReviewList";
 import { FinishedModal } from "@/app/account/components/FinishedModal";
 import { SaveReviewList } from "@/app/account/components/SaveReviewList";
 import { ScheduledAutomationModal } from "@/app/account/components/ScheduledAutomationModal";
+import {
+  CheckboxRow,
+  PrimaryButton,
+  SecondaryButton,
+  StackHeader,
+} from "@/components/account/shared-tab-components";
+import {
+  dropdownMenuShadow,
+  sharedTabStyles,
+} from "@/components/account/shared-tab-styles";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { SaveAndDeleteStatusBanner } from "@/components/SaveAndDeleteStatusBanner";
@@ -49,13 +59,6 @@ import type {
   AccountTabPalette,
   AccountTabProps,
 } from "@/types/account-tabs";
-import {
-  CheckboxRow,
-  PrimaryButton,
-  SecondaryButton,
-  StackHeader,
-} from "./_shared-tab-components";
-import { dropdownMenuShadow, sharedTabStyles } from "./_shared-tab-styles";
 
 const DAYS_OF_WEEK = [
   "Monday",

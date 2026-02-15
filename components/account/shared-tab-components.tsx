@@ -3,7 +3,7 @@ import React, { useCallback, type ReactNode } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import type { AccountTabPalette } from "@/types/account-tabs";
-import { sharedTabStyles } from "./_shared-tab-styles";
+import { sharedTabStyles } from "./shared-tab-styles";
 
 const styles = sharedTabStyles;
 
@@ -245,7 +245,7 @@ export function NumberInput({
       if (Number.isNaN(next)) return;
       onChange(Math.max(min, Math.floor(next)));
     },
-    [min, onChange]
+    [min, onChange],
   );
 
   return (

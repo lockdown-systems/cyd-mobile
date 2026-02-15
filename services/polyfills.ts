@@ -10,7 +10,7 @@ if (typeof global.TextEncoder === "undefined") {
 }
 
 if (typeof Intl.Segmenter === "undefined") {
-  require("@formatjs/intl-segmenter/polyfill");
+  require("@formatjs/intl-segmenter/polyfill.js");
 }
 
 if (

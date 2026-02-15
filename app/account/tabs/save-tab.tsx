@@ -10,6 +10,12 @@ import {
 
 import { FinishedModal } from "@/app/account/components/FinishedModal";
 import { SaveAutomationModal } from "@/app/account/components/SaveAutomationModal";
+import {
+  PrimaryButton,
+  SecondaryButton,
+  StackHeader,
+} from "@/components/account/shared-tab-components";
+import { sharedTabStyles } from "@/components/account/shared-tab-styles";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { useCydAccount } from "@/contexts";
 import type {
@@ -24,12 +30,6 @@ import {
 } from "@/database/save-settings";
 import { submitBlueskyProgress } from "@/services/submit-bluesky-progress";
 import type { AccountTabPalette, AccountTabProps } from "@/types/account-tabs";
-import {
-  PrimaryButton,
-  SecondaryButton,
-  StackHeader,
-} from "./_shared-tab-components";
-import { sharedTabStyles } from "./_shared-tab-styles";
 
 type SaveFlowScreen = "form" | "review";
 

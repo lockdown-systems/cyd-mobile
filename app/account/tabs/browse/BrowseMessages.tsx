@@ -20,8 +20,12 @@ import type {
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
+import {
+  type DeletedFilter,
+  fetchAccountMeta,
+  openAccountDb,
+} from "@/components/account/browse-shared";
 import { BrowsePlaceholderCard } from "./BrowsePlaceholderCard";
-import { type DeletedFilter, fetchAccountMeta, openAccountDb } from "./_shared";
 
 type Props = {
   handle: string;
@@ -33,7 +37,7 @@ type Props = {
       visible: boolean;
       title: string;
       onBack: () => void;
-    } | null
+    } | null,
   ) => void;
 };
 
@@ -76,7 +80,7 @@ export function BrowseMessages({
   onHeaderChange,
 }: Props) {
   const [conversations, setConversations] = useState<ConversationPreviewData[]>(
-    []
+    [],
   );
   const [messages, setMessages] = useState<MessagePreviewData[]>([]);
   const [loadingConvos, setLoadingConvos] = useState(true);
@@ -116,7 +120,7 @@ export function BrowseMessages({
         `SELECT convoId, memberDids, muted,
                 lastMessageText, lastMessageSentAt, lastMessageSenderDid
          FROM conversation
-         ORDER BY updatedAt DESC;`
+         ORDER BY updatedAt DESC;`,
       );
 
       if (convoRows.length === 0) {
@@ -147,7 +151,7 @@ export function BrowseMessages({
           `SELECT did, handle, displayName, avatarUrl
            FROM profile
            WHERE did IN (${placeholders});`,
-          Array.from(allDids)
+          Array.from(allDids),
         );
         profilesByDid = new Map(profileRows.map((p) => [p.did, p]));
       }
@@ -212,7 +216,7 @@ export function BrowseMessages({
          LEFT JOIN profile p ON p.did = m.senderDid
          WHERE m.convoId = ?${deletedClause}
          ORDER BY m.sentAt DESC, m.id DESC;`,
-        [convoId]
+        [convoId],
       );
 
       const parseUnknown = (value?: string | null): unknown => {
@@ -225,7 +229,7 @@ export function BrowseMessages({
       };
 
       const parseEmbed = (
-        value?: string | null
+        value?: string | null,
       ): Record<string, unknown> | null => {
         const parsed = parseUnknown(value);
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -278,7 +282,7 @@ export function BrowseMessages({
       (message) =>
         message.text?.toLowerCase().includes(searchTerm) ||
         message.sender?.handle?.toLowerCase().includes(searchTerm) ||
-        message.sender?.displayName?.toLowerCase().includes(searchTerm)
+        message.sender?.displayName?.toLowerCase().includes(searchTerm),
     );
   }, [messages, filterText]);
 
@@ -287,7 +291,7 @@ export function BrowseMessages({
     if (!selectedConvo && !loadingConvos && !error) {
       onCountChange?.(
         conversations.length,
-        `Showing ${conversations.length.toLocaleString()} chat conversation${conversations.length === 1 ? "" : "s"}`
+        `Showing ${conversations.length.toLocaleString()} chat conversation${conversations.length === 1 ? "" : "s"}`,
       );
       // Clear header when not viewing a conversation
       onHeaderChange?.(null);

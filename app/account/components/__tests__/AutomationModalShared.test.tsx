@@ -18,7 +18,7 @@ import {
   SecondaryButton,
   StepRow,
   SuccessCard,
-} from "../_AutomationModalShared";
+} from "@/components/account/AutomationModalShared";
 
 const defaultPalette: AccountTabPalette = Colors.light;
 
@@ -44,25 +44,25 @@ describe("AutomationModalShared", () => {
   describe("getStatusColor", () => {
     it("should return tint color for completed status", () => {
       expect(getStatusColor("completed", defaultPalette)).toBe(
-        defaultPalette.tint
+        defaultPalette.tint,
       );
     });
 
     it("should return tint color for running status", () => {
       expect(getStatusColor("running", defaultPalette)).toBe(
-        defaultPalette.tint
+        defaultPalette.tint,
       );
     });
 
     it("should return warning color for failed status", () => {
       expect(getStatusColor("failed", defaultPalette)).toBe(
-        defaultPalette.warning ?? defaultPalette.tint
+        defaultPalette.warning ?? defaultPalette.tint,
       );
     });
 
     it("should return icon color for pending status", () => {
       expect(getStatusColor("pending", defaultPalette)).toBe(
-        defaultPalette.icon
+        defaultPalette.icon,
       );
     });
   });
@@ -74,7 +74,7 @@ describe("AutomationModalShared", () => {
           label="Test Button"
           palette={defaultPalette}
           onPress={() => {}}
-        />
+        />,
       );
 
       expect(screen.getByText("Test Button")).toBeTruthy();
@@ -87,7 +87,7 @@ describe("AutomationModalShared", () => {
           label="Click Me"
           palette={defaultPalette}
           onPress={mockOnPress}
-        />
+        />,
       );
 
       fireEvent.press(screen.getByText("Click Me"));
@@ -101,7 +101,7 @@ describe("AutomationModalShared", () => {
           palette={defaultPalette}
           onPress={() => {}}
           iconName="pause"
-        />
+        />,
       );
 
       expect(screen.getByText("With Icon")).toBeTruthy();
@@ -114,7 +114,7 @@ describe("AutomationModalShared", () => {
           palette={defaultPalette}
           onPress={() => {}}
           variant="resume"
-        />
+        />,
       );
 
       expect(screen.getByText("Resume")).toBeTruthy();
@@ -127,7 +127,7 @@ describe("AutomationModalShared", () => {
           palette={defaultPalette}
           onPress={() => {}}
           variant="pause"
-        />
+        />,
       );
 
       expect(screen.getByText("Pause")).toBeTruthy();
@@ -141,7 +141,7 @@ describe("AutomationModalShared", () => {
           label="Cancel"
           palette={defaultPalette}
           onPress={() => {}}
-        />
+        />,
       );
 
       expect(screen.getByText("Cancel")).toBeTruthy();
@@ -154,7 +154,7 @@ describe("AutomationModalShared", () => {
           label="Delete"
           palette={defaultPalette}
           onPress={mockOnPress}
-        />
+        />,
       );
 
       fireEvent.press(screen.getByText("Delete"));
@@ -169,7 +169,7 @@ describe("AutomationModalShared", () => {
           palette={defaultPalette}
           onPress={mockOnPress}
           disabled={true}
-        />
+        />,
       );
 
       // Verify the button renders (disabled state is handled internally)
@@ -182,7 +182,7 @@ describe("AutomationModalShared", () => {
   describe("ErrorCard", () => {
     it("should render error message", () => {
       render(
-        <ErrorCard error="Something went wrong" palette={defaultPalette} />
+        <ErrorCard error="Something went wrong" palette={defaultPalette} />,
       );
 
       expect(screen.getByText("Something went wrong")).toBeTruthy();
@@ -203,7 +203,7 @@ describe("AutomationModalShared", () => {
         <SuccessCard
           message="Operation completed successfully"
           palette={defaultPalette}
-        />
+        />,
       );
 
       expect(screen.getByText("Operation completed successfully")).toBeTruthy();
@@ -213,7 +213,7 @@ describe("AutomationModalShared", () => {
   describe("InfoBar", () => {
     it("should render info message", () => {
       render(
-        <InfoBar message="Keep your phone unlocked" palette={defaultPalette} />
+        <InfoBar message="Keep your phone unlocked" palette={defaultPalette} />,
       );
 
       expect(screen.getByText("Keep your phone unlocked")).toBeTruthy();
@@ -229,7 +229,7 @@ describe("AutomationModalShared", () => {
           currentLabel="Delete posts"
           statusForUi="running"
           palette={defaultPalette}
-        />
+        />,
       );
 
       expect(screen.getByText("Step 2/5: Delete posts")).toBeTruthy();
@@ -243,7 +243,7 @@ describe("AutomationModalShared", () => {
           currentLabel="Preparing"
           statusForUi="running"
           palette={defaultPalette}
-        />
+        />,
       );
 
       expect(screen.getByText("Step 0/0: Preparing")).toBeTruthy();
@@ -261,7 +261,7 @@ describe("AutomationModalShared", () => {
           onResume={() => {}}
           onClose={() => {}}
           restartLabel="Back to Options"
-        />
+        />,
       );
 
       expect(screen.getByText("Pause")).toBeTruthy();
@@ -278,7 +278,7 @@ describe("AutomationModalShared", () => {
           onResume={() => {}}
           onClose={() => {}}
           restartLabel="Back to Options"
-        />
+        />,
       );
 
       expect(screen.getByText("Resume")).toBeTruthy();
@@ -296,7 +296,7 @@ describe("AutomationModalShared", () => {
           onRestart={mockRestart}
           onClose={() => {}}
           restartLabel="Back to Save Options"
-        />
+        />,
       );
 
       expect(screen.getByText("Back to Save Options")).toBeTruthy();
@@ -312,7 +312,7 @@ describe("AutomationModalShared", () => {
           onResume={() => {}}
           onClose={() => {}}
           restartLabel="Back to Options"
-        />
+        />,
       );
 
       expect(screen.getByText("Close")).toBeTruthy();
@@ -329,7 +329,7 @@ describe("AutomationModalShared", () => {
           onResume={() => {}}
           onClose={() => {}}
           restartLabel="Back to Options"
-        />
+        />,
       );
 
       fireEvent.press(screen.getByText("Pause"));
@@ -347,7 +347,7 @@ describe("AutomationModalShared", () => {
           onResume={mockResume}
           onClose={() => {}}
           restartLabel="Back to Options"
-        />
+        />,
       );
 
       fireEvent.press(screen.getByText("Resume"));

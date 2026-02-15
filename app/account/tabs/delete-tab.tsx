@@ -10,6 +10,16 @@ import {
 
 import { DeleteAutomationModal } from "@/app/account/components/DeleteAutomationModal";
 import { FinishedModal } from "@/app/account/components/FinishedModal";
+import {
+  CheckboxRow,
+  Indented,
+  NumberInput,
+  PrimaryButton,
+  SecondaryButton,
+  StackHeader,
+  StatusCard,
+} from "@/components/account/shared-tab-components";
+import { sharedTabStyles } from "@/components/account/shared-tab-styles";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PostsToDeleteReviewModal } from "@/components/PostsToDeleteReviewModal";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
@@ -31,16 +41,6 @@ import type {
   AccountTabPalette,
   AccountTabProps,
 } from "@/types/account-tabs";
-import {
-  CheckboxRow,
-  Indented,
-  NumberInput,
-  PrimaryButton,
-  SecondaryButton,
-  StackHeader,
-  StatusCard,
-} from "./_shared-tab-components";
-import { sharedTabStyles } from "./_shared-tab-styles";
 
 type DeleteFlowScreen = "form" | "review";
 

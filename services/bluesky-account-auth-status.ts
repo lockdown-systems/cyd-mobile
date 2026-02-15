@@ -1,11 +1,11 @@
 import type { AppBskyActorDefs } from "@atproto/api";
 
-import type { AccountAuthStatusValue } from "@/controllers";
+import { BlueskyAccountController } from "@/controllers/BlueskyAccountController";
 import {
   ACCOUNT_AUTH_STATUS,
   ACCOUNT_CONFIG_KEYS,
-  BlueskyAccountController,
-} from "@/controllers";
+  type AccountAuthStatusValue,
+} from "@/controllers/config";
 import type { AccountListItem } from "@/database/accounts";
 import { emitAuthStatusChange } from "@/services/auth-events";
 

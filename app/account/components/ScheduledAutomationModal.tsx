@@ -8,6 +8,15 @@ import React, {
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 
+import {
+  type AutomationModalState,
+  ButtonRow,
+  ErrorCard,
+  InfoBar,
+  StepRow,
+  SuccessCard,
+  styles,
+} from "@/components/account/AutomationModalShared";
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
@@ -22,15 +31,6 @@ import type {
 } from "@/controllers/bluesky/job-types";
 import type { PostPreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
-import {
-  type AutomationModalState,
-  ButtonRow,
-  ErrorCard,
-  InfoBar,
-  StepRow,
-  SuccessCard,
-  styles,
-} from "./_AutomationModalShared";
 import { SimpleProgressBar } from "./SimpleProgressBar";
 
 export type { AutomationModalState as ScheduledAutomationModalState };

@@ -2,12 +2,6 @@
  * @fileoverview Tests for browse tab shared helper functions
  */
 
-import type {
-  ExternalEmbed,
-  MediaAttachment,
-} from "@/controllers/bluesky/types";
-import { createMockDatabase } from "@/testUtils/mockDatabase";
-import type { SQLiteDatabase } from "expo-sqlite";
 import {
   buildFirstPageQuery,
   buildLoadMoreQuery,
@@ -18,7 +12,13 @@ import {
   type ExternalRow,
   type MediaRow,
   type PostRow,
-} from "../_shared";
+} from "@/components/account/browse-shared";
+import type {
+  ExternalEmbed,
+  MediaAttachment,
+} from "@/controllers/bluesky/types";
+import { createMockDatabase } from "@/testUtils/mockDatabase";
+import type { SQLiteDatabase } from "expo-sqlite";
 
 // Type for embedded record structure
 interface MockEmbedRecord {
