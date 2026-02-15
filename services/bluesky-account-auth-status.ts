@@ -7,9 +7,10 @@ import {
   BlueskyAccountController,
 } from "@/controllers";
 import type { AccountListItem } from "@/database/accounts";
+import { emitAuthStatusChange } from "@/services/auth-events";
 
 export function normalizeHandle(
-  handle: string | null | undefined
+  handle: string | null | undefined,
 ): string | null {
   if (!handle) {
     return null;
@@ -20,18 +21,18 @@ export function normalizeHandle(
 
 function profileMatchesAccount(
   profile: AppBskyActorDefs.ProfileViewDetailed,
-  account: AccountListItem
+  account: AccountListItem,
 ): boolean {
   const profileDid = profile.did ?? null;
   const accountDid = account.did ?? null;
   const didMatches = Boolean(
-    profileDid && accountDid && profileDid === accountDid
+    profileDid && accountDid && profileDid === accountDid,
   );
 
   const profileHandle = normalizeHandle(profile.handle);
   const accountHandle = normalizeHandle(account.handle);
   const handleMatches = Boolean(
-    profileHandle && accountHandle && profileHandle === accountHandle
+    profileHandle && accountHandle && profileHandle === accountHandle,
   );
 
   return didMatches || handleMatches;
@@ -56,14 +57,14 @@ function isMissingSessionError(err: unknown): boolean {
 export async function verifyBlueskyAccountAuthStatus(
   controller: BlueskyAccountController,
   account: AccountListItem,
-  options?: { force?: boolean }
+  options?: { force?: boolean },
 ): Promise<AccountAuthStatusValue> {
   const force = options?.force ?? false;
   console.log("[AuthStatus] verify -> start", account.id, account.handle);
   let storedStatus: AccountAuthStatusValue | null = null;
   try {
     const rawStatus = await controller.getConfig(
-      ACCOUNT_CONFIG_KEYS.authStatus
+      ACCOUNT_CONFIG_KEYS.authStatus,
     );
     if (
       rawStatus === ACCOUNT_AUTH_STATUS.authenticated ||
@@ -110,6 +111,7 @@ export async function verifyBlueskyAccountAuthStatus(
   try {
     await controller.setConfig(ACCOUNT_CONFIG_KEYS.authStatus, status);
     console.log("[AuthStatus] status persisted", account.id, status);
+    emitAuthStatusChange({ accountId: account.id, status });
   } catch (err) {
     console.warn("Failed to persist Bluesky auth status", err);
   }

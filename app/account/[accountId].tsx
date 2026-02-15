@@ -39,6 +39,7 @@ import {
 import { deleteAccount, type AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { onAuthStatusChange } from "@/services/auth-events";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
 import {
   authenticateBlueskyAccount,
@@ -264,6 +265,23 @@ export default function AccountPlaceholderScreen() {
     return () => {
       cancelled = true;
     };
+  }, [account]);
+
+  // Listen for auth status changes from anywhere in the app (e.g. reauth
+  // inside the automation modal's verifyAuthorization job).
+  useEffect(() => {
+    if (!account) return;
+    const unsubscribe = onAuthStatusChange((event) => {
+      if (event.accountId === account.id) {
+        console.log(
+          "[AccountScreen] auth status event",
+          account.id,
+          event.status,
+        );
+        setAuthStatus(event.status);
+      }
+    });
+    return unsubscribe;
   }, [account]);
 
   useFocusEffect(
