@@ -32,23 +32,31 @@ const ONBOARDING_SCREENS = [
   {
     content: `**Hello, friend! I'm Cyd -- short for Clawback Your Data.**
 
-Most tech platforms are controlled by a tiny group of powerful billionaires. You don't _owe_ them your data. Even posting to Bluesky is still a privacy nightmare.
+Most tech platforms are controlled by a tiny group of powerful billionaires. You don't _owe_ them your data. Even posting to Bluesky is a privacy nightmare.
 
 We go out of our way to protect our privacy. We use ad blockers to fight surveillance capitalists. We use Signal to keep our chats private.
 
 _Why should everything you post to social media stay online, and public, forever?_`,
   },
   {
-    content: `**Create a local, private backup of your data**, including Bluesky posts, reposts, likes, bookmarks, and chat messages.
+    content: `With this app, you can:
+
+**Create a local, private backup of your data**, including Bluesky posts, reposts, likes, bookmarks, and chat messages.
 
 **Choose what you want to delete.** You can delete it all, or you can be selective, deleting most of it but keeping what went viral.
 
-**Schedule automatic deletion**, keeping your your online data as ephemeral as you want.`,
+**Schedule automatic deletion**, keeping your online data as ephemeral as you want over time.`,
   },
   {
     content: `**We can't access your accounts or your data.**
 
-Cyd runs directly on your device, not on our servers. Cyd is designed so that we don't have access to your accounts, or to any of your data in those accounts. We don't even record what your username is. When you sign into a Bluesky account in Cyd, you grant the app running locally on your phone permission to access it, not us, the developers of the app.`,
+Cyd runs directly on your device, not on our servers.
+
+Cyd is designed so that we don't have access to your accounts, or to any of your data in those accounts. We don't even record what your username is.
+
+When you sign into a Bluesky account in Cyd, you grant the app running locally on your phone permission to access it, not us, the developers of the app.
+
+Cyd is [open source](https://github.com/lockdown-systems/cyd-mobile).`,
   },
   {
     content: `**Delete Bluesky data with this app.**
