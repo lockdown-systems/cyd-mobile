@@ -9,7 +9,7 @@
     "ios": "expo run:ios --device",
     "ios:release": "npx expo run:ios --configuration Release --device",
     "build:ios": "eas build --platform ios --profile production --local",
-    "submit:ios": "eas submit --platform ios --profile production",
+    "submit:ios": "./scripts/submit-ios.sh",
     "lint": "expo lint",
     "test": "jest",
     "test:watch": "jest --watch",
