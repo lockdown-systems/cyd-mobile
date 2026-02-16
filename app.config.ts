@@ -1,5 +1,7 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
+import packageJson from "./package.json";
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   // EAS Build sets APP_VARIANT for different build profiles
   // For local development, default to "development"
@@ -9,7 +11,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: "Cyd",
     slug: "cyd",
-    version: "1.0.2",
+    version: packageJson.version,
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: ["social.cyd.api", "social.cyd.dev-api"],
