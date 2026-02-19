@@ -40,3 +40,5 @@ yarn-error.*
 
 PLAN.md
 build-*.ipa
+build-*.aab
+google-play-service-account.json
