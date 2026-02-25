@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   type AutomationModalState,
@@ -69,6 +70,8 @@ export function DeleteAutomationModal({
 }: DeleteAutomationModalProps) {
   // Keep the screen awake while automation is running
   useKeepAwake();
+  const insets = useSafeAreaInsets();
+  const modalBottomPadding = Math.max(insets.bottom + 8, 24);
 
   const [jobs, setJobs] = useState<BlueskyJobRecord[]>([]);
   const [speech, setSpeech] = useState<string | null>(null);
@@ -379,7 +382,13 @@ export function DeleteAutomationModal({
       onRequestClose={handleClose}
     >
       <View
-        style={[styles.modalContainer, { backgroundColor: palette.background }]}
+        style={[
+          styles.modalContainer,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: modalBottomPadding,
+          },
+        ]}
       >
         <SpeechBubble message={speech ?? "Preparing to delete your data…"} />
 
