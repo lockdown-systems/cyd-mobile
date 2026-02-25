@@ -93,6 +93,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       "expo-font",
+      "./plugins/remove-android-permissions",
     ],
     experiments: {
       typedRoutes: true,
