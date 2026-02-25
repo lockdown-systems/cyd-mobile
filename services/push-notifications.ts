@@ -10,6 +10,27 @@ export type PushTokenResult = {
   error?: string;
 };
 
+function getExpoProjectId(): string | null {
+  const easProjectId = (Constants as { easConfig?: { projectId?: string } })
+    .easConfig?.projectId;
+  if (easProjectId) {
+    return easProjectId;
+  }
+
+  const expoExtraProjectId = (
+    Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined
+  )?.eas?.projectId;
+  if (expoExtraProjectId) {
+    return expoExtraProjectId;
+  }
+
+  const expoManifestProjectId = (
+    Constants as { manifest2?: { extra?: { eas?: { projectId?: string } } } }
+  ).manifest2?.extra?.eas?.projectId;
+
+  return expoManifestProjectId ?? null;
+}
+
 /**
  * Configure notification handler for foreground notifications
  */
@@ -37,12 +58,12 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
-  if (existingStatus === "granted") {
+  if (existingStatus === Notifications.PermissionStatus.GRANTED) {
     return true;
   }
 
   const { status } = await Notifications.requestPermissionsAsync();
-  return status === "granted";
+  return status === Notifications.PermissionStatus.GRANTED;
 }
 
 /**
@@ -54,7 +75,7 @@ export async function hasNotificationPermission(): Promise<boolean> {
   }
 
   const { status } = await Notifications.getPermissionsAsync();
-  return status === "granted";
+  return status === Notifications.PermissionStatus.GRANTED;
 }
 
 /**
@@ -89,7 +110,15 @@ export async function registerForPushNotifications(): Promise<PushTokenResult> {
 
     // Get Expo push token (works for both iOS and Android)
     // This token is sent to Expo's push service, which forwards to APNs/FCM
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const projectId = getExpoProjectId();
+    if (!projectId) {
+      return {
+        success: false,
+        error:
+          "Missing EAS projectId for push notifications. Rebuild the app with EAS metadata available.",
+      };
+    }
+
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
@@ -113,7 +142,7 @@ export async function registerForPushNotifications(): Promise<PushTokenResult> {
  * Returns a cleanup function to remove the listener
  */
 export function addNotificationResponseListener(
-  callback: (response: Notifications.NotificationResponse) => void
+  callback: (response: Notifications.NotificationResponse) => void,
 ): () => void {
   const subscription =
     Notifications.addNotificationResponseReceivedListener(callback);
@@ -125,7 +154,7 @@ export function addNotificationResponseListener(
  * Returns a cleanup function to remove the listener
  */
 export function addNotificationReceivedListener(
-  callback: (notification: Notifications.Notification) => void
+  callback: (notification: Notifications.Notification) => void,
 ): () => void {
   const subscription = Notifications.addNotificationReceivedListener(callback);
   return () => subscription.remove();
@@ -142,7 +171,7 @@ export async function getLastNotificationResponse(): Promise<Notifications.Notif
  * Parse notification data to extract account info for deep linking
  */
 export function parseNotificationData(
-  notification: Notifications.Notification
+  notification: Notifications.Notification,
 ): {
   accountId?: number;
   accountUUID?: string;
