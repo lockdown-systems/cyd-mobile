@@ -7,7 +7,6 @@ import React, {
   useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   type AutomationModalState,
@@ -29,6 +28,7 @@ import type {
   SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
 import type { PostPreviewData, PreviewData } from "@/controllers/bluesky/types";
+import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { SaveAutomationProgressBar } from "./SaveAutomationProgressBar";
 
@@ -60,8 +60,7 @@ export function SaveAutomationModal({
 }: SaveAutomationModalProps) {
   // Keep the screen awake while automation is running
   useKeepAwake();
-  const insets = useSafeAreaInsets();
-  const modalBottomPadding = Math.max(insets.bottom + 8, 24);
+  const modalBottomPadding = useModalBottomPadding();
 
   const [jobs, setJobs] = useState<BlueskyJobRecord[]>([]);
   const [speech, setSpeech] = useState<string | null>(null);

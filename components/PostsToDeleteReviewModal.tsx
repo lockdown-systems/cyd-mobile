@@ -23,6 +23,7 @@ import type {
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
+import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { extractEmbeddedPostFromJson } from "@/utils/embeddedPost";
 
@@ -43,6 +44,7 @@ export function PostsToDeleteReviewModal({
   palette,
   selections,
 }: PostsToDeleteReviewModalProps) {
+  const modalBottomPadding = useModalBottomPadding({ minPadding: 12 });
   const [postsToDelete, setPostsToDelete] = useState<PostPreviewData[]>([]);
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
@@ -198,7 +200,15 @@ export function PostsToDeleteReviewModal({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <View style={[styles.container, { backgroundColor: palette.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: modalBottomPadding,
+          },
+        ]}
+      >
         <View style={[styles.header, { borderColor: palette.icon + "22" }]}>
           <Pressable
             onPress={handleClose}
@@ -231,7 +241,10 @@ export function PostsToDeleteReviewModal({
                 onPreserveToggle={handlePreserveToggle}
               />
             )}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[
+              styles.list,
+              { paddingBottom: modalBottomPadding + 8 },
+            ]}
             ListEmptyComponent={
               <Text style={[styles.emptyText, { color: palette.icon }]}>
                 No posts to delete
