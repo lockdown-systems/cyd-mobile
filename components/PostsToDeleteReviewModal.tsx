@@ -49,6 +49,18 @@ export function PostsToDeleteReviewModal({
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
 
+  const cleanupController = useCallback(async () => {
+    const controller = controllerRef.current;
+    controllerRef.current = null;
+    if (controller) {
+      try {
+        await controller.cleanup();
+      } catch (err) {
+        console.warn("Failed to cleanup posts review controller", err);
+      }
+    }
+  }, []);
+
   // Helper to parse facets JSON
   const parseFacets = useCallback(
     (facetsJSON: string | null): unknown[] | null => {
@@ -121,6 +133,7 @@ export function PostsToDeleteReviewModal({
     async function loadPosts() {
       setLoading(true);
       try {
+        await cleanupController();
         const controller = new BlueskyAccountController(accountId, accountUUID);
         await controller.initDB();
         await controller.initAgent();
@@ -158,7 +171,18 @@ export function PostsToDeleteReviewModal({
     }
 
     void loadPosts();
-  }, [visible, accountId, accountUUID, selections, mapToPreviewData]);
+
+    return () => {
+      void cleanupController();
+    };
+  }, [
+    visible,
+    accountId,
+    accountUUID,
+    selections,
+    mapToPreviewData,
+    cleanupController,
+  ]);
 
   // Handle preserve toggle - toggle the value and update local state
   const handlePreserveToggle = useCallback(
@@ -190,8 +214,9 @@ export function PostsToDeleteReviewModal({
   // Handle close
   const handleClose = useCallback(() => {
     setPostsToDelete([]);
+    void cleanupController();
     onClose();
-  }, [onClose]);
+  }, [cleanupController, onClose]);
 
   return (
     <Modal

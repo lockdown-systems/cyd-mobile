@@ -782,8 +782,8 @@ function DeleteReviewScreen({
     async function loadCounts() {
       setCountsLoading(true);
       setCountsError(null);
+      const controller = new BlueskyAccountController(accountId, accountUUID);
       try {
-        const controller = new BlueskyAccountController(accountId, accountUUID);
         await controller.initDB();
         await controller.initAgent();
         const result = controller.getDeletionPreviewCounts(selections);
@@ -797,6 +797,11 @@ function DeleteReviewScreen({
           );
         }
       } finally {
+        try {
+          await controller.cleanup();
+        } catch (cleanupErr) {
+          console.warn("[DeleteReviewScreen] cleanup failed", cleanupErr);
+        }
         if (!cancelled) {
           setCountsLoading(false);
         }
