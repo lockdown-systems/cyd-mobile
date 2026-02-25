@@ -13,7 +13,7 @@ type PlatformSelectOptions<T> = Partial<Record<string, T>> & { default?: T };
 const createMockComponent = (name: string) => {
   const Component = React.forwardRef<unknown, MockProps>(
     ({ children, ...props }, ref) =>
-      React.createElement(name, { ...props, ref }, children as ReactNode)
+      React.createElement(name, { ...props, ref }, children as ReactNode),
   );
   Component.displayName = name;
   return Component;
@@ -29,13 +29,13 @@ jest.mock("react-native", () => {
           | Record<string, unknown>
           | Record<string, unknown>[]
           | null
-          | undefined
+          | undefined,
       ): Record<string, unknown> => {
         if (!style) return {};
         if (Array.isArray(style)) {
           return style.reduce<Record<string, unknown>>(
             (acc, s) => ({ ...acc, ...(s || {}) }),
-            {}
+            {},
           );
         }
         return style;
@@ -106,19 +106,20 @@ jest.mock("expo-router", () => ({
 
 // Mock expo-sqlite
 jest.mock("expo-sqlite", () => ({
+  defaultDatabaseDirectory: "/mock/files/SQLite",
   openDatabaseAsync: jest.fn(() =>
     Promise.resolve({
       execAsync: jest.fn(() => Promise.resolve()),
       getAllAsync: jest.fn(() => Promise.resolve([])),
       getFirstAsync: jest.fn(() => Promise.resolve(null)),
       runAsync: jest.fn(() =>
-        Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+        Promise.resolve({ changes: 0, lastInsertRowId: 0 }),
       ),
       closeAsync: jest.fn(() => Promise.resolve()),
       withTransactionAsync: jest.fn(
-        async (callback: () => Promise<void>) => await callback()
+        async (callback: () => Promise<void>) => await callback(),
       ),
-    })
+    }),
   ),
 }));
 
@@ -196,7 +197,7 @@ jest.mock("expo-file-system", () => {
     static downloadFileAsync = jest.fn(
       async (_url: string, to: { uri: string }) => {
         return { uri: to.uri };
-      }
+      },
     );
   }
 
@@ -207,10 +208,10 @@ jest.mock("expo-file-system", () => {
   };
 
   const downloadAsync = jest.fn((url: string, fileUri: string) =>
-    Promise.resolve({ uri: fileUri, url })
+    Promise.resolve({ uri: fileUri, url }),
   );
   const getInfoAsync = jest.fn(() =>
-    Promise.resolve({ exists: false, uri: "" })
+    Promise.resolve({ exists: false, uri: "" }),
   );
 
   return {

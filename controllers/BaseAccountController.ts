@@ -1,6 +1,10 @@
 import * as Crypto from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import {
+  defaultDatabaseDirectory,
+  openDatabaseAsync,
+  type SQLiteDatabase,
+} from "expo-sqlite";
 
 import { getDatabase } from "@/database";
 
@@ -13,17 +17,30 @@ function getDocumentsBasePath(): string {
   return uri.endsWith("/") ? uri : `${uri}/`;
 }
 
+/**
+ * Get the parent directory of the default SQLite database directory.
+ * expo-sqlite defaults to `<files>/SQLite/`. Account databases live under
+ * `<files>/accounts/<type>-<uuid>/` so we need the parent path.
+ */
+function getSQLiteParentDirectory(): string {
+  const dir = defaultDatabaseDirectory as string;
+  const lastSlash = dir.replace(/\/+$/, "").lastIndexOf("/");
+  return lastSlash > 0 ? dir.substring(0, lastSlash) : dir;
+}
+
 export function buildAccountPaths(accountType: string, accountUUID: string) {
   const base = getDocumentsBasePath();
   const accountsDir = `${base}accounts/`;
   const accountDir = `${accountsDir}${accountType}-${accountUUID}/`;
+  const sqliteParent = getSQLiteParentDirectory();
   return {
     base,
     accountsDir,
     accountDir,
     dbPath: `${accountDir}data.db`,
-    // Relative path so SQLite writes to Documents/accounts/... instead of Documents/SQLite/
-    dbPathForSQLite: `../accounts/${accountType}-${accountUUID}/data.db`,
+    // Directory for openDatabaseAsync so it writes to <files>/accounts/... instead of <files>/SQLite/
+    dbDirForSQLite: `${sqliteParent}/accounts/${accountType}-${accountUUID}`,
+    dbNameForSQLite: "data.db",
     mediaDir: `${accountDir}media/`,
     metadataPath: `${accountDir}metadata.json`,
   } as const;
@@ -150,9 +167,12 @@ export abstract class BaseAccountController<TProgress = unknown> {
       .accountDir;
   }
 
-  protected getAccountDatabasePathForSQLite(): string {
-    return buildAccountPaths(this.getAccountType(), this.accountUUID)
-      .dbPathForSQLite;
+  protected getAccountDatabaseSQLiteInfo(): {
+    dbDir: string;
+    dbName: string;
+  } {
+    const paths = buildAccountPaths(this.getAccountType(), this.accountUUID);
+    return { dbDir: paths.dbDirForSQLite, dbName: paths.dbNameForSQLite };
   }
 
   /**
@@ -182,7 +202,8 @@ export abstract class BaseAccountController<TProgress = unknown> {
    */
   protected async openAccountDatabase(): Promise<SQLiteDatabase> {
     await this.ensureAccountDirectory();
-    const db = await openDatabaseAsync(this.getAccountDatabasePathForSQLite());
+    const { dbDir, dbName } = this.getAccountDatabaseSQLiteInfo();
+    const db = await openDatabaseAsync(dbName, {}, dbDir);
     await db.execAsync("PRAGMA foreign_keys = ON;");
     return db;
   }
@@ -195,7 +216,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
       throw new Error("Database not initialized");
     }
     const result = await this.db.getFirstAsync<{ user_version: number }>(
-      "PRAGMA user_version;"
+      "PRAGMA user_version;",
     );
     return result?.user_version ?? 0;
   }
@@ -219,7 +240,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     }
     const result = await this.db.getFirstAsync<{ value: string }>(
       "SELECT value FROM config WHERE key = ?;",
-      [key]
+      [key],
     );
     return result?.value ?? null;
   }
@@ -234,7 +255,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     await this.db.runAsync(
       `INSERT INTO config (key, value) VALUES (?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
-      [key, value]
+      [key, value],
     );
   }
 
@@ -257,7 +278,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
       `UPDATE bsky_account 
        SET accessedAt = ? 
        WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
-      [Date.now(), this.accountId]
+      [Date.now(), this.accountId],
     );
   }
 
