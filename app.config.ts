@@ -70,6 +70,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             deploymentTarget: "15.5",
             useFrameworks: "static",
           },
+          android: {
+            enableProguardInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+          },
         },
       ],
       [
