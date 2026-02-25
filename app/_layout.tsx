@@ -1,3 +1,5 @@
+import "@/services/polyfills";
+
 import {
   DarkTheme,
   DefaultTheme,
