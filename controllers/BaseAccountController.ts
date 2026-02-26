@@ -64,9 +64,15 @@ async function ensureDirectoryExists(path: string): Promise<void> {
  * configuration storage, and progress tracking.
  */
 export abstract class BaseAccountController<TProgress = unknown> {
+  private static sharedAccountDbs = new Map<
+    string,
+    { db: SQLiteDatabase; refCount: number }
+  >();
+
   protected accountId: number;
   protected accountUUID: string;
   protected db: SQLiteDatabase | null = null;
+  private sharedDbKey: string | null = null;
   protected _progress: TProgress;
   private paused = false;
   private pauseResolvers: (() => void)[] = [];
@@ -201,10 +207,27 @@ export abstract class BaseAccountController<TProgress = unknown> {
    * Open the account-specific database
    */
   protected async openAccountDatabase(): Promise<SQLiteDatabase> {
+    if (this.db) {
+      return this.db;
+    }
+
     await this.ensureAccountDirectory();
     const { dbDir, dbName } = this.getAccountDatabaseSQLiteInfo();
+    const dbKey = `${dbDir}::${dbName}`;
+
+    const existing = BaseAccountController.sharedAccountDbs.get(dbKey);
+    if (existing) {
+      existing.refCount += 1;
+      this.sharedDbKey = dbKey;
+      return existing.db;
+    }
+
     const db = await openDatabaseAsync(dbName, {}, dbDir);
     await db.execAsync("PRAGMA foreign_keys = ON;");
+
+    BaseAccountController.sharedAccountDbs.set(dbKey, { db, refCount: 1 });
+    this.sharedDbKey = dbKey;
+
     return db;
   }
 
@@ -286,9 +309,28 @@ export abstract class BaseAccountController<TProgress = unknown> {
    * Clean up resources when the controller is no longer needed
    */
   async cleanup(): Promise<void> {
-    if (this.db) {
-      await this.db.closeAsync();
-      this.db = null;
+    if (!this.db) {
+      return;
     }
+
+    const dbToRelease = this.db;
+    const dbKey = this.sharedDbKey;
+
+    this.db = null;
+    this.sharedDbKey = null;
+
+    if (dbKey) {
+      const entry = BaseAccountController.sharedAccountDbs.get(dbKey);
+      if (entry) {
+        entry.refCount -= 1;
+        if (entry.refCount <= 0) {
+          BaseAccountController.sharedAccountDbs.delete(dbKey);
+          await entry.db.closeAsync();
+        }
+        return;
+      }
+    }
+
+    await dbToRelease.closeAsync();
   }
 }
