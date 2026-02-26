@@ -1,3 +1,4 @@
+import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import {
@@ -55,7 +56,7 @@ function jobLabel(jobType: BlueskyJobRecord["jobType"]): string {
 }
 
 function statusIcon(
-  status: BlueskyJobRecord["status"]
+  status: BlueskyJobRecord["status"],
 ): React.ComponentProps<typeof MaterialIcons>["name"] {
   if (status === "completed") return "check-circle";
   if (status === "failed") return "error-outline";
@@ -65,7 +66,7 @@ function statusIcon(
 
 function statusColor(
   status: BlueskyJobRecord["status"],
-  palette: AccountTabPalette
+  palette: AccountTabPalette,
 ): string {
   if (status === "failed") return palette.warning ?? palette.tint;
   if (status === "completed") return palette.tint;
@@ -171,17 +172,19 @@ export function FinishedModal({
   onViewBrowse,
   onViewDelete,
 }: FinishedModalProps) {
+  const containerBottomPadding = useModalBottomPadding({ minPadding: 20 });
+
   const orderedJobs = useMemo(
     () => [...jobs].sort((a, b) => a.scheduledAt - b.scheduledAt),
-    [jobs]
+    [jobs],
   );
   const displayJobs = useMemo(
     () => orderedJobs.filter((job) => job.jobType !== "verifyAuthorization"),
-    [orderedJobs]
+    [orderedJobs],
   );
   const failedJob = useMemo(
     () => jobs.find((job) => job.status === "failed"),
-    [jobs]
+    [jobs],
   );
   const totalDuration = useMemo(() => {
     const startTimes = jobs
@@ -211,7 +214,15 @@ export function FinishedModal({
         }
       }}
     >
-      <View style={[styles.container, { backgroundColor: palette.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: containerBottomPadding,
+          },
+        ]}
+      >
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text }]}>
             {mode === "schedule"

@@ -1,3 +1,4 @@
+import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
   useCallback,
@@ -67,6 +68,7 @@ export function ScheduledAutomationModal({
 }: ScheduledAutomationModalProps) {
   // Keep the screen awake while automation is running
   useKeepAwake();
+  const modalBottomPadding = useModalBottomPadding();
 
   const [jobs, setJobs] = useState<BlueskyJobRecord[]>([]);
   const [speech, setSpeech] = useState<string | null>(null);
@@ -388,7 +390,13 @@ export function ScheduledAutomationModal({
       onRequestClose={handleClose}
     >
       <View
-        style={[styles.modalContainer, { backgroundColor: palette.background }]}
+        style={[
+          styles.modalContainer,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: modalBottomPadding,
+          },
+        ]}
       >
         <SpeechBubble
           message={speech ?? "Preparing to save and delete your data…"}

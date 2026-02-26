@@ -210,6 +210,16 @@ export function ScheduleTab({
         } else if (result.error?.includes("simulator")) {
           // Silently skip on simulator
           console.log("Push notifications not available in simulator");
+        } else if (
+          result.error?.includes("projectId") ||
+          result.error?.includes("FirebaseApp") ||
+          result.error?.includes("Default FirebaseApp")
+        ) {
+          Alert.alert(
+            "Notification Setup Required",
+            "Push notifications are not fully configured in this Android build. Add google-services.json for package systems.lockdown.cydmobile, then rebuild Android.",
+            [{ text: "OK" }],
+          );
         } else {
           Alert.alert(
             "Notification Error",

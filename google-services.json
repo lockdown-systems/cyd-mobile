@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "507176991176",
+    "project_id": "cyd-mobile-61071",
+    "storage_bucket": "cyd-mobile-61071.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:507176991176:android:93e8a30a27541c958668fd",
+        "android_client_info": {
+          "package_name": "systems.lockdown.cydmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUvxELp-0UhjPJfkAaBZ1k4gcwgBdLqbs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

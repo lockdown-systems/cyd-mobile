@@ -4,6 +4,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -32,6 +33,8 @@ type CydAccountBarProps = {
 export function CydAccountBar({ onShowOnboarding }: CydAccountBarProps) {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom;
+  const barBottomPadding =
+    Platform.OS === "android" ? Math.max(bottomInset, 20) : bottomInset;
   const colorScheme = useColorScheme() ?? "light";
   const palette = Colors[colorScheme];
   const { state, signOut, getDashboardURL } = useCydAccount();
@@ -151,7 +154,7 @@ export function CydAccountBar({ onShowOnboarding }: CydAccountBarProps) {
           {
             backgroundColor: palette.card,
             borderTopColor: palette.icon + "22",
-            paddingBottom: 8,
+            paddingBottom: barBottomPadding,
           },
         ]}
       >

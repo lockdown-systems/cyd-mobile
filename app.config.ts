@@ -46,6 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "systems.lockdown.cydmobile",
+      googleServicesFile: "./google-services.json",
       intentFilters: [
         {
           action: "VIEW",
@@ -70,6 +71,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             deploymentTarget: "15.5",
             useFrameworks: "static",
           },
+          android: {
+            enableProguardInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+          },
         },
       ],
       [
@@ -79,6 +84,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           imageWidth: 300,
           resizeMode: "contain",
           backgroundColor: "#c3d1e4",
+          android: {
+            image: "./assets/images/splash-icon-android.png",
+            imageWidth: 200,
+          },
           dark: {
             backgroundColor: "#3a414b",
           },
@@ -93,6 +102,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       "expo-font",
+      "./plugins/remove-android-permissions",
     ],
     experiments: {
       typedRoutes: true,

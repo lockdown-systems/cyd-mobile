@@ -17,26 +17,33 @@ config.resolver = {
 // Prefer "react-native" then "browser" exports.
 // This ensures we get the browser version of "jose" (which uses WebCrypto)
 // instead of the Node version (which uses node:crypto).
-config.resolver.unstable_conditionNames = [
-  "react-native",
-  "browser",
-  "require",
-  "import",
-];
+config.resolver.unstable_conditionNames = ["react-native", "browser"];
+// Work around Metro warnings caused by package-internal cjs requires that are
+// valid on disk but not listed in package "exports" maps.
+config.resolver.unstable_enablePackageExports = false;
 
-// Silence warnings about "multiformats" and "uint8arrays" exports
-const originalGetTransformOptions = config.transformer.getTransformOptions;
-config.transformer.getTransformOptions = async (
-  entryFiles,
-  options,
-  getDependenciesOf
-) => {
-  const result = await originalGetTransformOptions(
-    entryFiles,
-    options,
-    getDependenciesOf
-  );
-  return result;
+// Remap package-internal deep imports to public export subpaths.
+// Some dependencies request cjs/src/* paths that are not exported, which causes
+// Metro warnings before falling back to file resolution.
+const packageInternalPathRemaps = {
+  "multiformats/cjs/src/cid.js": "multiformats/cid",
+  "multiformats/cjs/src/bases/base64.js": "multiformats/bases/base64",
+  "multiformats/cjs/src/hashes/digest.js": "multiformats/hashes/digest",
+  "multiformats/cjs/src/hashes/sha2-browser.js": "multiformats/hashes/sha2",
+  "multiformats/cjs/src/basics.js": "multiformats/basics",
+  "uint8arrays/cjs/src/from-string.js": "uint8arrays/from-string",
+  "uint8arrays/cjs/src/to-string.js": "uint8arrays/to-string",
+};
+
+const originalResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const remappedModule = packageInternalPathRemaps[moduleName] ?? moduleName;
+
+  if (originalResolveRequest) {
+    return originalResolveRequest(context, remappedModule, platform);
+  }
+
+  return context.resolveRequest(context, remappedModule, platform);
 };
 
 // Ignore specific warnings in LogBox (runtime)

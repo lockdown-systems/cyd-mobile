@@ -1,5 +1,3 @@
-import "@/services/polyfills";
-
 import { Agent } from "@atproto/api";
 import type { Jwk, Key } from "@atproto/jwk";
 import { JoseKey } from "@atproto/jwk-jose";
@@ -65,7 +63,7 @@ async function initClient(): Promise<OAuthClient> {
 
 export async function restoreBlueskyOAuthSession(
   did: string,
-  refresh?: boolean | "auto"
+  refresh?: boolean | "auto",
 ): Promise<OAuthSession> {
   const normalizedDid = did?.trim();
   if (!normalizedDid) {
@@ -116,7 +114,7 @@ export async function authenticateBlueskyAccount(handleInput: string) {
 
   const result = await WebBrowser.openAuthSessionAsync(
     authUrl.toString(),
-    redirectUri
+    redirectUri,
   );
   console.log("[BlueskyOAuth] auth session result", result.type);
 
@@ -148,7 +146,7 @@ export async function authenticateBlueskyAccount(handleInput: string) {
 }
 
 export async function revokeBlueskyAuthorization(
-  accountId: number
+  accountId: number,
 ): Promise<void> {
   console.log("[BlueskyOAuth] revoke -> start", accountId);
   const db = await getDatabase();
@@ -161,7 +159,7 @@ export async function revokeBlueskyAuthorization(
        INNER JOIN bsky_account b ON b.id = a.bskyAccountID
       WHERE a.id = ?
       LIMIT 1;`,
-    [accountId]
+    [accountId],
   );
 
   if (!accountRow?.bskyAccountID) {
@@ -171,7 +169,7 @@ export async function revokeBlueskyAuthorization(
   if (accountRow.sessionJson) {
     try {
       const storedSession = JSON.parse(
-        accountRow.sessionJson
+        accountRow.sessionJson,
       ) as Partial<PersistedSession> & { sub?: string };
       const subject = storedSession.sub;
       if (typeof subject === "string" && subject.length > 0) {
@@ -190,7 +188,7 @@ export async function revokeBlueskyAuthorization(
             refreshJwt = NULL,
             updatedAt = ?
       WHERE id = ?;`,
-    [Date.now(), accountRow.bskyAccountID]
+    [Date.now(), accountRow.bskyAccountID],
   );
   console.log("[BlueskyOAuth] revoke -> db session cleared", accountId);
 }
@@ -249,7 +247,7 @@ function serializeState(value: InternalStateData): SerializedState {
 }
 
 async function deserializeState(
-  value: SerializedState
+  value: SerializedState,
 ): Promise<InternalStateData> {
   const { dpopKeyJwk, ...rest } = value;
   return { ...rest, dpopKey: await deserializeKey(dpopKeyJwk) };
@@ -261,7 +259,7 @@ function serializeSession(value: PersistedSession): SerializedSession {
 }
 
 async function deserializeSession(
-  value: SerializedSession
+  value: SerializedSession,
 ): Promise<PersistedSession> {
   const { dpopKeyJwk, ...rest } = value;
   return { ...rest, dpopKey: await deserializeKey(dpopKeyJwk) };
@@ -306,7 +304,7 @@ function createRuntimeImplementation(): RuntimeImplementation {
         () =>
           new Promise<void>((resolve) => {
             release = resolve;
-          })
+          }),
       );
       locks.set(name, current);
       await previous;

@@ -15,6 +15,7 @@ import {
 import { Colors } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 
 type SignInModalProps = {
   visible: boolean;
@@ -26,6 +27,7 @@ type SignInStep = "email" | "verification" | "loading";
 export function CydSignInModal({ visible, onClose }: SignInModalProps) {
   const colorScheme = useColorScheme() ?? "light";
   const palette = Colors[colorScheme];
+  const modalBottomPadding = useModalBottomPadding({ minPadding: 16 });
   const { sendVerificationCode, signIn } = useCydAccount();
 
   const [step, setStep] = useState<SignInStep>("email");
@@ -102,7 +104,7 @@ export function CydSignInModal({ visible, onClose }: SignInModalProps) {
         setVerificationCode("");
       }
     },
-    [email, subscribeToNewsletter, signIn, handleClose]
+    [email, subscribeToNewsletter, signIn, handleClose],
   );
 
   const handleVerificationCodeChange = useCallback(
@@ -116,7 +118,7 @@ export function CydSignInModal({ visible, onClose }: SignInModalProps) {
         void handleVerifyCode(filtered);
       }
     },
-    [handleVerifyCode]
+    [handleVerifyCode],
   );
 
   const handleGoBack = useCallback(() => {
@@ -134,7 +136,13 @@ export function CydSignInModal({ visible, onClose }: SignInModalProps) {
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={[styles.container, { backgroundColor: palette.background }]}
+        style={[
+          styles.container,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: modalBottomPadding,
+          },
+        ]}
       >
         <View style={styles.header}>
           <Pressable onPress={handleClose} style={styles.closeButton}>

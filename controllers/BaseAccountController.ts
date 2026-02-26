@@ -1,6 +1,10 @@
 import * as Crypto from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import {
+  defaultDatabaseDirectory,
+  openDatabaseAsync,
+  type SQLiteDatabase,
+} from "expo-sqlite";
 
 import { getDatabase } from "@/database";
 
@@ -13,17 +17,30 @@ function getDocumentsBasePath(): string {
   return uri.endsWith("/") ? uri : `${uri}/`;
 }
 
+/**
+ * Get the parent directory of the default SQLite database directory.
+ * expo-sqlite defaults to `<files>/SQLite/`. Account databases live under
+ * `<files>/accounts/<type>-<uuid>/` so we need the parent path.
+ */
+function getSQLiteParentDirectory(): string {
+  const dir = defaultDatabaseDirectory as string;
+  const lastSlash = dir.replace(/\/+$/, "").lastIndexOf("/");
+  return lastSlash > 0 ? dir.substring(0, lastSlash) : dir;
+}
+
 export function buildAccountPaths(accountType: string, accountUUID: string) {
   const base = getDocumentsBasePath();
   const accountsDir = `${base}accounts/`;
   const accountDir = `${accountsDir}${accountType}-${accountUUID}/`;
+  const sqliteParent = getSQLiteParentDirectory();
   return {
     base,
     accountsDir,
     accountDir,
     dbPath: `${accountDir}data.db`,
-    // Relative path so SQLite writes to Documents/accounts/... instead of Documents/SQLite/
-    dbPathForSQLite: `../accounts/${accountType}-${accountUUID}/data.db`,
+    // Directory for openDatabaseAsync so it writes to <files>/accounts/... instead of <files>/SQLite/
+    dbDirForSQLite: `${sqliteParent}/accounts/${accountType}-${accountUUID}`,
+    dbNameForSQLite: "data.db",
     mediaDir: `${accountDir}media/`,
     metadataPath: `${accountDir}metadata.json`,
   } as const;
@@ -47,9 +64,15 @@ async function ensureDirectoryExists(path: string): Promise<void> {
  * configuration storage, and progress tracking.
  */
 export abstract class BaseAccountController<TProgress = unknown> {
+  private static sharedAccountDbs = new Map<
+    string,
+    { db: SQLiteDatabase; refCount: number }
+  >();
+
   protected accountId: number;
   protected accountUUID: string;
   protected db: SQLiteDatabase | null = null;
+  private sharedDbKey: string | null = null;
   protected _progress: TProgress;
   private paused = false;
   private pauseResolvers: (() => void)[] = [];
@@ -150,9 +173,12 @@ export abstract class BaseAccountController<TProgress = unknown> {
       .accountDir;
   }
 
-  protected getAccountDatabasePathForSQLite(): string {
-    return buildAccountPaths(this.getAccountType(), this.accountUUID)
-      .dbPathForSQLite;
+  protected getAccountDatabaseSQLiteInfo(): {
+    dbDir: string;
+    dbName: string;
+  } {
+    const paths = buildAccountPaths(this.getAccountType(), this.accountUUID);
+    return { dbDir: paths.dbDirForSQLite, dbName: paths.dbNameForSQLite };
   }
 
   /**
@@ -181,9 +207,27 @@ export abstract class BaseAccountController<TProgress = unknown> {
    * Open the account-specific database
    */
   protected async openAccountDatabase(): Promise<SQLiteDatabase> {
+    if (this.db) {
+      return this.db;
+    }
+
     await this.ensureAccountDirectory();
-    const db = await openDatabaseAsync(this.getAccountDatabasePathForSQLite());
+    const { dbDir, dbName } = this.getAccountDatabaseSQLiteInfo();
+    const dbKey = `${dbDir}::${dbName}`;
+
+    const existing = BaseAccountController.sharedAccountDbs.get(dbKey);
+    if (existing) {
+      existing.refCount += 1;
+      this.sharedDbKey = dbKey;
+      return existing.db;
+    }
+
+    const db = await openDatabaseAsync(dbName, {}, dbDir);
     await db.execAsync("PRAGMA foreign_keys = ON;");
+
+    BaseAccountController.sharedAccountDbs.set(dbKey, { db, refCount: 1 });
+    this.sharedDbKey = dbKey;
+
     return db;
   }
 
@@ -195,7 +239,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
       throw new Error("Database not initialized");
     }
     const result = await this.db.getFirstAsync<{ user_version: number }>(
-      "PRAGMA user_version;"
+      "PRAGMA user_version;",
     );
     return result?.user_version ?? 0;
   }
@@ -219,7 +263,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     }
     const result = await this.db.getFirstAsync<{ value: string }>(
       "SELECT value FROM config WHERE key = ?;",
-      [key]
+      [key],
     );
     return result?.value ?? null;
   }
@@ -234,7 +278,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     await this.db.runAsync(
       `INSERT INTO config (key, value) VALUES (?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
-      [key, value]
+      [key, value],
     );
   }
 
@@ -257,7 +301,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
       `UPDATE bsky_account 
        SET accessedAt = ? 
        WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
-      [Date.now(), this.accountId]
+      [Date.now(), this.accountId],
     );
   }
 
@@ -265,9 +309,28 @@ export abstract class BaseAccountController<TProgress = unknown> {
    * Clean up resources when the controller is no longer needed
    */
   async cleanup(): Promise<void> {
-    if (this.db) {
-      await this.db.closeAsync();
-      this.db = null;
+    if (!this.db) {
+      return;
     }
+
+    const dbToRelease = this.db;
+    const dbKey = this.sharedDbKey;
+
+    this.db = null;
+    this.sharedDbKey = null;
+
+    if (dbKey) {
+      const entry = BaseAccountController.sharedAccountDbs.get(dbKey);
+      if (entry) {
+        entry.refCount -= 1;
+        if (entry.refCount <= 0) {
+          BaseAccountController.sharedAccountDbs.delete(dbKey);
+          await entry.db.closeAsync();
+        }
+        return;
+      }
+    }
+
+    await dbToRelease.closeAsync();
   }
 }

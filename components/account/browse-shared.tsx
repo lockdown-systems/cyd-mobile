@@ -94,7 +94,7 @@ export type Cursor = {
 export const PAGE_SIZE = 25;
 
 export async function fetchAccountMeta(
-  accountId: number
+  accountId: number,
 ): Promise<AccountMeta | null> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<AccountMeta & { handle: string }>(
@@ -103,7 +103,7 @@ export async function fetchAccountMeta(
      INNER JOIN bsky_account b ON b.id = a.bskyAccountID
      WHERE a.id = ?
      LIMIT 1;`,
-    [accountId]
+    [accountId],
   );
 
   if (!row) return null;
@@ -130,7 +130,7 @@ export function mapRowToPreview(
   media?: MediaAttachment[],
   externalEmbed?: ExternalEmbed | null,
   quotedPostExternalEmbed?: ExternalEmbed | null,
-  browseType?: BrowseType
+  browseType?: BrowseType,
 ): PostPreviewData {
   let quotedPost = extractEmbeddedPostFromJson(row.embedJSON, row.createdAt);
   const facets = parseFacets(row.facetsJSON);
@@ -203,7 +203,7 @@ function mapMediaRowToAttachment(row: MediaRow): MediaAttachment {
 
 export async function fetchMediaForPosts(
   db: SQLiteDatabase,
-  postUris: string[]
+  postUris: string[],
 ): Promise<Map<string, MediaAttachment[]>> {
   if (postUris.length === 0) {
     return new Map();
@@ -216,7 +216,7 @@ export async function fetchMediaForPosts(
      FROM post_media
      WHERE postUri IN (${placeholders})
      ORDER BY postUri, position;`,
-    postUris
+    postUris,
   );
 
   const mediaMap = new Map<string, MediaAttachment[]>();
@@ -231,7 +231,7 @@ export async function fetchMediaForPosts(
 
 export async function fetchExternalEmbedsForPosts(
   db: SQLiteDatabase,
-  postUris: string[]
+  postUris: string[],
 ): Promise<Map<string, ExternalEmbed>> {
   if (postUris.length === 0) {
     return new Map();
@@ -242,7 +242,7 @@ export async function fetchExternalEmbedsForPosts(
     `SELECT postUri, uri, title, description, thumbUrl, thumbLocalPath
      FROM post_external
      WHERE postUri IN (${placeholders});`,
-    postUris
+    postUris,
   );
 
   const externalMap = new Map<string, ExternalEmbed>();
@@ -260,8 +260,11 @@ export async function fetchExternalEmbedsForPosts(
 }
 
 export async function openAccountDb(uuid: string): Promise<SQLiteDatabase> {
+  const paths = buildAccountPaths("bluesky", uuid);
   const db = await openDatabaseAsync(
-    buildAccountPaths("bluesky", uuid).dbPathForSQLite
+    paths.dbNameForSQLite,
+    {},
+    paths.dbDirForSQLite,
   );
   await db.execAsync("PRAGMA foreign_keys = ON;");
   return db;
@@ -272,7 +275,7 @@ export async function openAccountDb(uuid: string): Promise<SQLiteDatabase> {
  */
 function getDeletedFilterClause(
   type: BrowseType,
-  deletedFilter: DeletedFilter
+  deletedFilter: DeletedFilter,
 ): string {
   if (deletedFilter === "all") {
     return "";
@@ -309,7 +312,7 @@ export type BrowseType = "posts" | "reposts" | "likes" | "bookmarks";
 
 export function buildFirstPageQuery(
   type: BrowseType,
-  deletedFilter: DeletedFilter = "all"
+  deletedFilter: DeletedFilter = "all",
 ): string {
   const baseSelect = `
     SELECT
@@ -350,7 +353,7 @@ export function buildFirstPageQuery(
 
 export function buildLoadMoreQuery(
   type: BrowseType,
-  deletedFilter: DeletedFilter = "all"
+  deletedFilter: DeletedFilter = "all",
 ): string {
   const baseSelect = `
     SELECT
@@ -391,7 +394,7 @@ export function buildLoadMoreQuery(
 
 export function getFirstPageParams(
   type: BrowseType,
-  did: string
+  did: string,
 ): (string | number)[] {
   switch (type) {
     case "posts":
@@ -406,7 +409,7 @@ export function getFirstPageParams(
 export function getLoadMoreParams(
   type: BrowseType,
   did: string,
-  cursor: Cursor
+  cursor: Cursor,
 ): (string | number)[] {
   switch (type) {
     case "posts":
@@ -449,7 +452,7 @@ export function buildTotalCountQuery(type: BrowseType): string {
 
 export function getTotalCountParams(
   type: BrowseType,
-  did: string
+  did: string,
 ): (string | number)[] {
   switch (type) {
     case "posts":
@@ -519,7 +522,7 @@ export function BrowseList({
       const countParams = getTotalCountParams(type, meta.did);
       const countResult = await db.getFirstAsync<{ count: number }>(
         countQuery,
-        countParams
+        countParams,
       );
       setTotalCount(countResult?.count ?? 0);
 
@@ -548,8 +551,8 @@ export function BrowseList({
           row.quotedPostUri
             ? (externalMap.get(row.quotedPostUri) ?? null)
             : null,
-          type
-        )
+          type,
+        ),
       );
       setPosts(mapped);
       setHasMore(rows.length === PAGE_SIZE);
@@ -605,8 +608,8 @@ export function BrowseList({
           row.quotedPostUri
             ? (externalMap.get(row.quotedPostUri) ?? null)
             : null,
-          type
-        )
+          type,
+        ),
       );
       setPosts((prev) => [...prev, ...mapped]);
       setHasMore(rows.length === PAGE_SIZE);
@@ -632,7 +635,7 @@ export function BrowseList({
         // Get current preserve value
         const row = await db.getFirstAsync<{ preserve: number }>(
           `SELECT preserve FROM post WHERE uri = ?;`,
-          [postUri]
+          [postUri],
         );
         if (!row) return;
 
@@ -646,8 +649,8 @@ export function BrowseList({
         // Update local state
         setPosts((prev) =>
           prev.map((post) =>
-            post.uri === postUri ? { ...post, preserve: newValue === 1 } : post
-          )
+            post.uri === postUri ? { ...post, preserve: newValue === 1 } : post,
+          ),
         );
       } catch (err) {
         console.error("Failed to toggle preserve:", err);
@@ -669,7 +672,7 @@ export function BrowseList({
       (post) =>
         post.text?.toLowerCase().includes(searchTerm) ||
         post.author?.handle?.toLowerCase().includes(searchTerm) ||
-        post.author?.displayName?.toLowerCase().includes(searchTerm)
+        post.author?.displayName?.toLowerCase().includes(searchTerm),
     );
   }, [posts, filterText]);
 
@@ -715,7 +718,7 @@ export function BrowseList({
         onPreserveToggle={type === "posts" ? handlePreserveToggle : undefined}
       />
     ),
-    [palette, type, handlePreserveToggle]
+    [palette, type, handlePreserveToggle],
   );
 
   const keyExtractor = useCallback((item: PostPreviewData) => item.uri, []);
@@ -724,7 +727,7 @@ export function BrowseList({
     (_info: { distanceFromEnd: number }) => {
       void loadMore();
     },
-    [loadMore]
+    [loadMore],
   );
 
   if (loadingInitial) {

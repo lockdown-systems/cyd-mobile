@@ -23,6 +23,7 @@ import type {
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
+import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import { extractEmbeddedPostFromJson } from "@/utils/embeddedPost";
 
@@ -43,9 +44,22 @@ export function PostsToDeleteReviewModal({
   palette,
   selections,
 }: PostsToDeleteReviewModalProps) {
+  const modalBottomPadding = useModalBottomPadding({ minPadding: 12 });
   const [postsToDelete, setPostsToDelete] = useState<PostPreviewData[]>([]);
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
+
+  const cleanupController = useCallback(async () => {
+    const controller = controllerRef.current;
+    controllerRef.current = null;
+    if (controller) {
+      try {
+        await controller.cleanup();
+      } catch (err) {
+        console.warn("Failed to cleanup posts review controller", err);
+      }
+    }
+  }, []);
 
   // Helper to parse facets JSON
   const parseFacets = useCallback(
@@ -119,6 +133,7 @@ export function PostsToDeleteReviewModal({
     async function loadPosts() {
       setLoading(true);
       try {
+        await cleanupController();
         const controller = new BlueskyAccountController(accountId, accountUUID);
         await controller.initDB();
         await controller.initAgent();
@@ -156,7 +171,18 @@ export function PostsToDeleteReviewModal({
     }
 
     void loadPosts();
-  }, [visible, accountId, accountUUID, selections, mapToPreviewData]);
+
+    return () => {
+      void cleanupController();
+    };
+  }, [
+    visible,
+    accountId,
+    accountUUID,
+    selections,
+    mapToPreviewData,
+    cleanupController,
+  ]);
 
   // Handle preserve toggle - toggle the value and update local state
   const handlePreserveToggle = useCallback(
@@ -188,8 +214,9 @@ export function PostsToDeleteReviewModal({
   // Handle close
   const handleClose = useCallback(() => {
     setPostsToDelete([]);
+    void cleanupController();
     onClose();
-  }, [onClose]);
+  }, [cleanupController, onClose]);
 
   return (
     <Modal
@@ -198,7 +225,15 @@ export function PostsToDeleteReviewModal({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <View style={[styles.container, { backgroundColor: palette.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: palette.background,
+            paddingBottom: modalBottomPadding,
+          },
+        ]}
+      >
         <View style={[styles.header, { borderColor: palette.icon + "22" }]}>
           <Pressable
             onPress={handleClose}
@@ -231,7 +266,10 @@ export function PostsToDeleteReviewModal({
                 onPreserveToggle={handlePreserveToggle}
               />
             )}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[
+              styles.list,
+              { paddingBottom: modalBottomPadding + 8 },
+            ]}
             ListEmptyComponent={
               <Text style={[styles.emptyText, { color: palette.icon }]}>
                 No posts to delete
