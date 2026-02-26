@@ -20,6 +20,8 @@
  * Usage:
  *   npm run submit:android              # submits the latest .aab in the project
  *   npm run submit:android -- path.aab  # submits a specific .aab
+ *   npm run submit:android -- --release-status=draft
+ *   PLAY_RELEASE_STATUS=draft npm run submit:android
  */
 
 const fs = require("fs");
@@ -33,6 +35,75 @@ const SERVICE_ACCOUNT_KEY_PATH = path.resolve(
   "google-play-service-account.json",
 );
 const TRACK = "internal";
+
+function parseReleaseStatus(argv) {
+  const statusArg = argv.find((arg) => arg.startsWith("--release-status="));
+  const statusFromArg = statusArg?.split("=")[1]?.trim();
+  const statusFromEnv = process.env.PLAY_RELEASE_STATUS?.trim();
+  const candidate = (
+    statusFromArg ||
+    statusFromEnv ||
+    "completed"
+  ).toLowerCase();
+
+  const allowedStatuses = new Set([
+    "draft",
+    "inprogress",
+    "halted",
+    "completed",
+  ]);
+
+  if (!allowedStatuses.has(candidate)) {
+    console.error(
+      `Error: Invalid release status "${candidate}". Expected one of: draft, inProgress, halted, completed.`,
+    );
+    process.exit(1);
+  }
+
+  return candidate;
+}
+
+function isDraftAppStatusError(err) {
+  const apiError = err?.response?.data?.error;
+  if (!apiError) {
+    return false;
+  }
+
+  const combinedMessage = [
+    apiError.message,
+    ...(Array.isArray(apiError.errors)
+      ? apiError.errors.map((e) => `${e.message} ${e.reason}`)
+      : []),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return combinedMessage.includes(
+    "only releases with status draft may be created on draft app",
+  );
+}
+
+async function updateTrackReleaseStatus({
+  androidPublisher,
+  editId,
+  versionCode,
+  releaseStatus,
+}) {
+  await androidPublisher.edits.tracks.update({
+    packageName: PACKAGE_NAME,
+    editId,
+    track: TRACK,
+    requestBody: {
+      track: TRACK,
+      releases: [
+        {
+          versionCodes: [String(versionCode)],
+          status: releaseStatus,
+        },
+      ],
+    },
+  });
+}
 
 async function main() {
   // --- Validate service account key ---
@@ -50,7 +121,10 @@ async function main() {
   }
 
   // --- Find the .aab ---
-  let aabPath = process.argv[2];
+  const cliArgs = process.argv.slice(2);
+  const aabArg = cliArgs.find((arg) => !arg.startsWith("--"));
+  let aabPath = aabArg;
+  let releaseStatus = parseReleaseStatus(cliArgs);
 
   if (!aabPath) {
     // Find the most recently modified .aab in the project root
@@ -87,6 +161,7 @@ async function main() {
   );
   console.log(`  Package: ${PACKAGE_NAME}`);
   console.log(`  Track:   ${TRACK}`);
+  console.log(`  Status:  ${releaseStatus}`);
   console.log();
 
   // --- Authenticate with service account ---
@@ -123,31 +198,62 @@ async function main() {
 
     // 3. Assign to the internal track
     console.log(`Assigning to "${TRACK}" track...`);
-    await androidPublisher.edits.tracks.update({
-      packageName: PACKAGE_NAME,
-      editId,
-      track: TRACK,
-      requestBody: {
-        track: TRACK,
-        releases: [
-          {
-            versionCodes: [String(versionCode)],
-            status: "completed",
-          },
-        ],
-      },
-    });
+    try {
+      await updateTrackReleaseStatus({
+        androidPublisher,
+        editId,
+        versionCode,
+        releaseStatus,
+      });
+    } catch (trackErr) {
+      if (releaseStatus !== "draft" && isDraftAppStatusError(trackErr)) {
+        console.log(
+          '  App appears to still be in draft state. Retrying with release status "draft"...',
+        );
+        releaseStatus = "draft";
+        await updateTrackReleaseStatus({
+          androidPublisher,
+          editId,
+          versionCode,
+          releaseStatus,
+        });
+      } else {
+        throw trackErr;
+      }
+    }
 
     // 4. Commit the edit
     console.log("Committing edit...");
-    await androidPublisher.edits.commit({
-      packageName: PACKAGE_NAME,
-      editId,
-    });
+    try {
+      await androidPublisher.edits.commit({
+        packageName: PACKAGE_NAME,
+        editId,
+      });
+    } catch (commitErr) {
+      if (releaseStatus !== "draft" && isDraftAppStatusError(commitErr)) {
+        console.log(
+          '  Commit rejected for draft app. Switching release status to "draft" and retrying...',
+        );
+        releaseStatus = "draft";
+        await updateTrackReleaseStatus({
+          androidPublisher,
+          editId,
+          versionCode,
+          releaseStatus,
+        });
+        console.log("Retrying commit...");
+        await androidPublisher.edits.commit({
+          packageName: PACKAGE_NAME,
+          editId,
+        });
+      } else {
+        throw commitErr;
+      }
+    }
 
     console.log();
     console.log(
-      `Upload complete! Version code ${versionCode} is now on the "${TRACK}" track.`,
+      `Upload complete! Version code ${versionCode} is now on the "${TRACK}" track with status "${releaseStatus}".`,
     );
   } catch (err) {
     console.error();
