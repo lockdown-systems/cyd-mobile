@@ -217,7 +217,7 @@ export function ScheduleTab({
         ) {
           Alert.alert(
             "Notification Setup Required",
-            "Push notifications are not fully configured in this Android build yet. Rebuild the app after applying Android push-notification setup.",
+            "Push notifications are not fully configured in this Android build. Add google-services.json for package systems.lockdown.cydmobile, then rebuild Android.",
             [{ text: "OK" }],
           );
         } else {

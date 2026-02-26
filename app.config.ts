@@ -46,6 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "systems.lockdown.cydmobile",
+      googleServicesFile: "./google-services.json",
       intentFilters: [
         {
           action: "VIEW",
