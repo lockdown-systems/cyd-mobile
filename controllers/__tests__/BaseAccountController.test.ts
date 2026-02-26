@@ -3,6 +3,7 @@
  */
 
 import type { SQLiteDatabase } from "expo-sqlite";
+import { openDatabaseAsync } from "expo-sqlite";
 
 import { BaseAccountController } from "../BaseAccountController";
 
@@ -44,7 +45,33 @@ class TestAccountController extends BaseAccountController<TestProgress> {
   }
 }
 
+class SharedDbTestController extends BaseAccountController<TestProgress> {
+  getAccountType(): string {
+    return "test";
+  }
+
+  resetProgress(): TestProgress {
+    return {
+      count: 0,
+      message: "",
+      isRunning: false,
+    };
+  }
+
+  async initDB(): Promise<void> {
+    this.db = await this.openAccountDatabase();
+  }
+
+  public getDbForTesting(): SQLiteDatabase | null {
+    return this.db;
+  }
+}
+
 describe("BaseAccountController", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe("constructor", () => {
     it("should create a controller with the given account ID", () => {
       const controller = new TestAccountController(123);
@@ -58,7 +85,7 @@ describe("BaseAccountController", () => {
       expect(controller1.getAccountUUID()).toBeDefined();
       expect(controller2.getAccountUUID()).toBeDefined();
       expect(controller1.getAccountUUID()).not.toBe(
-        controller2.getAccountUUID()
+        controller2.getAccountUUID(),
       );
     });
 
@@ -122,6 +149,44 @@ describe("BaseAccountController", () => {
 
       // Should not throw
       await expect(controller.cleanup()).resolves.not.toThrow();
+    });
+
+    it("should reuse shared account DB and only close on final cleanup", async () => {
+      const accountUUID = "shared-account-uuid";
+      const controllerA = new SharedDbTestController(1, accountUUID);
+      const controllerB = new SharedDbTestController(2, accountUUID);
+
+      await controllerA.initDB();
+      await controllerB.initDB();
+
+      const dbA = controllerA.getDbForTesting();
+      const dbB = controllerB.getDbForTesting();
+
+      expect(openDatabaseAsync).toHaveBeenCalledTimes(1);
+      expect(dbA).toBeTruthy();
+      expect(dbB).toBeTruthy();
+      expect(dbA).toBe(dbB);
+
+      const closeAsync = (dbA as { closeAsync: jest.Mock }).closeAsync;
+
+      await controllerA.cleanup();
+      expect(closeAsync).toHaveBeenCalledTimes(0);
+
+      await controllerB.cleanup();
+      expect(closeAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it("should open separate databases for different account UUIDs", async () => {
+      const controllerA = new SharedDbTestController(1, "uuid-a");
+      const controllerB = new SharedDbTestController(2, "uuid-b");
+
+      await controllerA.initDB();
+      await controllerB.initDB();
+
+      expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
+
+      await controllerA.cleanup();
+      await controllerB.cleanup();
     });
   });
 
