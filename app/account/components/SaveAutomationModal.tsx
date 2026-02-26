@@ -279,23 +279,37 @@ export function SaveAutomationModal({
   }, []);
 
   useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
     let unsub: (() => void) | undefined;
     let cancelled = false;
 
     void (async () => {
-      const controller = await ensureController();
-      if (cancelled) return;
-      setPaused(controller.isPaused());
-      unsub = controller.onPauseChange((next) => {
-        setPaused(next);
-      });
+      try {
+        const controller = await ensureController();
+        if (cancelled) return;
+        setPaused(controller.isPaused());
+        unsub = controller.onPauseChange((next) => {
+          setPaused(next);
+        });
+      } catch (err) {
+        if (!cancelled) {
+          console.warn(
+            "[SaveAutomationModal] pause subscription setup failed",
+            accountId,
+            err,
+          );
+        }
+      }
     })();
 
     return () => {
       cancelled = true;
       unsub?.();
     };
-  }, [ensureController]);
+  }, [visible, ensureController, accountId]);
 
   const totalJobs = jobs.length;
   const completedCount = jobs.filter(
