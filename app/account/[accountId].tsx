@@ -34,6 +34,7 @@ import {
   ACCOUNT_AUTH_STATUS,
   ACCOUNT_CONFIG_KEYS,
   BlueskyAccountController,
+  withBlueskyController,
   type AccountAuthStatusValue,
 } from "@/controllers";
 import { deleteAccount, type AccountListItem } from "@/database/accounts";
@@ -222,13 +223,13 @@ export default function AccountPlaceholderScreen() {
     }
 
     let cancelled = false;
-    const controller = new BlueskyAccountController(account.id, account.uuid);
 
     void (async () => {
       try {
-        await controller.initDB();
-        const storedStatus = await controller.getConfig(
-          ACCOUNT_CONFIG_KEYS.authStatus,
+        const storedStatus = await runWithAccountController(
+          account,
+          async (controller) =>
+            controller.getConfig(ACCOUNT_CONFIG_KEYS.authStatus),
         );
         console.log(
           "[AccountScreen] useEffect -> stored status",
@@ -248,16 +249,6 @@ export default function AccountPlaceholderScreen() {
         console.warn("Unable to read account auth status", err);
         if (!cancelled) {
           setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
-        }
-      } finally {
-        try {
-          await controller.cleanup();
-          console.log("[AccountScreen] useEffect -> cleanup", account.id);
-        } catch (cleanupErr) {
-          console.warn(
-            "Failed to cleanup controller after reading status",
-            cleanupErr,
-          );
         }
       }
     })();
@@ -595,25 +586,13 @@ async function runWithAccountController<T>(
   fn: (controller: BlueskyAccountController) => Promise<T>,
 ): Promise<T> {
   console.log("[AccountScreen] runWithAccountController -> start", account.id);
-  const controller = new BlueskyAccountController(account.id, account.uuid);
-  try {
-    await controller.initDB();
+  return withBlueskyController(account.id, account.uuid, async (controller) => {
     console.log(
-      "[AccountScreen] runWithAccountController -> initDB",
+      "[AccountScreen] runWithAccountController -> ready",
       account.id,
     );
-    return await fn(controller);
-  } finally {
-    try {
-      await controller.cleanup();
-      console.log(
-        "[AccountScreen] runWithAccountController -> cleanup",
-        account.id,
-      );
-    } catch (cleanupErr) {
-      console.warn("Failed to cleanup controller", cleanupErr);
-    }
-  }
+    return fn(controller);
+  });
 }
 
 const styles = StyleSheet.create({

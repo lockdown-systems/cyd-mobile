@@ -5,7 +5,7 @@
  * and sends them to the server for tracking progress.
  */
 
-import { BlueskyAccountController } from "@/controllers";
+import { withBlueskyController } from "@/controllers";
 import type { BlueskyDatabaseStats } from "@/controllers/bluesky/types";
 import type CydAPIClient from "./cyd-api-client";
 import type { PostBlueskyProgressAPIRequest } from "./cyd-api-client";
@@ -21,21 +21,17 @@ import type { PostBlueskyProgressAPIRequest } from "./cyd-api-client";
 export async function submitBlueskyProgress(
   apiClient: CydAPIClient,
   accountId: number,
-  accountUUID: string
+  accountUUID: string,
 ): Promise<boolean> {
   try {
     console.log("[submitBlueskyProgress] Starting for account", accountId);
 
-    // Create a controller to access the database
-    const controller = new BlueskyAccountController(accountId, accountUUID);
-    await controller.initDB();
-
-    // Get the database stats
-    const stats: BlueskyDatabaseStats = await controller.getDatabaseStats();
+    const stats: BlueskyDatabaseStats = await withBlueskyController(
+      accountId,
+      accountUUID,
+      async (controller) => controller.getDatabaseStats(),
+    );
     console.log("[submitBlueskyProgress] Got stats:", stats);
-
-    // Clean up the controller
-    await controller.cleanup();
 
     // Map stats to the API request format
     const request: PostBlueskyProgressAPIRequest = {
@@ -65,7 +61,7 @@ export async function submitBlueskyProgress(
       console.warn(
         "[submitBlueskyProgress] Failed for account",
         accountId,
-        result
+        result,
       );
       return false;
     }
@@ -84,7 +80,7 @@ export async function submitBlueskyProgress(
  * @returns The number of accounts successfully submitted
  */
 export async function submitBlueskyProgressForAllAccounts(
-  apiClient: CydAPIClient
+  apiClient: CydAPIClient,
 ): Promise<number> {
   try {
     console.log("[submitBlueskyProgressForAllAccounts] Starting");
@@ -96,7 +92,7 @@ export async function submitBlueskyProgressForAllAccounts(
     console.log(
       "[submitBlueskyProgressForAllAccounts] Found",
       accounts.length,
-      "accounts"
+      "accounts",
     );
 
     let successCount = 0;
@@ -104,7 +100,7 @@ export async function submitBlueskyProgressForAllAccounts(
       const success = await submitBlueskyProgress(
         apiClient,
         account.id,
-        account.uuid
+        account.uuid,
       );
       if (success) {
         successCount++;
@@ -116,7 +112,7 @@ export async function submitBlueskyProgressForAllAccounts(
       successCount,
       "of",
       accounts.length,
-      "succeeded"
+      "succeeded",
     );
     return successCount;
   } catch (error) {

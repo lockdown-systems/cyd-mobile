@@ -9,19 +9,23 @@ import React, {
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-  type AutomationModalState,
   ButtonRow,
   ErrorCard,
   InfoBar,
   StepRow,
   SuccessCard,
   styles,
+  type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
-import { BlueskyAccountController } from "@/controllers";
+import {
+  acquireBlueskyController,
+  type BlueskyAccountController,
+  type BlueskyControllerLease,
+} from "@/controllers";
 import type {
   BlueskyJobRecord,
   BlueskyJobRunUpdate,
@@ -74,6 +78,9 @@ export function SaveAutomationModal({
   const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
+  const controllerLeaseRef = useRef<BlueskyControllerLease | null>(null);
+  const controllerInitPromiseRef =
+    useRef<Promise<BlueskyAccountController> | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
 
@@ -101,28 +108,43 @@ export function SaveAutomationModal({
     if (controllerRef.current) {
       return controllerRef.current;
     }
+    if (controllerInitPromiseRef.current) {
+      return controllerInitPromiseRef.current;
+    }
+
     console.log("[SaveAutomationModal] ensureController -> create", accountId);
-    const controller = new BlueskyAccountController(accountId, accountUUID);
-    controllerRef.current = controller;
-    controller.setProgressCallback(() => {
-      // progress is reported via job events
-    });
-    await controller.initDB();
-    try {
-      await controller.initAgent();
-      console.log("[SaveAutomationModal] ensureController -> ready", accountId);
-    } catch (err) {
-      if (err instanceof Error && err.name === "MissingBlueskySessionError") {
-        // Expected when user is signed out; verifyAuthorization job will reauth.
+    const initPromise = (async () => {
+      const lease = await acquireBlueskyController(accountId, accountUUID);
+      const controller = lease.controller;
+      controllerLeaseRef.current = lease;
+      controllerRef.current = controller;
+      try {
+        await controller.initAgent();
         console.log(
-          "[SaveAutomationModal] ensureController -> missing session (signed out)",
+          "[SaveAutomationModal] ensureController -> ready",
           accountId,
         );
-      } else {
-        throw err;
+      } catch (err) {
+        if (err instanceof Error && err.name === "MissingBlueskySessionError") {
+          // Expected when user is signed out; verifyAuthorization job will reauth.
+          console.log(
+            "[SaveAutomationModal] ensureController -> missing session (signed out)",
+            accountId,
+          );
+        } else {
+          throw err;
+        }
       }
+      return controller;
+    })();
+
+    controllerInitPromiseRef.current = initPromise;
+
+    try {
+      return await initPromise;
+    } finally {
+      controllerInitPromiseRef.current = null;
     }
-    return controller;
   }, [accountId, accountUUID]);
 
   const jobLabel = useMemo(
@@ -271,9 +293,15 @@ export function SaveAutomationModal({
   useEffect(() => {
     return () => {
       const controller = controllerRef.current;
+      const lease = controllerLeaseRef.current;
       if (controller) {
-        void controller.cleanup();
+        controller.clearProgressCallback();
         controllerRef.current = null;
+      }
+      controllerLeaseRef.current = null;
+      controllerInitPromiseRef.current = null;
+      if (lease) {
+        void lease.release();
       }
     };
   }, []);
