@@ -31,14 +31,31 @@ jobs:
 
   build_ios:
     name: Build iOS
-    runs-on: macos-latest
+    runs-on: macos-26-large
     needs: quality
     env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_PATH" ]; then
+            echo "Error: Xcode 26 not found. Available versions:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          echo "Selecting $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -49,12 +66,79 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build iOS locally with EAS
-        run: |
-          npm install -g eas-cli
-          eas build --platform ios --profile production --local --non-interactive
+      - name: Generate native projects (skip pod install)
+        run: npx expo prebuild --clean --no-install
 
-          IOS_BUILD_FILE=$(ls -t ./*.ipa | head -1)
+      - name: Configure Xcode Node binary
+        run: |
+          echo "NODE_BINARY=$(command -v node)" > ios/.xcode.env.local
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies
+        run: cd ios && pod install
+
+      - name: Restore App Store Connect API private key
+        run: python3 ./scripts/ci/restore-asc-private-key.py
+
+      - name: Build iOS locally with Xcode
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_PATH="$RUNNER_TEMP/Cyd.xcarchive"
+          EXPORT_DIR="$RUNNER_TEMP/ios-export"
+          EXPORT_OPTS="$RUNNER_TEMP/ExportOptions.plist"
+
+          cat > "$EXPORT_OPTS" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>G762K6CH36</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild \
+            -workspace ios/Cyd.xcworkspace \
+            -scheme Cyd \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
+            archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_DIR" \
+            -exportOptionsPlist "$EXPORT_OPTS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID"
+
+          IOS_BUILD_FILE=$(ls -t "$EXPORT_DIR"/*.ipa | head -1)
           if [ -z "$IOS_BUILD_FILE" ]; then
             echo "No .ipa file found after local iOS build"
             exit 1
@@ -72,7 +156,7 @@ jobs:
   submit_ios:
     name: Submit iOS to App Store
     runs-on: macos-latest
-    needs: build_ios
+    needs: [build_ios, build_android]
     env:
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
@@ -96,10 +180,8 @@ jobs:
 
   build_android:
     name: Build Android
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-android-builder
     needs: quality
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -123,14 +205,40 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Android locally with EAS
-        run: |
-          npm install -g eas-cli
-          export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          eas build --platform android --profile production --local --non-interactive
+      - name: Generate native iOS/Android projects
+        run: npm run prebuild
 
-          ANDROID_BUILD_FILE=$(ls -t ./*.aab | head -1)
-          if [ -z "$ANDROID_BUILD_FILE" ]; then
+      - name: Tune Gradle for CI runner
+        run: |
+          cat >> android/gradle.properties <<'EOF'
+
+          # CI overrides for 8-core / 32GB runner
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+          org.gradle.workers.max=8
+          org.gradle.caching=true
+          org.gradle.daemon=false
+          EOF
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle', 'android/app/build.gradle') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Build Android locally with Gradle
+        run: |
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          cd android
+          chmod +x ./gradlew
+          ./gradlew bundleRelease --build-cache --parallel --max-workers=8
+          cd ..
+
+          ANDROID_BUILD_FILE=android/app/build/outputs/bundle/release/app-release.aab
+          if [ ! -f "$ANDROID_BUILD_FILE" ]; then
             echo "No .aab file found after local Android build"
             exit 1
           fi
@@ -147,7 +255,7 @@ jobs:
   submit_android:
     name: Submit Android to Google Play
     runs-on: ubuntu-latest
-    needs: build_android
+    needs: [build_ios, build_android]
     env:
       GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 }}
 
