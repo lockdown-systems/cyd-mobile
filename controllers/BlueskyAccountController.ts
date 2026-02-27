@@ -776,12 +776,21 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         job.jobType,
       );
       const startedAt = Date.now();
-      await this.updateJobStatus(job.id, "running", startedAt, null, null);
       jobs = jobs.map((existing) =>
         existing.id === job.id
           ? { ...existing, status: "running", startedAt, error: null }
           : existing,
       );
+      try {
+        await this.updateJobStatus(job.id, "running", startedAt, null, null);
+      } catch (statusErr) {
+        console.warn(
+          "[BlueskyController] runJobs -> failed to persist running status",
+          this.accountId,
+          job.id,
+          statusErr,
+        );
+      }
       emit({ activeJobId: job.id });
 
       const emitForJob: JobEmit = (update: Parameters<JobEmit>[0]) => {
@@ -812,18 +821,27 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           emitForJob,
         );
         const finishedAt = Date.now();
-        await this.updateJobStatus(
-          job.id,
-          "completed",
-          job.startedAt ?? startedAt,
-          finishedAt,
-          null,
-        );
         jobs = jobs.map((existing) =>
           existing.id === job.id
             ? { ...existing, status: "completed", finishedAt, error: null }
             : existing,
         );
+        try {
+          await this.updateJobStatus(
+            job.id,
+            "completed",
+            job.startedAt ?? startedAt,
+            finishedAt,
+            null,
+          );
+        } catch (statusErr) {
+          console.warn(
+            "[BlueskyController] runJobs -> failed to persist completed status",
+            this.accountId,
+            job.id,
+            statusErr,
+          );
+        }
         emit({ activeJobId: null });
         console.log(
           "[BlueskyController] runJobs -> job complete",
@@ -834,42 +852,62 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       } catch (err) {
         const finishedAt = Date.now();
         const message = err instanceof Error ? err.message : String(err);
-        await this.updateJobStatus(
-          job.id,
-          "failed",
-          job.startedAt ?? startedAt,
-          finishedAt,
-          message,
-        );
+        const pendingJobIds = jobs
+          .filter(
+            (existing) =>
+              existing.id !== job.id && existing.status === "pending",
+          )
+          .map((pendingJob) => pendingJob.id);
+
         jobs = jobs.map((existing) =>
           existing.id === job.id
             ? { ...existing, status: "failed", finishedAt, error: message }
-            : existing,
+            : existing.status === "pending"
+              ? {
+                  ...existing,
+                  status: "failed",
+                  finishedAt,
+                  error: existing.error ?? "Cancelled due to previous failure",
+                }
+              : existing,
         );
 
-        // Cancel remaining jobs
-        const remaining = jobs.filter(
-          (existing) => existing.status === "pending",
-        );
-        for (const pendingJob of remaining) {
+        try {
           await this.updateJobStatus(
-            pendingJob.id,
+            job.id,
             "failed",
-            pendingJob.startedAt ?? null,
+            job.startedAt ?? startedAt,
             finishedAt,
-            "Cancelled due to previous failure",
+            message,
+          );
+        } catch (statusErr) {
+          console.warn(
+            "[BlueskyController] runJobs -> failed to persist failed status",
+            this.accountId,
+            job.id,
+            statusErr,
           );
         }
-        jobs = jobs.map((existing) =>
-          existing.status === "pending"
-            ? {
-                ...existing,
-                status: "failed",
-                finishedAt,
-                error: existing.error ?? "Cancelled due to previous failure",
-              }
-            : existing,
-        );
+
+        for (const pendingJobId of pendingJobIds) {
+          try {
+            await this.updateJobStatus(
+              pendingJobId,
+              "failed",
+              null,
+              finishedAt,
+              "Cancelled due to previous failure",
+            );
+          } catch (pendingStatusErr) {
+            console.warn(
+              "[BlueskyController] runJobs -> failed to persist cancelled status",
+              this.accountId,
+              pendingJobId,
+              pendingStatusErr,
+            );
+          }
+        }
+
         emit({
           activeJobId: null,
           progressMessage: message,

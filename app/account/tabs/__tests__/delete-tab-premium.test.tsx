@@ -8,6 +8,7 @@
  */
 
 import { Colors } from "@/constants/theme";
+import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import type { AccountTabPalette } from "@/types/account-tabs";
 import {
   act,
@@ -86,8 +87,29 @@ const mockGetDeletionPreviewCounts = jest.fn().mockReturnValue({
   messages: 8,
   follows: 15,
 });
+const mockWithBlueskyController: jest.MockedFunction<
+  (
+    accountId: number,
+    accountUUID: string,
+    fn: (controller: {
+      initAgent: () => Promise<void>;
+      getDeletionPreviewCounts: () => DeletionPreviewCounts;
+    }) => Promise<DeletionPreviewCounts>,
+  ) => Promise<DeletionPreviewCounts>
+> = jest.fn();
+
+const withBlueskyControllerMockImpl = (
+  accountId: number,
+  accountUUID: string,
+  fn: (controller: {
+    initAgent: () => Promise<void>;
+    getDeletionPreviewCounts: () => DeletionPreviewCounts;
+  }) => Promise<DeletionPreviewCounts>,
+): Promise<DeletionPreviewCounts> =>
+  mockWithBlueskyController(accountId, accountUUID, fn);
 
 jest.mock("@/controllers", () => ({
+  withBlueskyController: withBlueskyControllerMockImpl,
   BlueskyAccountController: jest.fn().mockImplementation(() => ({
     initDB: jest.fn().mockResolvedValue(undefined),
     initAgent: jest.fn().mockResolvedValue(undefined),
@@ -219,6 +241,15 @@ describe("DeleteTab Premium Integration", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockWithBlueskyController.mockImplementation(
+      async (_accountId, _accountUUID, fn) => {
+        return fn({
+          initAgent: async () => undefined,
+          getDeletionPreviewCounts: () =>
+            mockGetDeletionPreviewCounts() as DeletionPreviewCounts,
+        });
+      },
+    );
     // Reset to default signed out state
     mockUseCydAccount.mockReturnValue({
       state: {
@@ -289,7 +320,7 @@ describe("DeleteTab Premium Integration", () => {
         () => {
           expect(screen.queryByTestId("premium-required-banner")).toBeNull();
         },
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
     });
   });

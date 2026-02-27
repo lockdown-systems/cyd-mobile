@@ -26,7 +26,7 @@ import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
 import { PremiumRequiredModal } from "@/components/PremiumRequiredModal";
 import { SaveStatusBanner } from "@/components/SaveStatusBanner";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
-import { BlueskyAccountController } from "@/controllers";
+import { withBlueskyController } from "@/controllers";
 import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
 import { getLastSavedAt, setLastDeletedAt } from "@/database/accounts";
@@ -782,11 +782,15 @@ function DeleteReviewScreen({
     async function loadCounts() {
       setCountsLoading(true);
       setCountsError(null);
-      const controller = new BlueskyAccountController(accountId, accountUUID);
       try {
-        await controller.initDB();
-        await controller.initAgent();
-        const result = controller.getDeletionPreviewCounts(selections);
+        const result = await withBlueskyController(
+          accountId,
+          accountUUID,
+          async (controller) => {
+            await controller.initAgent();
+            return controller.getDeletionPreviewCounts(selections);
+          },
+        );
         if (!cancelled) {
           setCounts(result);
         }
@@ -797,11 +801,6 @@ function DeleteReviewScreen({
           );
         }
       } finally {
-        try {
-          await controller.cleanup();
-        } catch (cleanupErr) {
-          console.warn("[DeleteReviewScreen] cleanup failed", cleanupErr);
-        }
         if (!cancelled) {
           setCountsLoading(false);
         }

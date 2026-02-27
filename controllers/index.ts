@@ -17,3 +17,9 @@ export {
   ACCOUNT_CONFIG_KEYS,
   type AccountAuthStatusValue,
 } from "./config";
+
+export {
+  acquireBlueskyController,
+  withBlueskyController,
+  type BlueskyControllerLease,
+} from "./bluesky/controller-registry";

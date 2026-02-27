@@ -3,8 +3,7 @@ import React from "react";
 
 import { PostsToDeleteReviewModal } from "../PostsToDeleteReviewModal";
 
-const mockCleanup = jest.fn();
-const mockControllerInitDB = jest.fn();
+const mockRelease = jest.fn();
 const mockControllerInitAgent = jest.fn();
 const mockControllerGetPosts = jest.fn();
 const mockControllerGetDb = jest.fn();
@@ -23,13 +22,14 @@ jest.mock("@/components/PostPreview", () => ({
 }));
 
 jest.mock("@/controllers", () => ({
-  BlueskyAccountController: jest.fn().mockImplementation(() => ({
-    initDB: mockControllerInitDB.mockResolvedValue(undefined),
-    initAgent: mockControllerInitAgent.mockResolvedValue(undefined),
-    getPostsForDeletionReview: mockControllerGetPosts.mockReturnValue([]),
-    getDB: mockControllerGetDb.mockReturnValue({}),
-    setPostPreserve: jest.fn(),
-    cleanup: mockCleanup.mockResolvedValue(undefined),
+  acquireBlueskyController: jest.fn().mockImplementation(async () => ({
+    controller: {
+      initAgent: mockControllerInitAgent.mockResolvedValue(undefined),
+      getPostsForDeletionReview: mockControllerGetPosts.mockReturnValue([]),
+      getDB: mockControllerGetDb.mockReturnValue({}),
+      setPostPreserve: jest.fn(),
+    },
+    release: mockRelease.mockResolvedValue(undefined),
   })),
 }));
 
@@ -82,13 +82,13 @@ describe("PostsToDeleteReviewModal", () => {
     );
 
     await waitFor(() => {
-      expect(mockControllerInitDB).toHaveBeenCalled();
+      expect(mockControllerInitAgent).toHaveBeenCalled();
     });
 
     unmount();
 
     await waitFor(() => {
-      expect(mockCleanup).toHaveBeenCalled();
+      expect(mockRelease).toHaveBeenCalled();
     });
   });
 
@@ -121,7 +121,7 @@ describe("PostsToDeleteReviewModal", () => {
     );
 
     await waitFor(() => {
-      expect(mockCleanup).toHaveBeenCalled();
+      expect(mockRelease).toHaveBeenCalled();
     });
 
     expect(onClose).not.toHaveBeenCalled();

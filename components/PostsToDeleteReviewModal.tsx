@@ -15,7 +15,11 @@ import {
   fetchMediaForPosts,
 } from "@/components/account/browse-shared";
 import { PostPreview } from "@/components/PostPreview";
-import { BlueskyAccountController } from "@/controllers";
+import {
+  acquireBlueskyController,
+  type BlueskyAccountController,
+  type BlueskyControllerLease,
+} from "@/controllers";
 import type { PostToDeletePreview } from "@/controllers/bluesky/deletion-calculator";
 import type {
   ExternalEmbed,
@@ -48,13 +52,15 @@ export function PostsToDeleteReviewModal({
   const [postsToDelete, setPostsToDelete] = useState<PostPreviewData[]>([]);
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
+  const controllerLeaseRef = useRef<BlueskyControllerLease | null>(null);
 
   const cleanupController = useCallback(async () => {
-    const controller = controllerRef.current;
+    const lease = controllerLeaseRef.current;
     controllerRef.current = null;
-    if (controller) {
+    controllerLeaseRef.current = null;
+    if (lease) {
       try {
-        await controller.cleanup();
+        await lease.release();
       } catch (err) {
         console.warn("Failed to cleanup posts review controller", err);
       }
@@ -134,9 +140,10 @@ export function PostsToDeleteReviewModal({
       setLoading(true);
       try {
         await cleanupController();
-        const controller = new BlueskyAccountController(accountId, accountUUID);
-        await controller.initDB();
+        const lease = await acquireBlueskyController(accountId, accountUUID);
+        const controller = lease.controller;
         await controller.initAgent();
+        controllerLeaseRef.current = lease;
         controllerRef.current = controller;
 
         const posts = controller.getPostsForDeletionReview(selections);

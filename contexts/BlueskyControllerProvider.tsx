@@ -9,7 +9,9 @@ import React, {
 } from "react";
 
 import {
-  BlueskyAccountController,
+  acquireBlueskyController,
+  type BlueskyAccountController,
+  type BlueskyControllerLease,
   type BlueskyProgress,
   type RateLimitInfo,
 } from "@/controllers";
@@ -54,6 +56,7 @@ export function BlueskyControllerProvider({
   children,
 }: BlueskyControllerProviderProps) {
   const controllerRef = useRef<BlueskyAccountController | null>(null);
+  const leaseRef = useRef<BlueskyControllerLease | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAgentReady, setIsAgentReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -61,18 +64,23 @@ export function BlueskyControllerProvider({
     useState(false);
 
   const [progress, setProgress] = useState<BlueskyProgress>(
-    createInitialProgress()
+    createInitialProgress(),
   );
 
   const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo | null>(
-    null
+    null,
   );
 
   // Initialize the controller
   const initController = useCallback(async () => {
+    if (controllerRef.current) {
+      return;
+    }
+
     try {
-      // Create controller
-      const controller = new BlueskyAccountController(accountId, accountUUID);
+      const lease = await acquireBlueskyController(accountId, accountUUID);
+      leaseRef.current = lease;
+      const controller = lease.controller;
       controllerRef.current = controller;
 
       // Set up callbacks
@@ -82,8 +90,6 @@ export function BlueskyControllerProvider({
         setReauthenticationRequested(true);
       });
 
-      // Initialize database
-      await controller.initDB();
       setIsInitialized(true);
 
       // Try to initialize the agent (may fail if session expired)
@@ -102,10 +108,19 @@ export function BlueskyControllerProvider({
 
   // Clean up the controller
   const cleanupController = useCallback(async () => {
-    if (controllerRef.current) {
-      await controllerRef.current.cleanup();
-      controllerRef.current = null;
+    const controller = controllerRef.current;
+    const lease = leaseRef.current;
+    controllerRef.current = null;
+    leaseRef.current = null;
+
+    if (controller) {
+      controller.clearProgressCallback();
     }
+
+    if (lease) {
+      await lease.release();
+    }
+
     setIsInitialized(false);
     setIsAgentReady(false);
     setReauthenticationRequested(false);
@@ -133,21 +148,22 @@ export function BlueskyControllerProvider({
     }
   }, []);
 
-  // Initialize on mount
+  // Initialize/reinitialize when account changes
   useEffect(() => {
-    initController();
+    let cancelled = false;
+
+    void (async () => {
+      await cleanupController();
+      if (!cancelled) {
+        await initController();
+      }
+    })();
 
     return () => {
-      cleanupController();
+      cancelled = true;
+      void cleanupController();
     };
-  }, [initController, cleanupController]);
-
-  // Re-initialize if accountId changes
-  useEffect(() => {
-    cleanupController().then(() => {
-      initController();
-    });
-  }, [accountId, cleanupController, initController]);
+  }, [accountId, accountUUID, cleanupController, initController]);
 
   const contextValue: BlueskyControllerContextValue = {
     controller: controllerRef.current,
@@ -177,7 +193,7 @@ export function useBlueskyController(): BlueskyControllerContextValue {
 
   if (!context) {
     throw new Error(
-      "useBlueskyController must be used within a BlueskyControllerProvider"
+      "useBlueskyController must be used within a BlueskyControllerProvider",
     );
   }
 

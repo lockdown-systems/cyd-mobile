@@ -10,20 +10,24 @@ import React, {
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-  type AutomationModalState,
   ButtonRow,
   ErrorCard,
   InfoBar,
   StepRow,
   SuccessCard,
   styles,
+  type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import { ProfilePreview } from "@/components/ProfilePreview";
-import { BlueskyAccountController } from "@/controllers";
+import {
+  acquireBlueskyController,
+  type BlueskyAccountController,
+  type BlueskyControllerLease,
+} from "@/controllers";
 import type {
   BlueskyJobRecord,
   BlueskyJobRunUpdate,
@@ -82,6 +86,9 @@ export function ScheduledAutomationModal({
   const [activeJobProgress, setActiveJobProgress] = useState(0);
   const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
+  const controllerLeaseRef = useRef<BlueskyControllerLease | null>(null);
+  const controllerInitPromiseRef =
+    useRef<Promise<BlueskyAccountController> | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
 
@@ -110,34 +117,45 @@ export function ScheduledAutomationModal({
     if (controllerRef.current) {
       return controllerRef.current;
     }
+    if (controllerInitPromiseRef.current) {
+      return controllerInitPromiseRef.current;
+    }
     console.log(
       "[ScheduledAutomationModal] ensureController -> create",
       accountId,
     );
-    const controller = new BlueskyAccountController(accountId, accountUUID);
-    controllerRef.current = controller;
-    controller.setProgressCallback(() => {
-      // progress is reported via job events
-    });
-    await controller.initDB();
-    try {
-      await controller.initAgent();
-      console.log(
-        "[ScheduledAutomationModal] ensureController -> ready",
-        accountId,
-      );
-    } catch (err) {
-      if (err instanceof Error && err.name === "MissingBlueskySessionError") {
-        // Expected when user is signed out; verifyAuthorization job will reauth.
+    const initPromise = (async () => {
+      const lease = await acquireBlueskyController(accountId, accountUUID);
+      const controller = lease.controller;
+      controllerLeaseRef.current = lease;
+      controllerRef.current = controller;
+      try {
+        await controller.initAgent();
         console.log(
-          "[ScheduledAutomationModal] ensureController -> missing session (signed out)",
+          "[ScheduledAutomationModal] ensureController -> ready",
           accountId,
         );
-      } else {
-        throw err;
+      } catch (err) {
+        if (err instanceof Error && err.name === "MissingBlueskySessionError") {
+          // Expected when user is signed out; verifyAuthorization job will reauth.
+          console.log(
+            "[ScheduledAutomationModal] ensureController -> missing session (signed out)",
+            accountId,
+          );
+        } else {
+          throw err;
+        }
       }
+      return controller;
+    })();
+
+    controllerInitPromiseRef.current = initPromise;
+
+    try {
+      return await initPromise;
+    } finally {
+      controllerInitPromiseRef.current = null;
     }
-    return controller;
   }, [accountId, accountUUID]);
 
   const jobLabel = useMemo(
@@ -300,31 +318,51 @@ export function ScheduledAutomationModal({
   useEffect(() => {
     return () => {
       const controller = controllerRef.current;
+      const lease = controllerLeaseRef.current;
       if (controller) {
-        void controller.cleanup();
+        controller.clearProgressCallback();
         controllerRef.current = null;
+      }
+      controllerLeaseRef.current = null;
+      controllerInitPromiseRef.current = null;
+      if (lease) {
+        void lease.release();
       }
     };
   }, []);
 
   useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
     let unsub: (() => void) | undefined;
     let cancelled = false;
 
     void (async () => {
-      const controller = await ensureController();
-      if (cancelled) return;
-      setPaused(controller.isPaused());
-      unsub = controller.onPauseChange((next) => {
-        setPaused(next);
-      });
+      try {
+        const controller = await ensureController();
+        if (cancelled) return;
+        setPaused(controller.isPaused());
+        unsub = controller.onPauseChange((next) => {
+          setPaused(next);
+        });
+      } catch (err) {
+        if (!cancelled) {
+          console.warn(
+            "[ScheduledAutomationModal] pause subscription setup failed",
+            accountId,
+            err,
+          );
+        }
+      }
     })();
 
     return () => {
       cancelled = true;
       unsub?.();
     };
-  }, [ensureController]);
+  }, [visible, ensureController, accountId]);
 
   const totalJobs = jobs.length;
   const completedCount = jobs.filter(

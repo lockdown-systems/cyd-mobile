@@ -102,7 +102,7 @@ describe("BlueskyAccountController job pipeline", () => {
       onUpdate: (update) => {
         if (update.activeJobId) {
           updates.push(
-            `active:${update.activeJobId}:${update.speechText ?? ""}`
+            `active:${update.activeJobId}:${update.speechText ?? ""}`,
           );
         }
       },
@@ -172,5 +172,71 @@ describe("BlueskyAccountController job pipeline", () => {
     expect(indexBookmarks).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalled();
     expect(updates.length).toBeGreaterThan(0);
+  });
+
+  it("keeps in-memory failure states when persisting failed status throws", async () => {
+    const { controller, mockDb } = setupControllerWithDb();
+    const now = Date.now();
+    const jobs = [
+      {
+        id: 1,
+        jobType: "savePosts" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+      {
+        id: 2,
+        jobType: "saveLikes" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    (controller as unknown as { agent: unknown }).agent = {};
+
+    jest
+      .spyOn(controller, "indexPosts")
+      .mockRejectedValue(new Error("save posts failed"));
+    const indexLikes = jest
+      .spyOn(controller, "indexLikes")
+      .mockResolvedValue(undefined);
+
+    mockDb.runAsync = jest
+      .fn()
+      .mockImplementation((sql: string, params?: unknown[]) => {
+        if (
+          sql.includes("UPDATE job") &&
+          Array.isArray(params) &&
+          params[0] === "failed"
+        ) {
+          return Promise.reject(new Error("database is locked"));
+        }
+        return Promise.resolve({ changes: 1, lastInsertRowId: 0 });
+      });
+
+    let lastUpdateJobs: typeof jobs = jobs;
+
+    await expect(
+      controller.runJobs({
+        jobs,
+        onUpdate: (update) => {
+          lastUpdateJobs = update.jobs as typeof jobs;
+        },
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(indexLikes).not.toHaveBeenCalled();
+    expect(lastUpdateJobs[0].status).toBe("failed");
+    expect(lastUpdateJobs[0].error).toBe("save posts failed");
+    expect(lastUpdateJobs[1].status).toBe("failed");
+    expect(lastUpdateJobs[1].error).toBe("Cancelled due to previous failure");
   });
 });

@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/theme";
-import { BlueskyAccountController } from "@/controllers";
+import { withBlueskyController } from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { trackEvent } from "@/services/analytics";
@@ -42,7 +42,7 @@ export default function AddAccountScreen() {
     }
 
     const existingAccount = accounts.find(
-      (account) => normalizeHandle(account.handle) === normalizedHandle
+      (account) => normalizeHandle(account.handle) === normalizedHandle,
     );
 
     if (existingAccount) {
@@ -60,19 +60,19 @@ export default function AddAccountScreen() {
       // Track successful sign-in
       trackEvent(PlausibleEvents.BLUESKY_USER_SIGNED_IN);
       try {
-        const controller = new BlueskyAccountController(
+        await withBlueskyController(
           savedAccount.id,
-          savedAccount.uuid
+          savedAccount.uuid,
+          async (controller) => {
+            await verifyBlueskyAccountAuthStatus(controller, savedAccount, {
+              force: true,
+            });
+          },
         );
-        await controller.initDB();
-        await verifyBlueskyAccountAuthStatus(controller, savedAccount, {
-          force: true,
-        });
-        await controller.cleanup();
       } catch (verifyError) {
         console.warn(
           "[AddAccount] Failed to persist auth status after OAuth",
-          verifyError
+          verifyError,
         );
       }
       router.replace({
