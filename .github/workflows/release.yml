@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  quality:
+    name: Lint and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+  build_ios:
+    name: Build iOS
+    runs-on: macos-latest
+    needs: quality
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build iOS locally with EAS
+        run: |
+          npm install -g eas-cli
+          eas build --platform ios --profile production --local --non-interactive
+
+          IOS_BUILD_FILE=$(ls -t ./*.ipa | head -1)
+          if [ -z "$IOS_BUILD_FILE" ]; then
+            echo "No .ipa file found after local iOS build"
+            exit 1
+          fi
+
+          cp "$IOS_BUILD_FILE" cyd-mobile.ipa
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-${{ github.ref_name }}
+          path: cyd-mobile.ipa
+          if-no-files-found: error
+
+  submit_ios:
+    name: Submit iOS to App Store
+    runs-on: macos-latest
+    needs: build_ios
+    env:
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa-${{ github.ref_name }}
+          path: dist/ios
+
+      - name: Restore App Store Connect API private key
+        run: python3 ./scripts/ci/restore-asc-private-key.py
+
+      - name: Submit iOS build
+        run: ./scripts/ci/submit-ios.sh dist/ios/cyd-mobile.ipa
+
+  build_android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    needs: quality
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android locally with EAS
+        run: |
+          npm install -g eas-cli
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          eas build --platform android --profile production --local --non-interactive
+
+          ANDROID_BUILD_FILE=$(ls -t ./*.aab | head -1)
+          if [ -z "$ANDROID_BUILD_FILE" ]; then
+            echo "No .aab file found after local Android build"
+            exit 1
+          fi
+
+          cp "$ANDROID_BUILD_FILE" cyd-mobile.aab
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-${{ github.ref_name }}
+          path: cyd-mobile.aab
+          if-no-files-found: error
+
+  submit_android:
+    name: Submit Android to Google Play
+    runs-on: ubuntu-latest
+    needs: build_android
+    env:
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab-${{ github.ref_name }}
+          path: dist/android
+
+      - name: Restore Google Play service account key
+        run: python3 ./scripts/ci/restore-google-play-service-account.py
+
+      - name: Submit Android build
+        run: node ./scripts/ci/submit-android.js dist/android/cyd-mobile.aab
