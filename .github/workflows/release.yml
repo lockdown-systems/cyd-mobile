@@ -184,6 +184,11 @@ jobs:
     name: Build Android
     runs-on: ubuntu-latest-android-builder
     needs: quality
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -210,8 +215,26 @@ jobs:
       - name: Generate native iOS/Android projects
         run: npm run prebuild
 
+      - name: Decode upload keystore
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload.jks
+
+      - name: Configure release signing
+        run: |
+          python3 ./scripts/ci/configure-android-signing.py
+          echo "--- Signing config in build.gradle ---"
+          grep -A5 'signingConfigs' android/app/build.gradle | head -25
+
       - name: Tune Gradle for CI runner
         run: |
+          cat >> android/gradle.properties <<EOF
+
+          # Upload keystore credentials
+          UPLOAD_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
+          UPLOAD_KEY_ALIAS=$ANDROID_KEY_ALIAS
+          UPLOAD_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
+          EOF
+
           cat >> android/gradle.properties <<'EOF'
 
           # CI overrides for 8-core / 32GB runner
