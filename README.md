@@ -1,18 +1,25 @@
-# Cyd Mobile
+![Cyd Mobile](./readme/header.png)
 
-This is the code for Cyd for iOS and Android. It's implemented with Expo and React Native.
+# Cyd Mobile: Claw back your data from Bluesky
 
-## Database
+Most tech platforms are controlled by a tiny group of powerful billionaires. You don't _owe_ them your data. Even posting to Bluesky is a privacy nightmare.
 
-The app persists account metadata in a SQLite database (via [`expo-sqlite`](https://docs.expo.dev/versions/latest/sdk/sqlite/)). The shared database lives at `cyd-mobile/database` and is initialized on launch.
+Cyd Mobile is the iPhone and Android version of [Cyd](https://cyd.social/), and it helps you to control your data in Bluesky.
 
-### Creating a migration
+With this app, you can:
 
-1. Open `database/migrations.ts`.
-2. Append a new migration object with a `version` greater than the current maximum.
-3. Add one or more SQL statements that are **idempotent** and valid for already-migrated databases. Keep destructive changes behind checks (e.g., `IF NOT EXISTS`).
-4. Save the file and restart the Expo dev server (or reload the app). On boot, the `getDatabase()` helper will run any pending migrations automatically.
+- **Create a local, private backup of your data**, including Bluesky posts, reposts, likes, bookmarks, and chat messages.
+- **Choose what you want to delete.** You can delete it all, or you can be selective, deleting most of it but keeping what went viral.
+- **Schedule automatic deletion**, keeping your online data as ephemeral as you want over time.
 
-### Development seed data
+**Want to claw back your data from X and Facebook?** [Cyd Desktop](https://github.com/lockdown-systems/cyd), for Windows, Mac, and Linux, helps you control your data on those platforms.
 
-When `__DEV__` is true and there are zero rows in `account`, `ensureDevSeedData()` inserts two sample Bluesky accounts. This keeps the Account Selection screen populated without requiring manual database work.
+![Cyd Mobile](./readme/screenshot.png)
+
+## Be patient
+
+Cyd Mobile is under active development and testing. When it's ready, it will be available in the iPhone App Store and the Android Play Store.
+
+## Documentation
+
+Learn all about how to use Cyd, what features it has, and how to get involved in the open source project, including how to request features and report bugs, at the [Cyd Documentation](https://docs.cyd.social) website.
