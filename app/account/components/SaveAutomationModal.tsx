@@ -208,7 +208,7 @@ export function SaveAutomationModal({
         latestJobsRef.current = definedJobs;
         setJobs(definedJobs);
 
-        await controller.runJobs({
+        const runJobsPromise = controller.runJobs({
           jobs: definedJobs,
           onUpdate: (update: BlueskyJobRunUpdate) => {
             if (cancelled) return;
@@ -239,6 +239,13 @@ export function SaveAutomationModal({
             }
           },
         });
+
+        const lease = controllerLeaseRef.current;
+        if (lease) {
+          await lease.holdWhile(runJobsPromise);
+        } else {
+          await runJobsPromise;
+        }
         if (cancelled) return;
 
         const failed = latestJobsRef.current.some(
@@ -294,6 +301,12 @@ export function SaveAutomationModal({
     return () => {
       const controller = controllerRef.current;
       const lease = controllerLeaseRef.current;
+      if (isRunningRef.current) {
+        console.warn(
+          "[SaveAutomationModal] unmount while run is active; cleanup may be deferred by lease hold",
+          accountId,
+        );
+      }
       if (controller) {
         controller.clearProgressCallback();
         controllerRef.current = null;
@@ -304,7 +317,7 @@ export function SaveAutomationModal({
         void lease.release();
       }
     };
-  }, []);
+  }, [accountId]);
 
   useEffect(() => {
     if (!visible) {
