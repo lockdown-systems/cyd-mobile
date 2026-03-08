@@ -29,7 +29,7 @@ import {
 
 import { AccountMenuSheet } from "@/app/account/components/AccountMenuSheet";
 
-import { Colors } from "@/constants/theme";
+import { getThemePalette } from "@/constants/theme";
 import {
   ACCOUNT_AUTH_STATUS,
   ACCOUNT_CONFIG_KEYS,
@@ -63,8 +63,8 @@ export default function AccountPlaceholderScreen() {
     : params.accountId;
   const initialTab = params.initialTab;
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? "light";
-  const palette = Colors[colorScheme];
+  const colorScheme = useColorScheme();
+  const palette = getThemePalette(colorScheme);
   const { accounts, loading, error } = useAccounts();
   const account = useMemo(
     () => accounts.find((item) => item.uuid === accountId),
@@ -331,9 +331,7 @@ export default function AccountPlaceholderScreen() {
   const canonicalHandle = username ?? account?.handle ?? accountId ?? "unknown";
   const ActiveTabComponent = TAB_COMPONENTS[activeTab];
   const showWarning = authStatus !== ACCOUNT_AUTH_STATUS.authenticated;
-  const statusIconColor = showWarning
-    ? (palette.warning ?? Colors.light.warning)
-    : palette.tint;
+  const statusIconColor = showWarning ? palette.warning : palette.tint;
   const statusIconDisabled =
     (showWarning && statusActionPending) || verifyingAuth;
   const handleStatusIconPress = useCallback(() => {

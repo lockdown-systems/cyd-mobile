@@ -13,7 +13,7 @@ import Markdown, { type MarkdownProps } from "react-native-markdown-display";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CydAvatar } from "@/components/cyd/CydAvatar";
-import { Colors } from "@/constants/theme";
+import { getThemePalette } from "@/constants/theme";
 import {
   hasOnboardingBeenShown,
   setOnboardingShown,
@@ -71,8 +71,8 @@ If you want to delete your data on enshittified platforms like X or Facebook, yo
 
 export function OnboardingModal({ visible, onClose }: OnboardingModalProps) {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme() ?? "light";
-  const palette = Colors[colorScheme];
+  const colorScheme = useColorScheme();
+  const palette = getThemePalette(colorScheme);
   const [currentPage, setCurrentPage] = useState(0);
 
   const markdownStyles = useMemo<MarkdownProps["style"]>(

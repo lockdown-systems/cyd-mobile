@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Colors } from "@/constants/theme";
+import { getThemePalette } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -35,8 +35,8 @@ export function CydAccountBar({ onShowOnboarding }: CydAccountBarProps) {
   const bottomInset = insets.bottom;
   const barBottomPadding =
     Platform.OS === "android" ? Math.max(bottomInset, 20) : bottomInset;
-  const colorScheme = useColorScheme() ?? "light";
-  const palette = Colors[colorScheme];
+  const colorScheme = useColorScheme();
+  const palette = getThemePalette(colorScheme);
   const { state, signOut, getDashboardURL } = useCydAccount();
   const { refresh } = useAccounts();
 
