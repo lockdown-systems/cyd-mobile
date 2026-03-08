@@ -48,6 +48,25 @@ describe("bluesky controller registry", () => {
     expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
   });
 
+  it("defers cleanup while holdWhile is active", async () => {
+    const lease = await acquireBlueskyController(5, "uuid-5");
+
+    let resolveHold: (() => void) | null = null;
+    const holdPromise = new Promise<void>((resolve) => {
+      resolveHold = resolve;
+    });
+
+    const held = lease.holdWhile(holdPromise);
+    await lease.release();
+
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
+
+    resolveHold?.();
+    await held;
+
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
+  });
+
   it("creates a new controller after previous entry is fully released", async () => {
     const firstLease = await acquireBlueskyController(22, "uuid-22");
     const firstController = firstLease.controller;

@@ -220,7 +220,7 @@ export function DeleteAutomationModal({
         latestJobsRef.current = definedJobs;
         setJobs(definedJobs);
 
-        await controller.runJobs({
+        const runJobsPromise = controller.runJobs({
           jobs: definedJobs,
           onUpdate: (update: BlueskyJobRunUpdate) => {
             if (cancelled) return;
@@ -253,6 +253,13 @@ export function DeleteAutomationModal({
             }
           },
         });
+
+        const lease = controllerLeaseRef.current;
+        if (lease) {
+          await lease.holdWhile(runJobsPromise);
+        } else {
+          await runJobsPromise;
+        }
         if (cancelled) return;
 
         const failed = latestJobsRef.current.some(
@@ -316,7 +323,7 @@ export function DeleteAutomationModal({
       const lease = controllerLeaseRef.current;
       if (isRunningRef.current) {
         console.warn(
-          "[DeleteAutomationModal] unmount while run is active; releasing lease",
+          "[DeleteAutomationModal] unmount while run is active; cleanup may be deferred by lease hold",
           accountId,
         );
       }
@@ -330,7 +337,7 @@ export function DeleteAutomationModal({
         void lease.release();
       }
     };
-  }, []);
+  }, [accountId]);
 
   useEffect(() => {
     if (!visible) {

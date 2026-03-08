@@ -4,6 +4,7 @@ type RegistryEntry = {
   controller: BlueskyAccountController;
   accountUUID: string;
   refCount: number;
+  holdCount: number;
   initPromise: Promise<void>;
   cleanupPromise: Promise<void> | null;
 };
@@ -11,6 +12,7 @@ type RegistryEntry = {
 export type BlueskyControllerLease = {
   controller: BlueskyAccountController;
   release: () => Promise<void>;
+  holdWhile: <T>(promise: Promise<T>) => Promise<T>;
 };
 
 const controllerRegistry = new Map<number, RegistryEntry>();
@@ -26,6 +28,7 @@ function createEntry(accountId: number, accountUUID: string): RegistryEntry {
     controller,
     accountUUID,
     refCount: 0,
+    holdCount: 0,
     initPromise: controller.initDB(),
     cleanupPromise: null,
   };
@@ -41,6 +44,7 @@ async function cleanupEntry(
     accountId,
     {
       refCount: entry.refCount,
+      holdCount: entry.holdCount,
       hasCleanupPromise: Boolean(entry.cleanupPromise),
     },
   );
@@ -68,7 +72,7 @@ async function cleanupEntry(
       console.log(
         "[BlueskyControllerRegistry] cleanupEntry -> done",
         accountId,
-        { refCount: entry.refCount },
+        { refCount: entry.refCount, holdCount: entry.holdCount },
       );
       entry.cleanupPromise = null;
     }
@@ -97,6 +101,7 @@ export async function acquireBlueskyController(
         accountId,
         {
           refCount: entry.refCount,
+          holdCount: entry.holdCount,
         },
       );
     }
@@ -136,6 +141,48 @@ export async function acquireBlueskyController(
     let released = false;
     return {
       controller: entry.controller,
+      holdWhile: async <T>(promise: Promise<T>): Promise<T> => {
+        const currentEntry = controllerRegistry.get(accountId);
+        if (!currentEntry || currentEntry !== entry) {
+          console.warn(
+            "[BlueskyControllerRegistry] holdWhile -> stale lease ignored",
+            accountId,
+          );
+          return promise;
+        }
+
+        currentEntry.holdCount += 1;
+        console.log(
+          "[BlueskyControllerRegistry] holdWhile -> holdCount incremented",
+          accountId,
+          {
+            holdCount: currentEntry.holdCount,
+            refCount: currentEntry.refCount,
+          },
+        );
+
+        try {
+          return await promise;
+        } finally {
+          currentEntry.holdCount = Math.max(0, currentEntry.holdCount - 1);
+          console.log(
+            "[BlueskyControllerRegistry] holdWhile -> holdCount decremented",
+            accountId,
+            {
+              holdCount: currentEntry.holdCount,
+              refCount: currentEntry.refCount,
+            },
+          );
+
+          if (currentEntry.refCount === 0 && currentEntry.holdCount === 0) {
+            console.log(
+              "[BlueskyControllerRegistry] holdWhile -> triggering deferred cleanup",
+              accountId,
+            );
+            await cleanupEntry(accountId, currentEntry);
+          }
+        }
+      },
       release: async () => {
         if (released) {
           console.log(
@@ -170,14 +217,23 @@ export async function acquireBlueskyController(
           accountId,
           {
             refCount: currentEntry.refCount,
+            holdCount: currentEntry.holdCount,
           },
         );
         if (currentEntry.refCount === 0) {
-          console.log(
-            "[BlueskyControllerRegistry] release -> triggering cleanup",
-            accountId,
-          );
-          await cleanupEntry(accountId, currentEntry);
+          if (currentEntry.holdCount > 0) {
+            console.log(
+              "[BlueskyControllerRegistry] release -> cleanup deferred by active holds",
+              accountId,
+              { holdCount: currentEntry.holdCount },
+            );
+          } else {
+            console.log(
+              "[BlueskyControllerRegistry] release -> triggering cleanup",
+              accountId,
+            );
+            await cleanupEntry(accountId, currentEntry);
+          }
         }
       },
     };
