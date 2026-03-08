@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Colors } from "@/constants/theme";
+import { getThemePalette } from "@/constants/theme";
 import { withBlueskyController } from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -26,8 +26,8 @@ import { PlausibleEvents } from "@/types/analytics";
 
 export default function AddAccountScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? "light";
-  const palette = Colors[colorScheme];
+  const colorScheme = useColorScheme();
+  const palette = getThemePalette(colorScheme);
   const { accounts } = useAccounts();
   const [handle, setHandle] = useState("");
   const [submitting, setSubmitting] = useState(false);

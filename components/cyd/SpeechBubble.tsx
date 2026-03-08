@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
 import Markdown, { type MarkdownProps } from "react-native-markdown-display";
 
-import { Colors } from "@/constants/theme";
+import { getThemePalette } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { CydAvatar } from "./CydAvatar";
 
@@ -15,8 +15,8 @@ type SpeechBubbleProps = {
 };
 
 export function SpeechBubble({ message }: SpeechBubbleProps) {
-  const colorScheme = useColorScheme() ?? "light";
-  const palette = Colors[colorScheme];
+  const colorScheme = useColorScheme();
+  const palette = getThemePalette(colorScheme);
   const bubbleBackground = colorScheme === "dark" ? "#202020ff" : "#f3f3f3";
   const bubbleBorder = colorScheme === "dark" ? "#404040" : "#e0e0e0";
   const markdownStyles = useMemo<MarkdownProps["style"]>(
@@ -39,7 +39,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
         color: palette.tint,
       },
     }),
-    [palette.text, palette.tint]
+    [palette.text, palette.tint],
   );
 
   const normalizedMessage = useMemo(() => {

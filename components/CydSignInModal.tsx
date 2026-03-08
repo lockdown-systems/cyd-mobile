@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 
-import { Colors } from "@/constants/theme";
+import { getThemePalette } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
@@ -25,8 +25,8 @@ type SignInModalProps = {
 type SignInStep = "email" | "verification" | "loading";
 
 export function CydSignInModal({ visible, onClose }: SignInModalProps) {
-  const colorScheme = useColorScheme() ?? "light";
-  const palette = Colors[colorScheme];
+  const colorScheme = useColorScheme();
+  const palette = getThemePalette(colorScheme);
   const modalBottomPadding = useModalBottomPadding({ minPadding: 16 });
   const { sendVerificationCode, signIn } = useCydAccount();
 

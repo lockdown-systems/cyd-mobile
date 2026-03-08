@@ -43,6 +43,12 @@ export const Colors = {
   },
 };
 
+export type ThemePalette = typeof Colors.light;
+
+export function getThemePalette(colorScheme: "light" | "dark"): ThemePalette {
+  return colorScheme === "dark" ? Colors.dark : Colors.light;
+}
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

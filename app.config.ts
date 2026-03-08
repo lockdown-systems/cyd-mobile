@@ -102,6 +102,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       "expo-font",
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      "expo-localization",
+      "expo-sharing",
+      "expo-sqlite",
+      "expo-web-browser",
       "./plugins/remove-android-permissions",
     ],
     experiments: {

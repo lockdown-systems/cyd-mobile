@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
-import { Colors } from "@/constants/theme";
+import { Colors, getThemePalette } from "@/constants/theme";
 import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -23,8 +23,8 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 const CYD_DESKTOP_URL = "https://cyd.social/";
 
 export default function AccountSelectionScreen() {
-  const colorScheme = useColorScheme() ?? "light";
-  const palette = Colors[colorScheme];
+  const colorScheme = useColorScheme();
+  const palette = getThemePalette(colorScheme);
   const Wordmark = colorScheme === "dark" ? WordmarkDark : WordmarkLight;
   const { accounts, loading, error, refresh } = useAccounts();
   const router = useRouter();
