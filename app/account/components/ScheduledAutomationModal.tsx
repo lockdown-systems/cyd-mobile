@@ -319,6 +319,12 @@ export function ScheduledAutomationModal({
     return () => {
       const controller = controllerRef.current;
       const lease = controllerLeaseRef.current;
+      if (isRunningRef.current) {
+        console.warn(
+          "[ScheduledAutomationModal] unmount while run is active; releasing lease",
+          accountId,
+        );
+      }
       if (controller) {
         controller.clearProgressCallback();
         controllerRef.current = null;

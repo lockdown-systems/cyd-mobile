@@ -208,6 +208,14 @@ export abstract class BaseAccountController<TProgress = unknown> {
    */
   protected async openAccountDatabase(): Promise<SQLiteDatabase> {
     if (this.db) {
+      console.log(
+        "[BaseAccountController] openAccountDatabase -> reuse instance db",
+        {
+          accountId: this.accountId,
+          accountType: this.getAccountType(),
+          accountUUID: this.accountUUID,
+        },
+      );
       return this.db;
     }
 
@@ -219,14 +227,42 @@ export abstract class BaseAccountController<TProgress = unknown> {
     if (existing) {
       existing.refCount += 1;
       this.sharedDbKey = dbKey;
+      console.log(
+        "[BaseAccountController] openAccountDatabase -> reuse shared db",
+        {
+          accountId: this.accountId,
+          accountType: this.getAccountType(),
+          accountUUID: this.accountUUID,
+          dbKey,
+          refCount: existing.refCount,
+        },
+      );
       return existing.db;
     }
 
+    console.log(
+      "[BaseAccountController] openAccountDatabase -> opening new db",
+      {
+        accountId: this.accountId,
+        accountType: this.getAccountType(),
+        accountUUID: this.accountUUID,
+        dbKey,
+        dbDir,
+        dbName,
+      },
+    );
     const db = await openDatabaseAsync(dbName, {}, dbDir);
     await db.execAsync("PRAGMA foreign_keys = ON;");
 
     BaseAccountController.sharedAccountDbs.set(dbKey, { db, refCount: 1 });
     this.sharedDbKey = dbKey;
+    console.log("[BaseAccountController] openAccountDatabase -> opened", {
+      accountId: this.accountId,
+      accountType: this.getAccountType(),
+      accountUUID: this.accountUUID,
+      dbKey,
+      refCount: 1,
+    });
 
     return db;
   }
@@ -310,6 +346,11 @@ export abstract class BaseAccountController<TProgress = unknown> {
    */
   async cleanup(): Promise<void> {
     if (!this.db) {
+      console.log("[BaseAccountController] cleanup -> skipped (no db)", {
+        accountId: this.accountId,
+        accountType: this.getAccountType(),
+        accountUUID: this.accountUUID,
+      });
       return;
     }
 
@@ -319,18 +360,49 @@ export abstract class BaseAccountController<TProgress = unknown> {
     this.db = null;
     this.sharedDbKey = null;
 
+    console.log("[BaseAccountController] cleanup -> begin", {
+      accountId: this.accountId,
+      accountType: this.getAccountType(),
+      accountUUID: this.accountUUID,
+      dbKey,
+    });
+
     if (dbKey) {
       const entry = BaseAccountController.sharedAccountDbs.get(dbKey);
       if (entry) {
+        const beforeRefCount = entry.refCount;
         entry.refCount -= 1;
+        console.log(
+          "[BaseAccountController] cleanup -> shared refCount decremented",
+          {
+            accountId: this.accountId,
+            accountType: this.getAccountType(),
+            accountUUID: this.accountUUID,
+            dbKey,
+            beforeRefCount,
+            afterRefCount: entry.refCount,
+          },
+        );
         if (entry.refCount <= 0) {
           BaseAccountController.sharedAccountDbs.delete(dbKey);
+          console.log("[BaseAccountController] cleanup -> closing shared db", {
+            accountId: this.accountId,
+            accountType: this.getAccountType(),
+            accountUUID: this.accountUUID,
+            dbKey,
+          });
           await entry.db.closeAsync();
         }
         return;
       }
     }
 
+    console.log("[BaseAccountController] cleanup -> closing direct db", {
+      accountId: this.accountId,
+      accountType: this.getAccountType(),
+      accountUUID: this.accountUUID,
+      dbKey,
+    });
     await dbToRelease.closeAsync();
   }
 }

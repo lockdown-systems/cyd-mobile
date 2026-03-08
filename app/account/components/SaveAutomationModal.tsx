@@ -294,6 +294,12 @@ export function SaveAutomationModal({
     return () => {
       const controller = controllerRef.current;
       const lease = controllerLeaseRef.current;
+      if (isRunningRef.current) {
+        console.warn(
+          "[SaveAutomationModal] unmount while run is active; releasing lease",
+          accountId,
+        );
+      }
       if (controller) {
         controller.clearProgressCallback();
         controllerRef.current = null;
