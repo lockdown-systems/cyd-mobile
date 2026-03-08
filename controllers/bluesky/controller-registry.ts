@@ -148,6 +148,19 @@ export async function acquireBlueskyController(
 
         const currentEntry = controllerRegistry.get(accountId);
         if (!currentEntry) {
+          console.log(
+            "[BlueskyControllerRegistry] release -> no current entry",
+            accountId,
+          );
+          return;
+        }
+
+        // Ignore stale lease releases to avoid mutating refCounts on a newer entry.
+        if (currentEntry !== entry) {
+          console.warn(
+            "[BlueskyControllerRegistry] release -> stale lease ignored",
+            accountId,
+          );
           return;
         }
 
