@@ -83,11 +83,10 @@
     "babel-jest": "^30.2.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
-    "expo-module-scripts": "^5.0.8",
     "googleapis": "^171.4.0",
     "jest": "^29.7.0",
     "react-native-svg-transformer": "^1.5.2",
-    "react-test-renderer": "19.1.0",
+    "react-test-renderer": "19.2.0",
     "tsconfig": "^7.0.0",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.51.0"
