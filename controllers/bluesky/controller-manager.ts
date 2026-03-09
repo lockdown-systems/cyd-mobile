@@ -10,6 +10,7 @@ type ManagerEntry = {
 const controllerManager = new Map<number, ManagerEntry>();
 
 function createEntry(accountId: number, accountUUID: string): ManagerEntry {
+  console.log("[BlueskyControllerManager] create", accountId, accountUUID);
   const controller = new BlueskyAccountController(accountId, accountUUID);
   return {
     controller,
@@ -23,7 +24,12 @@ async function disposeEntry(
   accountId: number,
   entry: ManagerEntry,
 ): Promise<void> {
+  console.log("[BlueskyControllerManager] dispose -> requested", accountId);
   if (entry.disposePromise) {
+    console.log(
+      "[BlueskyControllerManager] dispose -> await in-flight",
+      accountId,
+    );
     await entry.disposePromise;
     return;
   }
@@ -31,11 +37,13 @@ async function disposeEntry(
   entry.disposePromise = (async () => {
     try {
       await entry.initPromise.catch(() => undefined);
+      console.log("[BlueskyControllerManager] dispose -> cleanup", accountId);
       await entry.controller.cleanup();
     } finally {
       if (controllerManager.get(accountId) === entry) {
         controllerManager.delete(accountId);
       }
+      console.log("[BlueskyControllerManager] dispose -> done", accountId);
       entry.disposePromise = null;
     }
   })();
@@ -53,6 +61,9 @@ export async function getBlueskyController(
     if (!entry) {
       entry = createEntry(accountId, accountUUID);
       controllerManager.set(accountId, entry);
+      console.log("[BlueskyControllerManager] get -> new", accountId);
+    } else {
+      console.log("[BlueskyControllerManager] get -> existing", accountId);
     }
 
     if (entry.disposePromise) {
@@ -92,6 +103,7 @@ export async function disposeBlueskyController(
 ): Promise<void> {
   const entry = controllerManager.get(accountId);
   if (!entry) {
+    console.log("[BlueskyControllerManager] dispose -> no-op", accountId);
     return;
   }
 

@@ -25,10 +25,3 @@ export {
   getBlueskyController,
   withBlueskyController,
 } from "./bluesky/controller-manager";
-
-// Legacy compatibility exports during migration from lease-based APIs.
-export {
-  acquireBlueskyController,
-  resetBlueskyControllerRegistryForTests,
-  type BlueskyControllerLease,
-} from "./bluesky/controller-registry";
