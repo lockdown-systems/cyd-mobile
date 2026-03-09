@@ -19,6 +19,7 @@ export {
 } from "./config";
 
 export {
+  deleteBlueskyAccountStorage,
   disposeAllBlueskyControllersForTests,
   disposeBlueskyController,
   getBlueskyController,

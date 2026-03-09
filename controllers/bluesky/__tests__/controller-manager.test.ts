@@ -1,4 +1,5 @@
 import {
+  deleteBlueskyAccountStorage,
   disposeAllBlueskyControllersForTests,
   disposeBlueskyController,
   getBlueskyController,
@@ -8,6 +9,7 @@ import {
 type MockController = {
   initDB: jest.Mock<Promise<void>, []>;
   cleanup: jest.Mock<Promise<void>, []>;
+  deleteAccountStorage: jest.Mock<Promise<void>, []>;
 };
 
 const mockControllers: MockController[] = [];
@@ -20,6 +22,7 @@ jest.mock("@/controllers/BlueskyAccountController", () => {
         const controller: MockController = {
           initDB: jest.fn(async () => undefined),
           cleanup: jest.fn(async () => undefined),
+          deleteAccountStorage: jest.fn(async () => undefined),
         };
         mockControllers.push(controller);
         return controller;
@@ -96,6 +99,7 @@ describe("bluesky controller manager", () => {
       const controller: MockController = {
         initDB: jest.fn(() => initDbImpl()),
         cleanup: jest.fn(async () => undefined),
+        deleteAccountStorage: jest.fn(async () => undefined),
       };
       mockControllers.push(controller);
       return controller;
@@ -109,5 +113,15 @@ describe("bluesky controller manager", () => {
     const retryController = await getBlueskyController(99, "uuid-99");
     expect(mockControllers).toHaveLength(2);
     expect(retryController).toBeDefined();
+  });
+
+  it("disposes managed controller before deleting account storage", async () => {
+    await getBlueskyController(42, "uuid-42");
+
+    await deleteBlueskyAccountStorage(42, "uuid-42");
+
+    expect(mockControllers).toHaveLength(2);
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
+    expect(mockControllers[1].deleteAccountStorage).toHaveBeenCalledTimes(1);
   });
 });

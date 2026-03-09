@@ -98,6 +98,20 @@ export async function disposeBlueskyController(
   await disposeEntry(accountId, entry);
 }
 
+export async function deleteBlueskyAccountStorage(
+  accountId: number,
+  accountUUID: string,
+): Promise<void> {
+  // Phase 5 sequence: dispose managed singleton first, then delete account data.
+  await disposeBlueskyController(accountId);
+
+  const cleanupController = new BlueskyAccountController(
+    accountId,
+    accountUUID,
+  );
+  await cleanupController.deleteAccountStorage();
+}
+
 export async function disposeAllBlueskyControllersForTests(): Promise<void> {
   const entries = [...controllerManager.entries()];
   for (const [accountId, entry] of entries) {
