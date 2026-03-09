@@ -23,3 +23,10 @@ export {
   withBlueskyController,
   type BlueskyControllerLease,
 } from "./bluesky/controller-registry";
+
+export {
+  disposeAllBlueskyControllersForTests,
+  disposeBlueskyController,
+  getBlueskyController as getManagedBlueskyController,
+  withBlueskyController as withManagedBlueskyController,
+} from "./bluesky/controller-manager";
