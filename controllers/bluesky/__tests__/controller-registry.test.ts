@@ -33,7 +33,7 @@ describe("bluesky controller registry", () => {
     jest.clearAllMocks();
   });
 
-  it("reuses one controller per account and cleans up on final release", async () => {
+  it("reuses one controller per account via compatibility lease", async () => {
     const leaseA = await acquireBlueskyController(1, "uuid-1");
     const leaseB = await acquireBlueskyController(1, "uuid-1");
 
@@ -42,13 +42,12 @@ describe("bluesky controller registry", () => {
     expect(mockControllers[0].initDB).toHaveBeenCalledTimes(1);
 
     await leaseA.release();
-    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
-
     await leaseB.release();
-    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
+    // Legacy release is now a no-op; cleanup is explicit manager disposal.
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
   });
 
-  it("defers cleanup while holdWhile is active", async () => {
+  it("passes through holdWhile for compatibility", async () => {
     const lease = await acquireBlueskyController(5, "uuid-5");
 
     let resolveHold: (() => void) | null = null;
@@ -64,10 +63,10 @@ describe("bluesky controller registry", () => {
     resolveHold?.();
     await held;
 
-    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
   });
 
-  it("creates a new controller after previous entry is fully released", async () => {
+  it("keeps controller alive after release for manager lifecycle", async () => {
     const firstLease = await acquireBlueskyController(22, "uuid-22");
     const firstController = firstLease.controller;
     await firstLease.release();
@@ -75,15 +74,15 @@ describe("bluesky controller registry", () => {
     const secondLease = await acquireBlueskyController(22, "uuid-22");
     const secondController = secondLease.controller;
 
-    expect(mockControllers).toHaveLength(2);
-    expect(secondController).not.toBe(firstController);
-    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
+    expect(mockControllers).toHaveLength(1);
+    expect(secondController).toBe(firstController);
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
 
     await secondLease.release();
-    expect(mockControllers[1].cleanup).toHaveBeenCalledTimes(1);
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
   });
 
-  it("releases lease when withBlueskyController callback throws", async () => {
+  it("preserves callback error behavior in withBlueskyController", async () => {
     await expect(
       withBlueskyController(7, "uuid-7", async () => {
         throw new Error("boom");
@@ -91,7 +90,7 @@ describe("bluesky controller registry", () => {
     ).rejects.toThrow("boom");
 
     expect(mockControllers).toHaveLength(1);
-    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
   });
 
   it("cleans up failed initialization entry and allows retry", async () => {
@@ -124,6 +123,6 @@ describe("bluesky controller registry", () => {
     const retryLease = await acquireBlueskyController(99, "uuid-99");
     expect(mockControllers).toHaveLength(2);
     await retryLease.release();
-    expect(mockControllers[1].cleanup).toHaveBeenCalledTimes(1);
+    expect(mockControllers[1].cleanup).toHaveBeenCalledTimes(0);
   });
 });

@@ -19,14 +19,15 @@ export {
 } from "./config";
 
 export {
-  acquireBlueskyController,
-  withBlueskyController,
-  type BlueskyControllerLease,
-} from "./bluesky/controller-registry";
-
-export {
   disposeAllBlueskyControllersForTests,
   disposeBlueskyController,
-  getBlueskyController as getManagedBlueskyController,
-  withBlueskyController as withManagedBlueskyController,
+  getBlueskyController,
+  withBlueskyController,
 } from "./bluesky/controller-manager";
+
+// Legacy compatibility exports during migration from lease-based APIs.
+export {
+  acquireBlueskyController,
+  resetBlueskyControllerRegistryForTests,
+  type BlueskyControllerLease,
+} from "./bluesky/controller-registry";
