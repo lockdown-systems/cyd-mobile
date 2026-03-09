@@ -587,23 +587,23 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     this.deleteSettings = settings;
 
     // Add delete jobs based on what the user selected and if there's data to delete
-    if (settings.deletePosts && counts.posts > 0) {
+    if (settings.deletePosts && counts && counts.posts > 0) {
       jobTypes.push("deletePosts");
     }
 
-    if (settings.deleteReposts && counts.reposts > 0) {
+    if (settings.deleteReposts && counts && counts.reposts > 0) {
       jobTypes.push("deleteReposts");
     }
 
-    if (settings.deleteLikes && counts.likes > 0) {
+    if (settings.deleteLikes && counts && counts.likes > 0) {
       jobTypes.push("deleteLikes");
     }
 
-    if (settings.deleteBookmarks && counts.bookmarks > 0) {
+    if (settings.deleteBookmarks && counts && counts.bookmarks > 0) {
       jobTypes.push("deleteBookmarks");
     }
 
-    if (settings.deleteChats && counts.messages > 0) {
+    if (settings.deleteChats && counts && counts.messages > 0) {
       jobTypes.push("deleteMessages");
     }
 
