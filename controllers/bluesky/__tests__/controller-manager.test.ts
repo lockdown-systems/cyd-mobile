@@ -69,6 +69,19 @@ describe("bluesky controller manager", () => {
     expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
   });
 
+  it("reuses singleton across get and with helper", async () => {
+    const controllerFromGet = await getBlueskyController(11, "uuid-11");
+    const controllerFromWith = await withBlueskyController(
+      11,
+      "uuid-11",
+      async (controller) => controller,
+    );
+
+    expect(mockControllers).toHaveLength(1);
+    expect(controllerFromWith).toBe(controllerFromGet);
+    expect(mockControllers[0].initDB).toHaveBeenCalledTimes(1);
+  });
+
   it("disposes and recreates controller on next get", async () => {
     const first = await getBlueskyController(22, "uuid-22");
     await disposeBlueskyController(22);

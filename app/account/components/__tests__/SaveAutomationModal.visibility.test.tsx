@@ -6,18 +6,12 @@ import type { AccountTabPalette } from "@/types/account-tabs";
 
 import { SaveAutomationModal } from "../SaveAutomationModal";
 
-const mockAcquireBlueskyController: jest.MockedFunction<
-  (
-    accountId: number,
-    accountUUID: string,
-  ) => Promise<{
-    controller: unknown;
-    release: () => Promise<void>;
-  }>
+const mockGetBlueskyController: jest.MockedFunction<
+  (accountId: number, accountUUID: string) => Promise<unknown>
 > = jest.fn();
 
 jest.mock("@/controllers", () => ({
-  acquireBlueskyController: mockAcquireBlueskyController,
+  getBlueskyController: mockGetBlueskyController,
 }));
 
 jest.mock("@/hooks/use-modal-bottom-padding", () => ({
@@ -70,6 +64,6 @@ describe("SaveAutomationModal visibility behavior", () => {
       />,
     );
 
-    expect(mockAcquireBlueskyController).not.toHaveBeenCalled();
+    expect(mockGetBlueskyController).not.toHaveBeenCalled();
   });
 });
