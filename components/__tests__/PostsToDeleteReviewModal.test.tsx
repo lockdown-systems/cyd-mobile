@@ -3,7 +3,7 @@ import React from "react";
 
 import { PostsToDeleteReviewModal } from "../PostsToDeleteReviewModal";
 
-const mockRelease = jest.fn();
+const mockGetBlueskyController = jest.fn();
 const mockControllerInitAgent = jest.fn();
 const mockControllerGetPosts = jest.fn();
 const mockControllerGetDb = jest.fn();
@@ -22,15 +22,15 @@ jest.mock("@/components/PostPreview", () => ({
 }));
 
 jest.mock("@/controllers", () => ({
-  acquireBlueskyController: jest.fn().mockImplementation(async () => ({
-    controller: {
+  getBlueskyController: jest.fn().mockImplementation(async () => {
+    mockGetBlueskyController();
+    return {
       initAgent: mockControllerInitAgent.mockResolvedValue(undefined),
       getPostsForDeletionReview: mockControllerGetPosts.mockReturnValue([]),
       getDB: mockControllerGetDb.mockReturnValue({}),
       setPostPreserve: jest.fn(),
-    },
-    release: mockRelease.mockResolvedValue(undefined),
-  })),
+    };
+  }),
 }));
 
 const palette = {
@@ -68,7 +68,7 @@ describe("PostsToDeleteReviewModal", () => {
     jest.clearAllMocks();
   });
 
-  it("cleans up controller when modal unmounts", async () => {
+  it("keeps manager-owned controller when modal unmounts", async () => {
     const onClose = jest.fn();
     const { unmount } = render(
       <PostsToDeleteReviewModal
@@ -87,12 +87,10 @@ describe("PostsToDeleteReviewModal", () => {
 
     unmount();
 
-    await waitFor(() => {
-      expect(mockRelease).toHaveBeenCalled();
-    });
+    expect(mockGetBlueskyController).toHaveBeenCalled();
   });
 
-  it("cleans up controller when visibility changes to false", async () => {
+  it("does not release manager-owned controller when visibility changes to false", async () => {
     const onClose = jest.fn();
     const { rerender } = render(
       <PostsToDeleteReviewModal
@@ -120,9 +118,7 @@ describe("PostsToDeleteReviewModal", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(mockRelease).toHaveBeenCalled();
-    });
+    expect(mockGetBlueskyController).toHaveBeenCalled();
 
     expect(onClose).not.toHaveBeenCalled();
   });

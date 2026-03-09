@@ -60,7 +60,9 @@ describe("bluesky controller registry", () => {
 
     expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);
 
-    resolveHold?.();
+    if (resolveHold) {
+      resolveHold();
+    }
     await held;
 
     expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(0);

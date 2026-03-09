@@ -9,9 +9,8 @@ import React, {
 } from "react";
 
 import {
-  acquireBlueskyController,
+  getBlueskyController,
   type BlueskyAccountController,
-  type BlueskyControllerLease,
   type BlueskyProgress,
   type RateLimitInfo,
 } from "@/controllers";
@@ -56,7 +55,6 @@ export function BlueskyControllerProvider({
   children,
 }: BlueskyControllerProviderProps) {
   const controllerRef = useRef<BlueskyAccountController | null>(null);
-  const leaseRef = useRef<BlueskyControllerLease | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAgentReady, setIsAgentReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -78,9 +76,7 @@ export function BlueskyControllerProvider({
     }
 
     try {
-      const lease = await acquireBlueskyController(accountId, accountUUID);
-      leaseRef.current = lease;
-      const controller = lease.controller;
+      const controller = await getBlueskyController(accountId, accountUUID);
       controllerRef.current = controller;
 
       // Set up callbacks
@@ -109,16 +105,10 @@ export function BlueskyControllerProvider({
   // Clean up the controller
   const cleanupController = useCallback(async () => {
     const controller = controllerRef.current;
-    const lease = leaseRef.current;
     controllerRef.current = null;
-    leaseRef.current = null;
 
     if (controller) {
       controller.clearProgressCallback();
-    }
-
-    if (lease) {
-      await lease.release();
     }
 
     setIsInitialized(false);

@@ -33,9 +33,11 @@ import { getThemePalette } from "@/constants/theme";
 import {
   ACCOUNT_AUTH_STATUS,
   ACCOUNT_CONFIG_KEYS,
-  BlueskyAccountController,
+  disposeBlueskyController,
+  getBlueskyController,
   withBlueskyController,
   type AccountAuthStatusValue,
+  type BlueskyAccountController,
 } from "@/controllers";
 import { deleteAccount, type AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -181,8 +183,9 @@ export default function AccountPlaceholderScreen() {
     await handleSignOut();
 
     try {
-      const controller = new BlueskyAccountController(account.id, account.uuid);
+      const controller = await getBlueskyController(account.id, account.uuid);
       await controller.deleteAccountStorage();
+      await disposeBlueskyController(account.id);
     } catch (err) {
       console.warn("Failed to delete account storage", err);
       throw err instanceof Error
