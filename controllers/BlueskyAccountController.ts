@@ -113,6 +113,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   private rateLimitCallback?: (info: RateLimitInfo) => void;
   private progressCallback?: (progress: BlueskyProgress) => void;
   private deleteSettings: AccountDeleteSettings | null = null;
+  private isRunJobsActive = false;
 
   constructor(accountId: number, accountUUID?: string) {
     super(accountId, accountUUID);
@@ -749,6 +750,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     jobs?: BlueskyJobRecord[];
     onUpdate?: (update: BlueskyJobRunUpdate) => void;
   }): Promise<void> {
+    if (this.isRunJobsActive) {
+      throw new Error("Automation already running for this account.");
+    }
+
+    this.isRunJobsActive = true;
+
+    try {
     console.log("[BlueskyController] runJobs -> start", this.accountId);
     let jobs = params?.jobs ?? (await this.getPendingJobs());
     const emit = (update: Partial<BlueskyJobRunUpdate>) => {
@@ -925,6 +933,9 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     console.log("[BlueskyController] runJobs -> done", this.accountId);
+    } finally {
+      this.isRunJobsActive = false;
+    }
   }
 
   private async updateJobStatus(

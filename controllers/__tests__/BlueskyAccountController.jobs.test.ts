@@ -239,4 +239,44 @@ describe("BlueskyAccountController job pipeline", () => {
     expect(lastUpdateJobs[1].status).toBe("failed");
     expect(lastUpdateJobs[1].error).toBe("Cancelled due to previous failure");
   });
+
+  it("rejects overlapping runJobs calls for the same account", async () => {
+    const { controller } = setupControllerWithDb();
+    const now = Date.now();
+    const jobs = [
+      {
+        id: 1,
+        jobType: "savePosts" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    (controller as unknown as { agent: unknown }).agent = {};
+
+    let resolveIndexPosts: (() => void) | null = null;
+    const indexPostsPromise = new Promise<void>((resolve) => {
+      resolveIndexPosts = resolve;
+    });
+
+    jest.spyOn(controller, "indexPosts").mockImplementation(async () => {
+      await indexPostsPromise;
+    });
+
+    const firstRunPromise = controller.runJobs({ jobs });
+
+    await expect(controller.runJobs({ jobs })).rejects.toThrow(
+      "Automation already running for this account.",
+    );
+
+    if (resolveIndexPosts) {
+      resolveIndexPosts();
+    }
+
+    await expect(firstRunPromise).resolves.toBeUndefined();
+  });
 });
