@@ -73,6 +73,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
   protected accountUUID: string;
   protected db: SQLiteDatabase | null = null;
   private sharedDbKey: string | null = null;
+  private _disposed = false;
   protected _progress: TProgress;
   private paused = false;
   private pauseResolvers: (() => void)[] = [];
@@ -83,6 +84,10 @@ export abstract class BaseAccountController<TProgress = unknown> {
     // If UUID not provided, generate one (will be overwritten when fetched from DB)
     this.accountUUID = accountUUID ?? Crypto.randomUUID();
     this._progress = this.resetProgress();
+  }
+
+  get isDisposed(): boolean {
+    return this._disposed;
   }
 
   isPaused(): boolean {
@@ -345,6 +350,8 @@ export abstract class BaseAccountController<TProgress = unknown> {
    * Clean up resources when the controller is no longer needed
    */
   async cleanup(): Promise<void> {
+    this._disposed = true;
+
     if (!this.db) {
       console.log("[BaseAccountController] cleanup -> skipped (no db)", {
         accountId: this.accountId,

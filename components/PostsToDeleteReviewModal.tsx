@@ -16,9 +16,8 @@ import {
 } from "@/components/account/browse-shared";
 import { PostPreview } from "@/components/PostPreview";
 import {
-  acquireBlueskyController,
+  getBlueskyController,
   type BlueskyAccountController,
-  type BlueskyControllerLease,
 } from "@/controllers";
 import type { PostToDeletePreview } from "@/controllers/bluesky/deletion-calculator";
 import type {
@@ -52,19 +51,10 @@ export function PostsToDeleteReviewModal({
   const [postsToDelete, setPostsToDelete] = useState<PostPreviewData[]>([]);
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
-  const controllerLeaseRef = useRef<BlueskyControllerLease | null>(null);
 
-  const cleanupController = useCallback(async () => {
-    const lease = controllerLeaseRef.current;
+  // Clear local ref only — the controller-manager owns the controller lifecycle.
+  const cleanupController = useCallback(() => {
     controllerRef.current = null;
-    controllerLeaseRef.current = null;
-    if (lease) {
-      try {
-        await lease.release();
-      } catch (err) {
-        console.warn("Failed to cleanup posts review controller", err);
-      }
-    }
   }, []);
 
   // Helper to parse facets JSON
@@ -139,11 +129,9 @@ export function PostsToDeleteReviewModal({
     async function loadPosts() {
       setLoading(true);
       try {
-        await cleanupController();
-        const lease = await acquireBlueskyController(accountId, accountUUID);
-        const controller = lease.controller;
+        cleanupController();
+        const controller = await getBlueskyController(accountId, accountUUID);
         await controller.initAgent();
-        controllerLeaseRef.current = lease;
         controllerRef.current = controller;
 
         const posts = controller.getPostsForDeletionReview(selections);
@@ -180,7 +168,7 @@ export function PostsToDeleteReviewModal({
     void loadPosts();
 
     return () => {
-      void cleanupController();
+      cleanupController();
     };
   }, [
     visible,
@@ -221,7 +209,7 @@ export function PostsToDeleteReviewModal({
   // Handle close
   const handleClose = useCallback(() => {
     setPostsToDelete([]);
-    void cleanupController();
+    cleanupController();
     onClose();
   }, [cleanupController, onClose]);
 

@@ -22,9 +22,8 @@ import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import {
-  acquireBlueskyController,
+  getBlueskyController,
   type BlueskyAccountController,
-  type BlueskyControllerLease,
 } from "@/controllers";
 import type {
   BlueskyJobRecord,
@@ -78,7 +77,6 @@ export function SaveAutomationModal({
   const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
-  const controllerLeaseRef = useRef<BlueskyControllerLease | null>(null);
   const controllerInitPromiseRef =
     useRef<Promise<BlueskyAccountController> | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
@@ -114,9 +112,7 @@ export function SaveAutomationModal({
 
     console.log("[SaveAutomationModal] ensureController -> create", accountId);
     const initPromise = (async () => {
-      const lease = await acquireBlueskyController(accountId, accountUUID);
-      const controller = lease.controller;
-      controllerLeaseRef.current = lease;
+      const controller = await getBlueskyController(accountId, accountUUID);
       controllerRef.current = controller;
       try {
         await controller.initAgent();
@@ -240,12 +236,7 @@ export function SaveAutomationModal({
           },
         });
 
-        const lease = controllerLeaseRef.current;
-        if (lease) {
-          await lease.holdWhile(runJobsPromise);
-        } else {
-          await runJobsPromise;
-        }
+        await runJobsPromise;
         if (cancelled) return;
 
         const failed = latestJobsRef.current.some(
@@ -300,22 +291,19 @@ export function SaveAutomationModal({
   useEffect(() => {
     return () => {
       const controller = controllerRef.current;
-      const lease = controllerLeaseRef.current;
       if (isRunningRef.current) {
         console.warn(
-          "[SaveAutomationModal] unmount while run is active; cleanup may be deferred by lease hold",
+          "[SaveAutomationModal] unmount while run is active",
           accountId,
         );
       }
+      // Clear callbacks and local refs only — the controller-manager owns the
+      // controller lifecycle, so we do not dispose or close the DB here.
       if (controller) {
         controller.clearProgressCallback();
         controllerRef.current = null;
       }
-      controllerLeaseRef.current = null;
       controllerInitPromiseRef.current = null;
-      if (lease) {
-        void lease.release();
-      }
     };
   }, [accountId]);
 

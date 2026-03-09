@@ -19,7 +19,9 @@ export {
 } from "./config";
 
 export {
-  acquireBlueskyController,
+  deleteBlueskyAccountStorage,
+  disposeAllBlueskyControllersForTests,
+  disposeBlueskyController,
+  getBlueskyController,
   withBlueskyController,
-  type BlueskyControllerLease,
-} from "./bluesky/controller-registry";
+} from "./bluesky/controller-manager";
