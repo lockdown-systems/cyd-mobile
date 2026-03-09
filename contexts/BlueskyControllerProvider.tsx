@@ -102,7 +102,8 @@ export function BlueskyControllerProvider({
     }
   }, [accountId, accountUUID]);
 
-  // Clean up the controller
+  // Clean up local refs and state only — the controller-manager owns the
+  // controller lifecycle, so we do not dispose or close the DB here.
   const cleanupController = useCallback(async () => {
     const controller = controllerRef.current;
     controllerRef.current = null;

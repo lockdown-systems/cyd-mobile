@@ -73,10 +73,12 @@ export async function getBlueskyController(
 
     if (entry.accountUUID !== accountUUID) {
       console.warn(
-        "[BlueskyControllerManager] account UUID mismatch for shared controller",
+        "[BlueskyControllerManager] account UUID mismatch — disposing stale controller",
         accountId,
         { expected: entry.accountUUID, received: accountUUID },
       );
+      await disposeEntry(accountId, entry);
+      continue;
     }
 
     try {
@@ -117,11 +119,15 @@ export async function deleteBlueskyAccountStorage(
   // Phase 5 sequence: dispose managed singleton first, then delete account data.
   await disposeBlueskyController(accountId);
 
-  const cleanupController = new BlueskyAccountController(
-    accountId,
-    accountUUID,
-  );
-  await cleanupController.deleteAccountStorage();
+  // Unmanaged controller used only for file deletion — never registered with the manager.
+  // deleteAccountStorage() calls cleanup() internally, but we guard with try/finally
+  // to ensure resources are released even if the internal implementation changes.
+  const tempController = new BlueskyAccountController(accountId, accountUUID);
+  try {
+    await tempController.deleteAccountStorage();
+  } finally {
+    await tempController.cleanup();
+  }
 }
 
 export async function disposeAllBlueskyControllersForTests(): Promise<void> {

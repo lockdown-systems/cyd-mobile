@@ -34,6 +34,10 @@ describe("BlueskyAccountController job pipeline", () => {
     chat: false,
   };
 
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
+
   const setupControllerWithDb = () => {
     const controller = new BlueskyAccountController(1);
     const mockDb = createMockDatabase();

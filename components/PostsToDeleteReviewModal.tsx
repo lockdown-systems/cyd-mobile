@@ -52,6 +52,7 @@ export function PostsToDeleteReviewModal({
   const [loading, setLoading] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
 
+  // Clear local ref only — the controller-manager owns the controller lifecycle.
   const cleanupController = useCallback(() => {
     controllerRef.current = null;
   }, []);

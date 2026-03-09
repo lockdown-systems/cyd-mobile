@@ -297,6 +297,8 @@ export function SaveAutomationModal({
           accountId,
         );
       }
+      // Clear callbacks and local refs only — the controller-manager owns the
+      // controller lifecycle, so we do not dispose or close the DB here.
       if (controller) {
         controller.clearProgressCallback();
         controllerRef.current = null;

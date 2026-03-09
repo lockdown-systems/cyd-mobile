@@ -959,6 +959,9 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   private requireDb() {
+    if (this.isDisposed) {
+      throw new Error("Controller has been disposed");
+    }
     if (!this.db) {
       throw new Error("Database not initialized");
     }

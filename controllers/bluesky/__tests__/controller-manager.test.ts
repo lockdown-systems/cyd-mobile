@@ -37,6 +37,10 @@ describe("bluesky controller manager", () => {
     jest.clearAllMocks();
   });
 
+  afterAll(async () => {
+    await disposeAllBlueskyControllersForTests();
+  });
+
   it("reuses one controller per account", async () => {
     const controllerA = await getBlueskyController(1, "uuid-1");
     const controllerB = await getBlueskyController(1, "uuid-1");
@@ -136,5 +140,20 @@ describe("bluesky controller manager", () => {
     expect(mockControllers).toHaveLength(2);
     expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
     expect(mockControllers[1].deleteAccountStorage).toHaveBeenCalledTimes(1);
+    // Explicit cleanup guard on the unmanaged temp controller
+    expect(mockControllers[1].cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("disposes stale controller on UUID mismatch and creates fresh one", async () => {
+    const first = await getBlueskyController(50, "uuid-old");
+
+    expect(mockControllers).toHaveLength(1);
+
+    const second = await getBlueskyController(50, "uuid-new");
+
+    expect(mockControllers).toHaveLength(2);
+    expect(second).not.toBe(first);
+    expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
+    expect(mockControllers[1].initDB).toHaveBeenCalledTimes(1);
   });
 });
