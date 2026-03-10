@@ -44,9 +44,11 @@ jobs:
 
       - name: Select Xcode 26
         run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          # Prefer stable Xcode 26 builds; avoid beta toolchains in release CI.
+          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi 'beta' | sort -V | tail -1)
+
           if [ -z "$XCODE_PATH" ]; then
-            echo "Error: Xcode 26 not found. Available versions:"
+            echo "Error: No stable Xcode 26 build found. Available versions:"
             ls -d /Applications/Xcode*.app
             exit 1
           fi
