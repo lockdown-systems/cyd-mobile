@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   quality:
     name: Lint and test
@@ -261,16 +264,24 @@ jobs:
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
           cd android
           chmod +x ./gradlew
-          ./gradlew bundleRelease --build-cache --parallel --max-workers=8
+          ./gradlew bundleRelease assembleRelease --build-cache --parallel --max-workers=8
           cd ..
 
-          ANDROID_BUILD_FILE=android/app/build/outputs/bundle/release/app-release.aab
-          if [ ! -f "$ANDROID_BUILD_FILE" ]; then
+          ANDROID_BUNDLE_FILE=android/app/build/outputs/bundle/release/app-release.aab
+          ANDROID_APK_FILE=android/app/build/outputs/apk/release/app-release.apk
+
+          if [ ! -f "$ANDROID_BUNDLE_FILE" ]; then
             echo "No .aab file found after local Android build"
             exit 1
           fi
 
-          cp "$ANDROID_BUILD_FILE" cyd-mobile.aab
+          if [ ! -f "$ANDROID_APK_FILE" ]; then
+            echo "No .apk file found after local Android build"
+            exit 1
+          fi
+
+          cp "$ANDROID_BUNDLE_FILE" cyd-mobile.aab
+          cp "$ANDROID_APK_FILE" cyd-mobile.apk
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
@@ -278,6 +289,34 @@ jobs:
           name: android-aab-${{ github.ref_name }}
           path: cyd-mobile.aab
           if-no-files-found: error
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.ref_name }}
+          path: cyd-mobile.apk
+          if-no-files-found: error
+
+  upload_release_assets:
+    name: Upload APK to GitHub Release
+    runs-on: ubuntu-latest
+    needs: build_android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Android APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk-${{ github.ref_name }}
+          path: dist/android
+
+      - name: Upload APK to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/android/cyd-mobile.apk
+          fail_on_unmatched_files: true
 
   submit_android:
     name: Submit Android to Google Play
