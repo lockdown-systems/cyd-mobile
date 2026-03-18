@@ -36,7 +36,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       icon: "./assets/images/cyd.icon",
     },
     android: {
-      versionCode: 6,
+      versionCode: 7,
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
