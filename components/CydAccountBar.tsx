@@ -34,7 +34,7 @@ export function CydAccountBar({ onShowOnboarding }: CydAccountBarProps) {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom;
   const barBottomPadding =
-    Platform.OS === "android" ? Math.max(bottomInset, 20) : bottomInset;
+    Platform.OS === "android" ? Math.max(bottomInset, 8) : bottomInset;
   const colorScheme = useColorScheme();
   const palette = getThemePalette(colorScheme);
   const { state, signOut, getDashboardURL } = useCydAccount();
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 0,
   },
   statusText: {
     flex: 1,
