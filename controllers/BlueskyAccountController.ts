@@ -822,12 +822,15 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           });
         };
 
+        this.rateLimiter.setJobEmit(emitForJob);
+
         try {
           await runJob(
             this,
             { ...job, status: "running", startedAt },
             emitForJob,
           );
+          this.rateLimiter.clearJobEmit();
           const finishedAt = Date.now();
           jobs = jobs.map((existing) =>
             existing.id === job.id
@@ -858,6 +861,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
             job.jobType,
           );
         } catch (err) {
+          this.rateLimiter.clearJobEmit();
           const finishedAt = Date.now();
           const message = err instanceof Error ? err.message : String(err);
           const pendingJobIds = jobs
