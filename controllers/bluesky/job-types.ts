@@ -22,7 +22,12 @@ export type BlueskyJobType =
   | "deleteMessages"
   | "unfollowUsers";
 
-export type BlueskyJobStatus = "pending" | "running" | "completed" | "failed";
+export type BlueskyJobStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "canceled";
 
 export type BlueskyJobRecord = {
   id: number;
