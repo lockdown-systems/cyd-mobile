@@ -198,7 +198,7 @@ export class BlueskyRateLimiter {
   ): void {
     if (!this.jobEmit) return;
     const update: Parameters<JobEmit>[0] = {
-      speechText: `Bluesky rate limit hit! Taking a short break... I'll continue in: ${formatDuration(remainingSeconds)}`,
+      speechText: `Bluesky rate limit hit! Taking a short break...\n\n**I'll continue in:**\n**${formatDuration(remainingSeconds)}**`,
       progressMessage: "Waiting for rate limit to expire...",
     };
     if (clearPreview) {
