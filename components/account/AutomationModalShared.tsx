@@ -31,10 +31,11 @@ export type AutomationModalBaseProps = {
  */
 export function getStatusIcon(
   status: BlueskyJobRecord["status"],
-): "check-circle" | "play-circle" | "error-outline" | "schedule" {
+): "check-circle" | "play-circle" | "error-outline" | "schedule" | "cancel" {
   if (status === "completed") return "check-circle";
   if (status === "running") return "play-circle";
   if (status === "failed") return "error-outline";
+  if (status === "canceled") return "cancel";
   return "schedule";
 }
 
@@ -48,6 +49,7 @@ export function getStatusColor(
   if (status === "failed") return palette.warning ?? palette.tint;
   if (status === "completed") return palette.tint;
   if (status === "running") return palette.tint;
+  if (status === "canceled") return palette.icon;
   return palette.icon;
 }
 
