@@ -1,34 +1,34 @@
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-  ButtonRow,
-  ErrorCard,
-  InfoBar,
-  StepRow,
-  SuccessCard,
-  styles,
-  type AutomationModalState,
+    ButtonRow,
+    ErrorCard,
+    InfoBar,
+    StepRow,
+    SuccessCard,
+    styles,
+    type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import {
-  getBlueskyController,
-  type BlueskyAccountController,
+    getBlueskyController,
+    type BlueskyAccountController,
 } from "@/controllers";
 import type {
-  BlueskyJobRecord,
-  BlueskyJobRunUpdate,
-  SaveJobOptions,
+    BlueskyJobRecord,
+    BlueskyJobRunUpdate,
+    SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
 import type { PostPreviewData, PreviewData } from "@/controllers/bluesky/types";
 import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
@@ -83,7 +83,12 @@ export function SaveAutomationModal({
   const isRunningRef = useRef(false);
 
   const handleClose = useCallback(() => {
-    onClose(latestJobsRef.current);
+    const jobs = latestJobsRef.current.map((job) =>
+      job.status === "running" || job.status === "pending"
+        ? { ...job, status: "canceled" as const }
+        : job,
+    );
+    onClose(jobs);
   }, [onClose]);
 
   const handleRestart = useMemo(

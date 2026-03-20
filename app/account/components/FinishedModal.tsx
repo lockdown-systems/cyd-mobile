@@ -2,12 +2,12 @@ import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
@@ -61,6 +61,7 @@ function statusIcon(
   if (status === "completed") return "check-circle";
   if (status === "failed") return "error-outline";
   if (status === "running") return "play-circle";
+  if (status === "canceled") return "cancel";
   return "schedule";
 }
 
@@ -71,6 +72,7 @@ function statusColor(
   if (status === "failed") return palette.warning ?? palette.tint;
   if (status === "completed") return palette.tint;
   if (status === "running") return palette.tint;
+  if (status === "canceled") return palette.icon;
   return palette.icon;
 }
 
@@ -287,9 +289,11 @@ export function FinishedModal({
                   : ""
                 : job.status === "failed"
                   ? " – Failed"
-                  : job.status === "running"
-                    ? " – In progress"
-                    : " – Pending";
+                  : job.status === "canceled"
+                    ? " \u2013 Canceled"
+                    : job.status === "running"
+                      ? " \u2013 In progress"
+                      : " \u2013 Pending";
             return (
               <View key={job.id} style={styles.jobRow}>
                 <MaterialIcons
