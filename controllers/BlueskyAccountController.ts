@@ -764,12 +764,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       console.log("[BlueskyController] runJobs -> start", this.accountId);
       let jobs = params?.jobs ?? (await this.getPendingJobs());
       const emit = (update: Partial<BlueskyJobRunUpdate>) => {
-        console.log(
-          "[BlueskyController] runJobs -> emit",
-          this.accountId,
-          "activeJobId:",
-          update.activeJobId ?? null,
-        );
         params?.onUpdate?.({
           jobs,
           activeJobId: update.activeJobId ?? null,
