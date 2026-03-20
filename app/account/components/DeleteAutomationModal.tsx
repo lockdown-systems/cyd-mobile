@@ -92,7 +92,12 @@ export function DeleteAutomationModal({
   const isRunningRef = useRef(false);
 
   const handleClose = useCallback(() => {
-    onClose(latestJobsRef.current);
+    const jobs = latestJobsRef.current.map((job) =>
+      job.status === "running" || job.status === "pending"
+        ? { ...job, status: "canceled" as const }
+        : job,
+    );
+    onClose(jobs);
   }, [onClose]);
 
   const handleRestart = useMemo(

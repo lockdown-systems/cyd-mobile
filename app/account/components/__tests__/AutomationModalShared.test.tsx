@@ -9,15 +9,15 @@ import { Colors } from "@/constants/theme";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
 import {
-  ButtonRow,
-  DangerButton,
-  ErrorCard,
-  getStatusColor,
-  getStatusIcon,
-  InfoBar,
-  SecondaryButton,
-  StepRow,
-  SuccessCard,
+    ButtonRow,
+    DangerButton,
+    ErrorCard,
+    getStatusColor,
+    getStatusIcon,
+    InfoBar,
+    SecondaryButton,
+    StepRow,
+    SuccessCard,
 } from "@/components/account/AutomationModalShared";
 
 const defaultPalette: AccountTabPalette = Colors.light;
@@ -265,7 +265,7 @@ describe("AutomationModalShared", () => {
       );
 
       expect(screen.getByText("Pause")).toBeTruthy();
-      expect(screen.getByText("Cancel")).toBeTruthy();
+      expect(screen.getByText("Stop Now")).toBeTruthy();
     });
 
     it("should render resume button when paused", () => {
