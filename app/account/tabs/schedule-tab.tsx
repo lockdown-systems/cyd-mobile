@@ -223,7 +223,7 @@ export function ScheduleTab({
         } else {
           Alert.alert(
             "Notification Error",
-            "Could not enable push notifications. Please try again later.",
+            `Could not enable push notifications. Please try again later.\n\nError: ${result.error ?? "unknown"}`,
             [{ text: "OK" }],
           );
         }
