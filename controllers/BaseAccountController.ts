@@ -98,6 +98,16 @@ export abstract class BaseAccountController<TProgress = unknown> {
     return this._disposed;
   }
 
+  /**
+   * Get the open database handle. Throws if the database has not been opened.
+   */
+  getDb(): SQLiteDatabase {
+    if (!this.db) {
+      throw new Error("Database not initialized");
+    }
+    return this.db;
+  }
+
   isPaused(): boolean {
     return this.paused;
   }

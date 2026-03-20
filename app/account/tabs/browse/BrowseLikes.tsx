@@ -1,12 +1,13 @@
 import {
-  BrowseList,
-  type BrowseProps,
+    BrowseList,
+    type BrowseProps,
 } from "@/components/account/browse-shared";
 
 export function BrowseLikes({
   handle,
   palette,
   accountId,
+  accountUUID,
   onCountChange,
 }: BrowseProps) {
   return (
@@ -14,6 +15,7 @@ export function BrowseLikes({
       handle={handle}
       palette={palette}
       accountId={accountId}
+      accountUUID={accountUUID}
       type="likes"
       onCountChange={onCountChange}
     />
