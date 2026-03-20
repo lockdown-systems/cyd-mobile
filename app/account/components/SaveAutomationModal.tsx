@@ -81,6 +81,7 @@ export function SaveAutomationModal({
     useRef<Promise<BlueskyAccountController> | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
+  const cancelledRef = useRef(false);
 
   const handleClose = useCallback(() => {
     const jobs = latestJobsRef.current.map((job) =>
@@ -186,7 +187,7 @@ export function SaveAutomationModal({
   };
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
 
     const run = async () => {
       if (!visible || isRunningRef.current) {
@@ -212,7 +213,7 @@ export function SaveAutomationModal({
         const runJobsPromise = controller.runJobs({
           jobs: definedJobs,
           onUpdate: (update: BlueskyJobRunUpdate) => {
-            if (cancelled) return;
+            if (cancelledRef.current) return;
             latestJobsRef.current = update.jobs;
             setJobs(update.jobs);
             setActiveJobId(update.activeJobId);
@@ -242,7 +243,7 @@ export function SaveAutomationModal({
         });
 
         await runJobsPromise;
-        if (cancelled) return;
+        if (cancelledRef.current) return;
 
         const failed = latestJobsRef.current.some(
           (job) => job.status === "failed",
@@ -263,7 +264,7 @@ export function SaveAutomationModal({
           failed ? "failed" : "completed",
         );
       } catch (err) {
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
         setState("failed");
@@ -277,7 +278,7 @@ export function SaveAutomationModal({
     void run();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [visible, options, onFinished, ensureController, accountId]);
 
