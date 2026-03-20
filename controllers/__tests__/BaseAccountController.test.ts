@@ -5,7 +5,10 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { openDatabaseAsync } from "expo-sqlite";
 
-import { BaseAccountController } from "../BaseAccountController";
+import {
+  BaseAccountController,
+  CancelledError,
+} from "../BaseAccountController";
 
 // Mock implementation for testing
 interface TestProgress {
@@ -199,6 +202,72 @@ describe("BaseAccountController", () => {
       // This is tested indirectly through the openAccountDatabase method
       expect(controller.getAccountType()).toBe("test");
       expect(uuid).toBeDefined();
+    });
+  });
+
+  describe("cancel", () => {
+    it("should start in non-cancelled state", () => {
+      const controller = new TestAccountController(1);
+      expect(controller.isCancelled()).toBe(false);
+    });
+
+    it("cancel() sets the cancelled flag", () => {
+      const controller = new TestAccountController(1);
+      controller.cancel();
+      expect(controller.isCancelled()).toBe(true);
+    });
+
+    it("resetCancel() clears the cancelled flag", () => {
+      const controller = new TestAccountController(1);
+      controller.cancel();
+      expect(controller.isCancelled()).toBe(true);
+      controller.resetCancel();
+      expect(controller.isCancelled()).toBe(false);
+    });
+
+    it("waitForPause() throws CancelledError when cancelled", async () => {
+      const controller = new TestAccountController(1);
+      controller.cancel();
+      await expect(controller.waitForPause()).rejects.toThrow(CancelledError);
+    });
+
+    it("waitForPause() throws CancelledError when cancelled while paused", async () => {
+      const controller = new TestAccountController(1);
+      controller.pause();
+
+      // Start waiting (will block on pause)
+      const waitPromise = controller.waitForPause();
+
+      // Cancel while paused — should unblock and throw
+      controller.cancel();
+
+      await expect(waitPromise).rejects.toThrow(CancelledError);
+    });
+
+    it("waitForPause() resolves normally after resetCancel + resume", async () => {
+      const controller = new TestAccountController(1);
+      controller.cancel();
+      controller.resetCancel();
+
+      // Should not throw since cancel was reset
+      await expect(controller.waitForPause()).resolves.toBeUndefined();
+    });
+
+    it("cancel() unblocks a paused waitForPause() even without resume()", async () => {
+      const controller = new TestAccountController(1);
+      controller.pause();
+
+      let threw = false;
+      const waitPromise = controller.waitForPause().catch((err) => {
+        if (err instanceof CancelledError) threw = true;
+      });
+
+      // Without calling resume(), cancel should still unblock it
+      controller.cancel();
+      await waitPromise;
+
+      expect(threw).toBe(true);
+      expect(controller.isPaused()).toBe(true); // pause state unchanged
     });
   });
 });
