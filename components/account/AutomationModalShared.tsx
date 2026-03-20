@@ -299,7 +299,7 @@ export function ButtonRow({
           onPress={onRestart ?? onClose}
         />
       )}
-      <DangerButton label="Cancel" palette={palette} onPress={onClose} />
+      <DangerButton label="Stop Now" palette={palette} onPress={onClose} />
     </View>
   );
 }
