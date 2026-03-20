@@ -93,6 +93,10 @@ export function DeleteAutomationModal({
   const cancelledRef = useRef(false);
 
   const handleClose = useCallback(() => {
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.cancel();
+    }
     const jobs = latestJobsRef.current.map((job) =>
       job.status === "running" || job.status === "pending"
         ? { ...job, status: "canceled" as const }
@@ -328,6 +332,7 @@ export function DeleteAutomationModal({
       // Clear callbacks and local refs only — the controller-manager owns the
       // controller lifecycle, so we do not dispose or close the DB here.
       if (controller) {
+        controller.cancel();
         controller.clearProgressCallback();
         controllerRef.current = null;
       }

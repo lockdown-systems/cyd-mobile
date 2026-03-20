@@ -58,6 +58,13 @@ async function ensureDirectoryExists(path: string): Promise<void> {
   dir.create({ intermediates: true, idempotent: true });
 }
 
+export class CancelledError extends Error {
+  constructor() {
+    super("Operation cancelled");
+    this.name = "CancelledError";
+  }
+}
+
 /**
  * Abstract base class for account controllers.
  * Provides common functionality for managing per-account databases,
@@ -76,6 +83,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
   private _disposed = false;
   protected _progress: TProgress;
   private paused = false;
+  private cancelled = false;
   private pauseResolvers: (() => void)[] = [];
   private pauseListeners: ((paused: boolean) => void)[] = [];
 
@@ -131,6 +139,28 @@ export abstract class BaseAccountController<TProgress = unknown> {
   }
 
   /**
+   * Cancel any in-progress work. Causes waitForPause() to throw CancelledError.
+   */
+  cancel(): void {
+    this.cancelled = true;
+    // Unblock anything waiting on pause so it can see the cancellation
+    const resolvers = [...this.pauseResolvers];
+    this.pauseResolvers = [];
+    resolvers.forEach((resolve) => resolve());
+  }
+
+  /**
+   * Reset the cancelled flag so the controller can be reused.
+   */
+  resetCancel(): void {
+    this.cancelled = false;
+  }
+
+  isCancelled(): boolean {
+    return this.cancelled;
+  }
+
+  /**
    * Pause any long-running work. Call resume() to continue.
    */
   pause(): void {
@@ -154,12 +184,19 @@ export abstract class BaseAccountController<TProgress = unknown> {
 
   /**
    * Wait until the controller is no longer paused. Safe to call repeatedly.
+   * Throws CancelledError if the controller has been cancelled.
    */
   async waitForPause(): Promise<void> {
+    if (this.cancelled) {
+      throw new CancelledError();
+    }
     while (this.paused) {
       await new Promise<void>((resolve) => {
         this.pauseResolvers.push(resolve);
       });
+      if (this.cancelled) {
+        throw new CancelledError();
+      }
     }
   }
 

@@ -14,6 +14,7 @@ import type { AccountDeleteSettings } from "@/database/delete-settings";
 import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import {
   BaseAccountController,
+  CancelledError,
   buildAccountPaths,
 } from "./BaseAccountController";
 import {
@@ -757,6 +758,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     this.isRunJobsActive = true;
+    this.resetCancel();
 
     try {
       console.log("[BlueskyController] runJobs -> start", this.accountId);
@@ -946,6 +948,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       }
 
       console.log("[BlueskyController] runJobs -> done", this.accountId);
+    } catch (err) {
+      // CancelledError is expected when the user stops the automation
+      if (err instanceof CancelledError) {
+        console.log("[BlueskyController] runJobs -> cancelled", this.accountId);
+      } else {
+        throw err;
+      }
     } finally {
       this.isRunJobsActive = false;
     }
