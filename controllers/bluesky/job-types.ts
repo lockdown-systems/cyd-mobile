@@ -52,8 +52,8 @@ export type BlueskyJobRunUpdate = {
 };
 
 export type JobEmit = (update: {
-  speechText?: string;
-  progressMessage?: string;
+  speechText?: string | null;
+  progressMessage?: string | null;
   progressPercent?: number;
   /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
   unknownTotal?: boolean;

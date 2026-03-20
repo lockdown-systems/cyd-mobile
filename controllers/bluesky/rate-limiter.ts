@@ -170,6 +170,11 @@ export class BlueskyRateLimiter {
     this.rateLimitInfo.isLimited = false;
     this.notifyRateLimit();
     this.deps.onProgressUpdate({ currentAction: "Resuming..." });
+
+    // Clear the rate-limit speech so the normal job speech resumes
+    if (this.jobEmit) {
+      this.jobEmit({ speechText: null, progressMessage: null });
+    }
   }
 
   private waitForRateLimitReset(resetAt: number): Promise<void> {
