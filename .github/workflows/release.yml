@@ -48,16 +48,26 @@ jobs:
 
       - name: Select Xcode 26
         run: |
-          # Prefer stable Xcode 26 builds; avoid beta toolchains in release CI.
-          XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi 'beta' | sort -V | tail -1)
+          # Pick the latest stable (non-beta) Xcode 26 on the runner.
+          # We resolve symlinks because some aliases (e.g. Xcode_26.4.0.app)
+          # don't contain "beta" in their name but point to a beta install.
+          BEST=""
+          for app in $(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V); do
+            REAL=$(readlink -f "$app" 2>/dev/null || realpath "$app")
+            if basename "$REAL" | grep -qi 'beta'; then
+              echo "Skipping $app (resolves to beta: $REAL)"
+              continue
+            fi
+            BEST="$app"
+          done
 
-          if [ -z "$XCODE_PATH" ]; then
-            echo "Error: No stable Xcode 26 build found. Available versions:"
-            ls -d /Applications/Xcode*.app
+          if [ -z "$BEST" ]; then
+            echo "::error::No non-beta Xcode 26 found on this runner."
+            ls -ld /Applications/Xcode*.app
             exit 1
           fi
-          echo "Selecting $XCODE_PATH"
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          echo "Selecting $BEST"
+          sudo xcode-select -s "$BEST/Contents/Developer"
           xcodebuild -version
 
       - name: Install iOS platform
