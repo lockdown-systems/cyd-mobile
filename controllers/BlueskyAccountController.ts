@@ -14,6 +14,7 @@ import type { AccountDeleteSettings } from "@/database/delete-settings";
 import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import {
   BaseAccountController,
+  CancelledError,
   buildAccountPaths,
 } from "./BaseAccountController";
 import {
@@ -374,8 +375,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       return null;
     }
 
-    const response = await this.agent.getProfile({ actor: this.did });
-    return response.data;
+    const did = this.did;
+    return this.rateLimiter.makeApiRequest(() =>
+      this.agent!.getProfile({ actor: did }),
+    );
   }
 
   /**
@@ -755,6 +758,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     }
 
     this.isRunJobsActive = true;
+    this.resetCancel();
 
     try {
       console.log("[BlueskyController] runJobs -> start", this.accountId);
@@ -938,6 +942,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       }
 
       console.log("[BlueskyController] runJobs -> done", this.accountId);
+    } catch (err) {
+      // CancelledError is expected when the user stops the automation
+      if (err instanceof CancelledError) {
+        console.log("[BlueskyController] runJobs -> cancelled", this.accountId);
+      } else {
+        throw err;
+      }
     } finally {
       this.isRunJobsActive = false;
     }
@@ -1257,11 +1268,13 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     );
 
     if (bookmark?.subjectUri) {
-      // Delete from Bluesky using the bookmark API
-      // Note: This API returns { success, headers } instead of { data, headers }
-      // so we call it directly instead of using makeApiRequest
-      await agent.api.app.bsky.bookmark.deleteBookmark({
-        uri: bookmark.subjectUri,
+      // The bookmark API returns { success, headers } instead of { data, headers },
+      // so we reshape it to work with makeApiRequest
+      await this.makeApiRequest(async () => {
+        const result = await agent.api.app.bsky.bookmark.deleteBookmark({
+          uri: bookmark.subjectUri,
+        });
+        return { data: result.success, headers: result.headers };
       });
     }
 

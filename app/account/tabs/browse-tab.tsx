@@ -1,9 +1,9 @@
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ComponentType,
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+    type ComponentType,
 } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -21,13 +21,14 @@ type CategoryComponentProps = {
   handle: string;
   palette: AccountTabPalette;
   accountId?: number;
+  accountUUID?: string;
   onCountChange?: (count: number, label: string) => void;
   onHeaderChange?: (
     header: {
       visible: boolean;
       title: string;
       onBack: () => void;
-    } | null
+    } | null,
   ) => void;
 };
 
@@ -49,7 +50,12 @@ const CATEGORY_COMPONENTS: Record<BrowseCategory, CategoryComponent> = {
   messages: BrowseMessages,
 };
 
-export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
+export function BrowseTab({
+  accountId,
+  accountUUID,
+  handle,
+  palette,
+}: AccountTabProps) {
   const [category, setCategory] = useState<BrowseCategory>("posts");
   const [countLabel, setCountLabel] = useState<string>("");
   const [conversationHeader, setConversationHeader] = useState<{
@@ -64,11 +70,11 @@ export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
 
   const handleHeaderChange = useCallback(
     (
-      header: { visible: boolean; title: string; onBack: () => void } | null
+      header: { visible: boolean; title: string; onBack: () => void } | null,
     ) => {
       setConversationHeader(header);
     },
-    []
+    [],
   );
 
   // Reset count label and header when switching tabs
@@ -79,7 +85,7 @@ export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
 
   const ActiveCategory = useMemo(
     () => CATEGORY_COMPONENTS[category],
-    [category]
+    [category],
   );
 
   return (
@@ -157,6 +163,7 @@ export function BrowseTab({ accountId, handle, palette }: AccountTabProps) {
         handle={handle}
         palette={palette}
         accountId={accountId}
+        accountUUID={accountUUID}
         onCountChange={handleCountChange}
         onHeaderChange={handleHeaderChange}
       />

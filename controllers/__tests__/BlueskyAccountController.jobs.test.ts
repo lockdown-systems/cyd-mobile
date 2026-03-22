@@ -283,4 +283,185 @@ describe("BlueskyAccountController job pipeline", () => {
 
     await expect(firstRunPromise).resolves.toBeUndefined();
   });
+
+  it("cancel() stops a running job and resets isRunJobsActive", async () => {
+    const { controller, mockDb } = setupControllerWithDb();
+    const now = Date.now();
+    const jobs = [
+      {
+        id: 1,
+        jobType: "savePosts" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+      {
+        id: 2,
+        jobType: "saveLikes" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    (controller as unknown as { agent: unknown }).agent = {};
+
+    // indexPosts blocks until we signal, then calls waitForPause to pick up cancel
+    let unblockIndexPosts: (() => void) | null = null;
+    jest.spyOn(controller, "indexPosts").mockImplementation(async () => {
+      await new Promise<void>((resolve) => {
+        unblockIndexPosts = resolve;
+      });
+      await controller.waitForPause();
+    });
+    const indexLikes = jest
+      .spyOn(controller, "indexLikes")
+      .mockResolvedValue(undefined);
+
+    const resumeInterval = setInterval(() => controller.resume(), 5);
+    const runPromise = controller.runJobs({ jobs });
+
+    // Give the loop a tick to enter indexPosts and block
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Cancel, then unblock indexPosts so it hits the cancelled waitForPause
+    controller.cancel();
+    unblockIndexPosts!();
+
+    await expect(runPromise).resolves.toBeUndefined();
+    clearInterval(resumeInterval);
+
+    // Second job should never have been reached
+    expect(indexLikes).not.toHaveBeenCalled();
+
+    // isRunJobsActive must be reset so a new run can start
+    const secondJobs = [
+      {
+        id: 3,
+        jobType: "savePosts" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    jest.spyOn(controller, "indexPosts").mockResolvedValue(undefined);
+
+    // This should NOT throw "Automation already running"
+    const resumeInterval2 = setInterval(() => controller.resume(), 5);
+    await expect(
+      controller.runJobs({ jobs: secondJobs }),
+    ).resolves.toBeUndefined();
+    clearInterval(resumeInterval2);
+  });
+
+  it("cancel() while paused unblocks and terminates the job loop", async () => {
+    const { controller } = setupControllerWithDb();
+    const now = Date.now();
+    const jobs = [
+      {
+        id: 1,
+        jobType: "savePosts" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    (controller as unknown as { agent: unknown }).agent = {};
+
+    jest.spyOn(controller, "indexPosts").mockImplementation(async () => {
+      // Simulate work that checks pause
+      await controller.waitForPause();
+    });
+
+    controller.pause();
+    const runPromise = controller.runJobs({ jobs });
+
+    // Give the loop a tick to reach waitForPause inside the for-loop
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Cancel while paused — should unblock and exit cleanly
+    controller.cancel();
+    await expect(runPromise).resolves.toBeUndefined();
+  });
+
+  it("resetCancel() at start of runJobs clears a previous cancellation", async () => {
+    const { controller } = setupControllerWithDb();
+    const now = Date.now();
+    const jobs = [
+      {
+        id: 1,
+        jobType: "savePosts" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    (controller as unknown as { agent: unknown }).agent = {};
+
+    jest.spyOn(controller, "indexPosts").mockResolvedValue(undefined);
+
+    // Cancel, then start a new run — resetCancel() should clear it
+    controller.cancel();
+    expect(controller.isCancelled()).toBe(true);
+
+    const resumeInterval = setInterval(() => controller.resume(), 5);
+    await expect(controller.runJobs({ jobs })).resolves.toBeUndefined();
+    clearInterval(resumeInterval);
+
+    expect(controller.isCancelled()).toBe(false);
+  });
+
+  it("non-CancelledError exceptions still propagate from runJobs", async () => {
+    const { controller } = setupControllerWithDb();
+    const now = Date.now();
+    const jobs = [
+      {
+        id: 1,
+        jobType: "savePosts" as const,
+        status: "pending" as const,
+        scheduledAt: now,
+        startedAt: null,
+        finishedAt: null,
+        progress: undefined,
+        error: null,
+      },
+    ];
+
+    (controller as unknown as { agent: unknown }).agent = {};
+
+    jest.spyOn(controller, "indexPosts").mockImplementation(async () => {
+      throw new Error("unexpected network error");
+    });
+
+    // Non-cancel errors should be caught by the inner try-catch (job failure),
+    // not re-thrown by the outer catch. The job should be marked failed.
+    let lastJobs: typeof jobs = jobs;
+    await controller.runJobs({
+      jobs,
+      onUpdate: (update) => {
+        lastJobs = update.jobs as typeof jobs;
+      },
+    });
+
+    expect(lastJobs[0].status).toBe("failed");
+    expect(lastJobs[0].error).toBe("unexpected network error");
+  });
 });

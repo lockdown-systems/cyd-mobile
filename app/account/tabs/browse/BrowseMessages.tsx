@@ -1,29 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { MessagePreview } from "@/components/MessagePreview";
 import type {
-  ConversationPreviewData,
-  MessagePreviewData,
-  ProfileData,
+    ConversationPreviewData,
+    MessagePreviewData,
+    ProfileData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
 import {
-  type DeletedFilter,
-  fetchAccountMeta,
-  openAccountDb,
+    type DeletedFilter,
+    fetchAccountMeta,
+    getAccountDb,
 } from "@/components/account/browse-shared";
 import { BrowsePlaceholderCard } from "./BrowsePlaceholderCard";
 
@@ -31,6 +31,7 @@ type Props = {
   handle: string;
   palette: AccountTabPalette;
   accountId?: number;
+  accountUUID?: string;
   onCountChange?: (count: number, label: string) => void;
   onHeaderChange?: (
     header: {
@@ -76,6 +77,7 @@ export function BrowseMessages({
   handle,
   palette,
   accountId,
+  accountUUID,
   onCountChange,
   onHeaderChange,
 }: Props) {
@@ -90,7 +92,6 @@ export function BrowseMessages({
     useState<ConversationPreviewData | null>(null);
   const [filterText, setFilterText] = useState("");
   const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("all");
-  const accountUuidRef = useRef<string | null>(null);
 
   useEffect(() => {
     void loadConversations();
@@ -98,7 +99,7 @@ export function BrowseMessages({
   }, [accountId]);
 
   const loadConversations = async () => {
-    if (!accountId) {
+    if (!accountId || !accountUUID) {
       setError("Missing account");
       setLoadingConvos(false);
       return;
@@ -113,9 +114,7 @@ export function BrowseMessages({
         setError("Account not found");
         return;
       }
-      accountUuidRef.current = meta.uuid;
-
-      const db = await openAccountDb(meta.uuid);
+      const db = await getAccountDb(accountId, accountUUID);
       const convoRows = await db.getAllAsync<ConversationRow>(
         `SELECT convoId, memberDids, muted,
                 lastMessageText, lastMessageSentAt, lastMessageSenderDid
@@ -193,12 +192,11 @@ export function BrowseMessages({
   };
 
   const loadMessages = async (convoId: string) => {
-    const uuid = accountUuidRef.current;
-    if (!uuid) return;
+    if (!accountId || !accountUUID) return;
 
     setLoadingMessages(true);
     try {
-      const db = await openAccountDb(uuid);
+      const db = await getAccountDb(accountId, accountUUID);
 
       // Build deleted filter clause
       let deletedClause = "";
