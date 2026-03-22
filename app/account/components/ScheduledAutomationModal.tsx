@@ -1,22 +1,22 @@
 import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-  ButtonRow,
-  ErrorCard,
-  InfoBar,
-  StepRow,
-  SuccessCard,
-  styles,
-  type AutomationModalState,
+    ButtonRow,
+    ErrorCard,
+    InfoBar,
+    StepRow,
+    SuccessCard,
+    styles,
+    type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
@@ -24,14 +24,14 @@ import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import { ProfilePreview } from "@/components/ProfilePreview";
 import {
-  getBlueskyController,
-  type BlueskyAccountController,
+    getBlueskyController,
+    type BlueskyAccountController,
 } from "@/controllers";
 import type {
-  BlueskyJobRecord,
-  BlueskyJobRunUpdate,
-  PreviewData,
-  SaveAndDeleteJobOptions,
+    BlueskyJobRecord,
+    BlueskyJobRunUpdate,
+    PreviewData,
+    SaveAndDeleteJobOptions,
 } from "@/controllers/bluesky/job-types";
 import type { PostPreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -89,9 +89,19 @@ export function ScheduledAutomationModal({
     useRef<Promise<BlueskyAccountController> | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
+  const cancelledRef = useRef(false);
 
   const handleClose = useCallback(() => {
-    onClose(latestJobsRef.current);
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.cancel();
+    }
+    const jobs = latestJobsRef.current.map((job) =>
+      job.status === "running" || job.status === "pending"
+        ? { ...job, status: "canceled" as const }
+        : job,
+    );
+    onClose(jobs);
   }, [onClose]);
 
   const handleRestart = useMemo(
@@ -206,7 +216,7 @@ export function ScheduledAutomationModal({
   };
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
 
     const run = async () => {
       if (!visible || isRunningRef.current) {
@@ -232,7 +242,7 @@ export function ScheduledAutomationModal({
         const runJobsPromise = controller.runJobs({
           jobs: definedJobs,
           onUpdate: (update: BlueskyJobRunUpdate) => {
-            if (cancelled) return;
+            if (cancelledRef.current) return;
             latestJobsRef.current = update.jobs;
             setJobs(update.jobs);
             setActiveJobId(update.activeJobId);
@@ -262,7 +272,7 @@ export function ScheduledAutomationModal({
         });
 
         await runJobsPromise;
-        if (cancelled) return;
+        if (cancelledRef.current) return;
 
         const failed = latestJobsRef.current.some(
           (job) => job.status === "failed",
@@ -283,7 +293,7 @@ export function ScheduledAutomationModal({
           failed ? "failed" : "completed",
         );
       } catch (err) {
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
         setState("failed");
@@ -297,7 +307,7 @@ export function ScheduledAutomationModal({
     void run();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [visible, options, onFinished, ensureController, accountId, resetUi]);
 
@@ -325,6 +335,7 @@ export function ScheduledAutomationModal({
       // Clear callbacks and local refs only — the controller-manager owns the
       // controller lifecycle, so we do not dispose or close the DB here.
       if (controller) {
+        controller.cancel();
         controller.clearProgressCallback();
         controllerRef.current = null;
       }

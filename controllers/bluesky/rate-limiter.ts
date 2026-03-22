@@ -1,5 +1,6 @@
 import type { HeadersMap } from "@atproto/xrpc";
 
+import type { JobEmit } from "./job-types";
 import type { BlueskyProgress, RateLimitInfo, ResponseHeaders } from "./types";
 
 export type ApiRequestFn<T> = () => Promise<{
@@ -13,6 +14,15 @@ interface RateLimiterDeps {
   notifyRateLimit?: (info: RateLimitInfo) => void;
 }
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m > 0) {
+    return `${m}m ${s}s`;
+  }
+  return `${s}s`;
+}
+
 export class BlueskyRateLimiter {
   private rateLimitInfo: RateLimitInfo = {
     limit: 3000,
@@ -21,7 +31,17 @@ export class BlueskyRateLimiter {
     isLimited: false,
   };
 
+  private jobEmit: JobEmit | null = null;
+
   constructor(private deps: RateLimiterDeps) {}
+
+  setJobEmit(emit: JobEmit): void {
+    this.jobEmit = emit;
+  }
+
+  clearJobEmit(): void {
+    this.jobEmit = null;
+  }
 
   setRateLimitCallback(callback?: (info: RateLimitInfo) => void): void {
     this.deps.notifyRateLimit = callback;
@@ -50,7 +70,7 @@ export class BlueskyRateLimiter {
   }
 
   private async makeAuthenticatedRequest<T>(
-    requestFn: ApiRequestFn<T>
+    requestFn: ApiRequestFn<T>,
   ): Promise<{ data: T; headers?: ResponseHeaders }> {
     try {
       return await requestFn();
@@ -143,11 +163,18 @@ export class BlueskyRateLimiter {
     this.rateLimitInfo.resetAt = resetAt;
     this.notifyRateLimit();
 
+    this.emitRateLimitStatus(resetAt - now, true);
+
     await this.waitForRateLimitReset(resetAt);
 
     this.rateLimitInfo.isLimited = false;
     this.notifyRateLimit();
     this.deps.onProgressUpdate({ currentAction: "Resuming..." });
+
+    // Clear the rate-limit speech so the normal job speech resumes
+    if (this.jobEmit) {
+      this.jobEmit({ speechText: null, progressMessage: null });
+    }
   }
 
   private waitForRateLimitReset(resetAt: number): Promise<void> {
@@ -163,10 +190,26 @@ export class BlueskyRateLimiter {
           this.deps.onProgressUpdate({
             currentAction: `Rate limited. Resuming in ${remaining}s...`,
           });
+          this.emitRateLimitStatus(remaining);
           this.notifyRateLimit();
         }
       }, 1000);
     });
+  }
+
+  private emitRateLimitStatus(
+    remainingSeconds: number,
+    clearPreview = false,
+  ): void {
+    if (!this.jobEmit) return;
+    const update: Parameters<JobEmit>[0] = {
+      speechText: `Bluesky rate limit hit! Taking a short break...\n\n**I'll continue in:**\n**${formatDuration(remainingSeconds)}**`,
+      progressMessage: "Waiting for rate limit to expire...",
+    };
+    if (clearPreview) {
+      update.previewData = null;
+    }
+    this.jobEmit(update);
   }
 
   private notifyRateLimit(): void {

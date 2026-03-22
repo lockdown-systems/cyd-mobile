@@ -1,23 +1,23 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
 } from "react-native";
 
 import { DeleteAutomationModal } from "@/app/account/components/DeleteAutomationModal";
 import { FinishedModal } from "@/app/account/components/FinishedModal";
 import {
-  CheckboxRow,
-  Indented,
-  NumberInput,
-  PrimaryButton,
-  SecondaryButton,
-  StackHeader,
-  StatusCard,
+    CheckboxRow,
+    Indented,
+    NumberInput,
+    PrimaryButton,
+    SecondaryButton,
+    StackHeader,
+    StatusCard,
 } from "@/components/account/shared-tab-components";
 import { sharedTabStyles } from "@/components/account/shared-tab-styles";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
@@ -31,15 +31,15 @@ import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calcu
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
 import { getLastSavedAt, setLastDeletedAt } from "@/database/accounts";
 import {
-  getAccountDeleteSettings,
-  updateAccountDeleteSettings,
-  type AccountDeleteSettings,
+    getAccountDeleteSettings,
+    updateAccountDeleteSettings,
+    type AccountDeleteSettings,
 } from "@/database/delete-settings";
 import { submitBlueskyProgress } from "@/services/submit-bluesky-progress";
 import type {
-  AccountTabKey,
-  AccountTabPalette,
-  AccountTabProps,
+    AccountTabKey,
+    AccountTabPalette,
+    AccountTabProps,
 } from "@/types/account-tabs";
 
 type DeleteFlowScreen = "form" | "review";
@@ -752,6 +752,33 @@ type DeleteReviewScreenProps = {
   refreshKey: number;
 };
 
+function estimateDeletionTime(counts: DeletionPreviewCounts): string | null {
+  const total =
+    counts.posts +
+    counts.reposts +
+    counts.likes +
+    counts.messages +
+    counts.bookmarks +
+    counts.follows;
+
+  if (total <= 0) return null;
+
+  // Each delete costs 1 rate-limit point. Bluesky limits: 5,000 pts/hour, 35,000 pts/day.
+  const POINTS_PER_HOUR = 5000;
+  const POINTS_PER_DAY = 35000;
+
+  if (total <= POINTS_PER_HOUR) return null;
+
+  const hours = Math.ceil(total / POINTS_PER_HOUR);
+  const days = Math.ceil(total / POINTS_PER_DAY);
+  const formattedTotal = total.toLocaleString();
+
+  if (days > 1) {
+    return `Due to Bluesky rate limits, deleting ${formattedTotal} items will take approximately ${days} days. Cyd will automatically pause and resume as needed.`;
+  }
+  return `Due to Bluesky rate limits, deleting ${formattedTotal} items will take approximately ${hours} ${hours === 1 ? "hour" : "hours"}. Cyd will automatically pause and resume as needed.`;
+}
+
 function DeleteReviewScreen({
   accountId,
   accountUUID,
@@ -1039,6 +1066,31 @@ function DeleteReviewScreen({
             })
           )}
         </View>
+        {!countsLoading &&
+          !countsError &&
+          counts &&
+          (() => {
+            const estimate = estimateDeletionTime(counts);
+            if (!estimate) return null;
+            return (
+              <View
+                style={[
+                  styles.estimateCard,
+                  { borderColor: palette.icon + "22" },
+                ]}
+              >
+                <MaterialIcons
+                  name="schedule"
+                  size={20}
+                  color={palette.icon}
+                  style={styles.estimateIcon}
+                />
+                <Text style={[styles.estimateText, { color: palette.icon }]}>
+                  {estimate}
+                </Text>
+              </View>
+            );
+          })()}
       </ScrollView>
       <View
         style={[
@@ -1107,6 +1159,23 @@ const styles = {
   reviewPostsButtonText: {
     fontSize: 13,
     fontWeight: "600" as const,
+  },
+  estimateCard: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    gap: 10,
+  },
+  estimateIcon: {
+    marginTop: 2,
+  },
+  estimateText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
 };
 

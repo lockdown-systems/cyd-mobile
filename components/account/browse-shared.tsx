@@ -1,23 +1,23 @@
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import { type SQLiteDatabase } from "expo-sqlite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 import { PostPreview } from "@/components/PostPreview";
-import { buildAccountPaths } from "@/controllers/BaseAccountController";
+import { getBlueskyController } from "@/controllers";
 import type {
-  ExternalEmbed,
-  MediaAttachment,
-  PostPreviewData,
+    ExternalEmbed,
+    MediaAttachment,
+    PostPreviewData,
 } from "@/controllers/bluesky/types";
 import { getDatabase } from "@/database";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -27,6 +27,7 @@ export type BrowseProps = {
   handle: string;
   palette: AccountTabPalette;
   accountId?: number;
+  accountUUID?: string;
   onCountChange?: (count: number, label: string) => void;
 };
 
@@ -259,15 +260,12 @@ export async function fetchExternalEmbedsForPosts(
   return externalMap;
 }
 
-export async function openAccountDb(uuid: string): Promise<SQLiteDatabase> {
-  const paths = buildAccountPaths("bluesky", uuid);
-  const db = await openDatabaseAsync(
-    paths.dbNameForSQLite,
-    {},
-    paths.dbDirForSQLite,
-  );
-  await db.execAsync("PRAGMA foreign_keys = ON;");
-  return db;
+export async function getAccountDb(
+  accountId: number,
+  accountUUID: string,
+): Promise<SQLiteDatabase> {
+  const controller = await getBlueskyController(accountId, accountUUID);
+  return controller.getDb();
 }
 
 /**
@@ -437,16 +435,20 @@ export function getEmptyMessage(type: BrowseType, hasFilter: boolean): string {
   }
 }
 
-export function buildTotalCountQuery(type: BrowseType): string {
+export function buildTotalCountQuery(
+  type: BrowseType,
+  deletedFilter: DeletedFilter = "all",
+): string {
+  const deletedClause = getDeletedFilterClause(type, deletedFilter);
   switch (type) {
     case "posts":
-      return `SELECT COUNT(*) as count FROM post WHERE authorDid = ? AND isRepost = 0;`;
+      return `SELECT COUNT(*) as count FROM post p WHERE p.authorDid = ? AND p.isRepost = 0${deletedClause};`;
     case "reposts":
-      return `SELECT COUNT(*) as count FROM post WHERE viewerReposted = 1;`;
+      return `SELECT COUNT(*) as count FROM post p WHERE p.viewerReposted = 1${deletedClause};`;
     case "likes":
-      return `SELECT COUNT(*) as count FROM post WHERE viewerLiked = 1;`;
+      return `SELECT COUNT(*) as count FROM post p WHERE p.viewerLiked = 1${deletedClause};`;
     case "bookmarks":
-      return `SELECT COUNT(*) as count FROM post WHERE viewerBookmarked = 1;`;
+      return `SELECT COUNT(*) as count FROM post p WHERE p.viewerBookmarked = 1${deletedClause};`;
   }
 }
 
@@ -471,6 +473,7 @@ export function BrowseList({
   handle,
   palette,
   accountId,
+  accountUUID,
   type,
   onCountChange,
 }: BrowseProps & { type: BrowseType }) {
@@ -483,11 +486,10 @@ export function BrowseList({
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const cursorRef = useRef<Cursor | null>(null);
-  const accountDbRef = useRef<SQLiteDatabase | null>(null);
   const metaRef = useRef<AccountMeta | null>(null);
 
   const loadFirstPage = useCallback(async () => {
-    if (!accountId) {
+    if (!accountId || !accountUUID) {
       setError("Missing account");
       setLoadingInitial(false);
       return;
@@ -514,11 +516,10 @@ export function BrowseList({
         return;
       }
 
-      const db = await openAccountDb(meta.uuid);
-      accountDbRef.current = db;
+      const db = await getAccountDb(accountId, accountUUID);
 
-      // Fetch total count first
-      const countQuery = buildTotalCountQuery(type);
+      // Fetch total count first (respects the deleted filter)
+      const countQuery = buildTotalCountQuery(type, deletedFilter);
       const countParams = getTotalCountParams(type, meta.did);
       const countResult = await db.getFirstAsync<{ count: number }>(
         countQuery,
@@ -566,23 +567,23 @@ export function BrowseList({
     } finally {
       setLoadingInitial(false);
     }
-  }, [accountId, deletedFilter, handle, type]);
+  }, [accountId, accountUUID, deletedFilter, handle, type]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || loadingInitial || !hasMore) {
       return;
     }
 
-    const db = accountDbRef.current;
     const meta = metaRef.current;
     const cursor = cursorRef.current;
 
-    if (!db || !meta?.did || !cursor) {
+    if (!meta?.did || !cursor || !accountId || !accountUUID) {
       return;
     }
 
     setLoadingMore(true);
     try {
+      const db = await getAccountDb(accountId, accountUUID);
       const query = buildLoadMoreQuery(type, deletedFilter);
       const params = getLoadMoreParams(type, meta.did, cursor);
       const rows = await db.getAllAsync<PostRow>(query, params);
@@ -623,40 +624,54 @@ export function BrowseList({
     } finally {
       setLoadingMore(false);
     }
-  }, [deletedFilter, handle, hasMore, loadingInitial, loadingMore, type]);
+  }, [
+    accountId,
+    accountUUID,
+    deletedFilter,
+    handle,
+    hasMore,
+    loadingInitial,
+    loadingMore,
+    type,
+  ]);
 
   // Toggle preserve flag for a post (only for "posts" type browsing)
-  const handlePreserveToggle = useCallback((postUri: string) => {
-    const db = accountDbRef.current;
-    if (!db) return;
+  const handlePreserveToggle = useCallback(
+    (postUri: string) => {
+      if (!accountId || !accountUUID) return;
 
-    void (async () => {
-      try {
-        // Get current preserve value
-        const row = await db.getFirstAsync<{ preserve: number }>(
-          `SELECT preserve FROM post WHERE uri = ?;`,
-          [postUri],
-        );
-        if (!row) return;
+      void (async () => {
+        try {
+          const db = await getAccountDb(accountId, accountUUID);
+          // Get current preserve value
+          const row = await db.getFirstAsync<{ preserve: number }>(
+            `SELECT preserve FROM post WHERE uri = ?;`,
+            [postUri],
+          );
+          if (!row) return;
 
-        // Toggle preserve value
-        const newValue = row.preserve === 1 ? 0 : 1;
-        await db.runAsync(`UPDATE post SET preserve = ? WHERE uri = ?;`, [
-          newValue,
-          postUri,
-        ]);
+          // Toggle preserve value
+          const newValue = row.preserve === 1 ? 0 : 1;
+          await db.runAsync(`UPDATE post SET preserve = ? WHERE uri = ?;`, [
+            newValue,
+            postUri,
+          ]);
 
-        // Update local state
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.uri === postUri ? { ...post, preserve: newValue === 1 } : post,
-          ),
-        );
-      } catch (err) {
-        console.error("Failed to toggle preserve:", err);
-      }
-    })();
-  }, []);
+          // Update local state
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.uri === postUri
+                ? { ...post, preserve: newValue === 1 }
+                : post,
+            ),
+          );
+        } catch (err) {
+          console.error("Failed to toggle preserve:", err);
+        }
+      })();
+    },
+    [accountId, accountUUID],
+  );
 
   useEffect(() => {
     void loadFirstPage();
@@ -683,9 +698,7 @@ export function BrowseList({
     const hasTextFilter = filterText.trim().length > 0;
     const hasDeletedFilter = deletedFilter !== "all";
 
-    // Determine the base count - when deleted filter is active, use loaded posts count
-    const baseCount = hasDeletedFilter ? posts.length : totalCount;
-    const displayCount = hasTextFilter ? filteredPosts.length : baseCount;
+    const displayCount = hasTextFilter ? filteredPosts.length : totalCount;
 
     // Build the label
     let label = `Showing ${displayCount.toLocaleString()} ${typeLabel}`;

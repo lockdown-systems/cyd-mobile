@@ -1,36 +1,36 @@
 import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-  ButtonRow,
-  ErrorCard,
-  InfoBar,
-  StepRow,
-  SuccessCard,
-  styles,
-  type AutomationModalState,
+    ButtonRow,
+    ErrorCard,
+    InfoBar,
+    StepRow,
+    SuccessCard,
+    styles,
+    type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import { ProfilePreview } from "@/components/ProfilePreview";
 import {
-  getBlueskyController,
-  type BlueskyAccountController,
+    getBlueskyController,
+    type BlueskyAccountController,
 } from "@/controllers";
 import type {
-  BlueskyJobRecord,
-  BlueskyJobRunUpdate,
-  DeleteJobOptions,
-  PreviewData,
+    BlueskyJobRecord,
+    BlueskyJobRunUpdate,
+    DeleteJobOptions,
+    PreviewData,
 } from "@/controllers/bluesky/job-types";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -90,8 +90,13 @@ export function DeleteAutomationModal({
     useRef<Promise<BlueskyAccountController> | null>(null);
   const latestJobsRef = useRef<BlueskyJobRecord[]>([]);
   const isRunningRef = useRef(false);
+  const cancelledRef = useRef(false);
 
   const handleClose = useCallback(() => {
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.cancel();
+    }
     const jobs = latestJobsRef.current.map((job) =>
       job.status === "running" || job.status === "pending"
         ? { ...job, status: "canceled" as const }
@@ -197,7 +202,7 @@ export function DeleteAutomationModal({
   );
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
 
     const run = async () => {
       if (!visible || isRunningRef.current) {
@@ -224,7 +229,7 @@ export function DeleteAutomationModal({
         const runJobsPromise = controller.runJobs({
           jobs: definedJobs,
           onUpdate: (update: BlueskyJobRunUpdate) => {
-            if (cancelled) return;
+            if (cancelledRef.current) return;
             latestJobsRef.current = update.jobs;
             setJobs(update.jobs);
             setActiveJobId(update.activeJobId);
@@ -256,7 +261,7 @@ export function DeleteAutomationModal({
         });
 
         await runJobsPromise;
-        if (cancelled) return;
+        if (cancelledRef.current) return;
 
         const failed = latestJobsRef.current.some(
           (job) => job.status === "failed",
@@ -277,7 +282,7 @@ export function DeleteAutomationModal({
           failed ? "failed" : "completed",
         );
       } catch (err) {
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
         setState("failed");
@@ -291,8 +296,9 @@ export function DeleteAutomationModal({
     void run();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     visible,
     settings,
@@ -300,7 +306,8 @@ export function DeleteAutomationModal({
     onFinished,
     ensureController,
     accountId,
-    resetUi,
+    // Note: resetUi intentionally excluded — it depends on totalItemsToDelete
+    // which changes as items are deleted. Including it would restart the job.
   ]);
 
   useEffect(() => {
@@ -325,6 +332,7 @@ export function DeleteAutomationModal({
       // Clear callbacks and local refs only — the controller-manager owns the
       // controller lifecycle, so we do not dispose or close the DB here.
       if (controller) {
+        controller.cancel();
         controller.clearProgressCallback();
         controllerRef.current = null;
       }
