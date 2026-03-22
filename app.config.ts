@@ -33,7 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           },
         ],
       },
-      icon: "./assets/images/icon.png",
+      icon: "./assets/images/cyd.icon",
     },
     android: {
       versionCode: 10,
