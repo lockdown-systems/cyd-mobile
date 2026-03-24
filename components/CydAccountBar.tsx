@@ -28,9 +28,13 @@ import { CydSignInModal } from "./CydSignInModal";
 
 type CydAccountBarProps = {
   onShowOnboarding?: () => void;
+  hidden?: boolean;
 };
 
-export function CydAccountBar({ onShowOnboarding }: CydAccountBarProps) {
+export function CydAccountBar({
+  onShowOnboarding,
+  hidden,
+}: CydAccountBarProps) {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom;
   const barBottomPadding =
@@ -142,7 +146,7 @@ export function CydAccountBar({ onShowOnboarding }: CydAccountBarProps) {
     }
   }, [isImporting, refresh]);
 
-  if (state.isLoading) {
+  if (state.isLoading || hidden) {
     return null;
   }
 
