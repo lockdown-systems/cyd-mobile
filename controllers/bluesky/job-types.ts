@@ -54,6 +54,8 @@ export type BlueskyJobRunUpdate = {
   previewData?: PreviewData | null;
   /** Optional progress snapshot for the active job */
   progress?: unknown;
+  /** Unix timestamp (seconds) when the current rate limit expires, or null when not rate-limited */
+  rateLimitResetAt?: number | null;
 };
 
 export type JobEmit = (update: {
@@ -68,6 +70,8 @@ export type JobEmit = (update: {
   previewData?: PreviewData | null;
   /** Optional progress snapshot for the active job */
   progress?: unknown;
+  /** Unix timestamp (seconds) when the current rate limit expires, or null when not rate-limited */
+  rateLimitResetAt?: number | null;
 }) => void;
 
 export type {

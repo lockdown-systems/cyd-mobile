@@ -14,15 +14,6 @@ interface RateLimiterDeps {
   notifyRateLimit?: (info: RateLimitInfo) => void;
 }
 
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m > 0) {
-    return `${m}m ${s}s`;
-  }
-  return `${s}s`;
-}
-
 export class BlueskyRateLimiter {
   private rateLimitInfo: RateLimitInfo = {
     limit: 3000,
@@ -159,11 +150,21 @@ export class BlueskyRateLimiter {
       resetAt = now + 300;
     }
 
+    console.log(
+      "[RateLimiter] Rate limit hit! resetAt:",
+      resetAt,
+      "now:",
+      now,
+      "wait:",
+      resetAt - now,
+      "s",
+    );
+
     this.rateLimitInfo.isLimited = true;
     this.rateLimitInfo.resetAt = resetAt;
     this.notifyRateLimit();
 
-    this.emitRateLimitStatus(resetAt - now, true);
+    this.emitRateLimitStatus(resetAt, true);
 
     await this.waitForRateLimitReset(resetAt);
 
@@ -171,9 +172,13 @@ export class BlueskyRateLimiter {
     this.notifyRateLimit();
     this.deps.onProgressUpdate({ currentAction: "Resuming..." });
 
-    // Clear the rate-limit speech so the normal job speech resumes
+    // Clear the rate-limit speech and countdown so the normal job speech resumes
     if (this.jobEmit) {
-      this.jobEmit({ speechText: null, progressMessage: null });
+      this.jobEmit({
+        speechText: null,
+        progressMessage: null,
+        rateLimitResetAt: null,
+      });
     }
   }
 
@@ -190,21 +195,24 @@ export class BlueskyRateLimiter {
           this.deps.onProgressUpdate({
             currentAction: `Rate limited. Resuming in ${remaining}s...`,
           });
-          this.emitRateLimitStatus(remaining);
           this.notifyRateLimit();
         }
       }, 1000);
     });
   }
 
-  private emitRateLimitStatus(
-    remainingSeconds: number,
-    clearPreview = false,
-  ): void {
-    if (!this.jobEmit) return;
+  private emitRateLimitStatus(resetAt: number, clearPreview = false): void {
+    if (!this.jobEmit) {
+      console.warn(
+        "[RateLimiter] jobEmit not set, cannot emit rate limit status",
+      );
+      return;
+    }
+    console.log("[RateLimiter] Emitting rate limit status, resetAt:", resetAt);
     const update: Parameters<JobEmit>[0] = {
-      speechText: `Bluesky rate limit hit! Taking a short break...\n\n**I'll continue in:**\n**${formatDuration(remainingSeconds)}**`,
+      speechText: "Bluesky rate limit hit! Taking a short break...",
       progressMessage: "Waiting for rate limit to expire...",
+      rateLimitResetAt: resetAt,
     };
     if (clearPreview) {
       update.previewData = null;

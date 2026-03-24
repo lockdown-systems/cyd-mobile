@@ -103,14 +103,16 @@ describe("BlueskyRateLimiter", () => {
     expect(result).toBe("success after retry");
     expect(requestFn).toHaveBeenCalledTimes(2);
 
-    // Verify job emit was called with rate limit speech
+    // Verify job emit was called with rate limit speech and resetAt
     expect(jobEmit).toHaveBeenCalled();
     const firstEmit = jobEmitCalls[0];
-    expect(firstEmit.speechText).toMatch(/rate limit/i);
-    expect(firstEmit.speechText).toMatch(/I'll continue in/);
+    expect(firstEmit.speechText).toBe(
+      "Bluesky rate limit hit! Taking a short break...",
+    );
     expect(firstEmit.progressMessage).toBe(
       "Waiting for rate limit to expire...",
     );
+    expect(firstEmit.rateLimitResetAt).toBe(resetAt);
     expect(firstEmit.previewData).toBeNull();
 
     // Verify rate limit info was updated during the wait
@@ -178,12 +180,11 @@ describe("BlueskyRateLimiter", () => {
 
     const resultPromise = limiter.makeApiRequest(requestFn);
 
-    // The first emit should mention ~5m (300s)
+    // The first emit should mention the rate limit
     await jest.advanceTimersByTimeAsync(1000);
     expect(jobEmitCalls.length).toBeGreaterThan(0);
     const speech = jobEmitCalls[0].speechText as string;
-    // First emit is from handleRateLimit before the interval, showing full 300s
-    expect(speech).toMatch(/5m 0s/);
+    expect(speech).toBe("Bluesky rate limit hit! Taking a short break...");
 
     // Fast-forward past the 300s wait
     await jest.advanceTimersByTimeAsync(300_000);

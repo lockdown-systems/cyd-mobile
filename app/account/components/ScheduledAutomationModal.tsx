@@ -1,37 +1,38 @@
 import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-    ButtonRow,
-    ErrorCard,
-    InfoBar,
-    StepRow,
-    SuccessCard,
-    styles,
-    type AutomationModalState,
+  ButtonRow,
+  ErrorCard,
+  InfoBar,
+  StepRow,
+  SuccessCard,
+  styles,
+  type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
+import { RateLimitCountdown } from "@/components/account/RateLimitCountdown";
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import { ProfilePreview } from "@/components/ProfilePreview";
 import {
-    getBlueskyController,
-    type BlueskyAccountController,
+  getBlueskyController,
+  type BlueskyAccountController,
 } from "@/controllers";
 import type {
-    BlueskyJobRecord,
-    BlueskyJobRunUpdate,
-    PreviewData,
-    SaveAndDeleteJobOptions,
+  BlueskyJobRecord,
+  BlueskyJobRunUpdate,
+  PreviewData,
+  SaveAndDeleteJobOptions,
 } from "@/controllers/bluesky/job-types";
 import type { PostPreviewData } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -82,6 +83,7 @@ export function ScheduledAutomationModal({
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [rateLimitResetAt, setRateLimitResetAt] = useState<number | null>(null);
   const [activeJobProgress, setActiveJobProgress] = useState(0);
   const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
@@ -118,6 +120,7 @@ export function ScheduledAutomationModal({
     setPreviewData(null);
     setActiveJobProgress(0);
     setActiveJobUnknownTotal(false);
+    setRateLimitResetAt(null);
     latestJobsRef.current = [];
   }, []);
 
@@ -268,6 +271,9 @@ export function ScheduledAutomationModal({
             if (update.previewData !== undefined) {
               setPreviewData(update.previewData ?? null);
             }
+            if (update.rateLimitResetAt !== undefined) {
+              setRateLimitResetAt(update.rateLimitResetAt);
+            }
           },
         });
 
@@ -321,6 +327,7 @@ export function ScheduledAutomationModal({
     setActiveJobProgress(0);
     setPreviewPost(null);
     setPreviewData(null);
+    setRateLimitResetAt(null);
   }, [activeJobId]);
 
   useEffect(() => {
@@ -479,7 +486,9 @@ export function ScheduledAutomationModal({
           bounces={true}
         >
           {/* Render appropriate preview based on previewData type */}
-          {previewData?.type === "post" ? (
+          {rateLimitResetAt ? (
+            <RateLimitCountdown resetAt={rateLimitResetAt} palette={palette} />
+          ) : previewData?.type === "post" ? (
             <PostPreview post={previewData.data} palette={palette} />
           ) : previewData?.type === "conversation" ? (
             <ConversationPreview
