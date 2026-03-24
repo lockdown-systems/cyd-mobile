@@ -131,7 +131,9 @@ export function DashboardTab({
                   </Text>
                 </View>
               )}
-              <Image source={card.icon} style={styles.icon} />
+              <View style={styles.iconContainer}>
+                <Image source={card.icon} style={styles.icon} />
+              </View>
               <Text style={[styles.title, { color: palette.text }]}>
                 {card.title}
               </Text>
@@ -183,10 +185,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
   },
+  iconContainer: {
+    marginTop: 15,
+    marginBottom: 8,
+  },
   icon: {
     width: 60,
     height: 60,
-    marginBottom: 8,
   },
   title: {
     fontSize: 18,
