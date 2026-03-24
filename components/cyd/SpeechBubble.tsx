@@ -12,9 +12,10 @@ const AVATAR_HEIGHT = Math.max(110, TARGET_HEIGHT * 0.65);
 
 type SpeechBubbleProps = {
   message: string;
+  avatarHeight?: number;
 };
 
-export function SpeechBubble({ message }: SpeechBubbleProps) {
+export function SpeechBubble({ message, avatarHeight }: SpeechBubbleProps) {
   const colorScheme = useColorScheme();
   const palette = getThemePalette(colorScheme);
   const bubbleBackground = colorScheme === "dark" ? "#202020ff" : "#f3f3f3";
@@ -58,7 +59,7 @@ export function SpeechBubble({ message }: SpeechBubbleProps) {
 
   return (
     <View style={styles.wrapper} accessibilityRole="text">
-      <CydAvatar height={AVATAR_HEIGHT} style={styles.avatar} />
+      <CydAvatar height={avatarHeight ?? AVATAR_HEIGHT} style={styles.avatar} />
       <View
         style={[
           styles.bubble,

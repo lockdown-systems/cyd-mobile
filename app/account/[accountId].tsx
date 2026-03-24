@@ -10,7 +10,6 @@ import {
   useEffect,
   useMemo,
   useState,
-  type ComponentProps,
   type ComponentType,
 } from "react";
 import {
@@ -21,6 +20,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ImageSourcePropType,
 } from "react-native";
 import {
   SafeAreaView,
@@ -28,6 +28,12 @@ import {
 } from "react-native-safe-area-context";
 
 import { AccountMenuSheet } from "@/app/account/components/AccountMenuSheet";
+
+import iconBrowse from "@/assets/images/icon-browse.png";
+import iconDelete from "@/assets/images/icon-delete.png";
+import iconHome from "@/assets/images/icon-home.png";
+import iconSave from "@/assets/images/icon-save.png";
+import iconSchedule from "@/assets/images/icon-schedule.png";
 
 import { getThemePalette } from "@/constants/theme";
 import {
@@ -54,7 +60,7 @@ import { DeleteTab } from "./tabs/delete-tab";
 import { SaveTab } from "./tabs/save-tab";
 import { ScheduleTab } from "./tabs/schedule-tab";
 
-export default function AccountPlaceholderScreen() {
+export default function AccountScreen() {
   const params = useLocalSearchParams<{
     accountId: string | string[];
     initialTab?: AccountTabKey;
@@ -521,10 +527,9 @@ export default function AccountPlaceholderScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                   >
-                    <MaterialIcons
-                      name={tab.icon}
-                      size={20}
-                      color={selected ? palette.tint : palette.icon}
+                    <Image
+                      source={tab.icon}
+                      style={[styles.tabIcon, { opacity: selected ? 1 : 0.5 }]}
                     />
                     <Text
                       style={[
@@ -560,15 +565,15 @@ export default function AccountPlaceholderScreen() {
 type TabConfig = {
   key: AccountTabKey;
   label: string;
-  icon: ComponentProps<typeof MaterialIcons>["name"];
+  icon: ImageSourcePropType;
 };
 
 const TAB_CONFIG: TabConfig[] = [
-  { key: "dashboard", label: "Home", icon: "home" },
-  { key: "save", label: "Save", icon: "download" },
-  { key: "delete", label: "Delete", icon: "local-fire-department" },
-  { key: "schedule", label: "Schedule", icon: "schedule" },
-  { key: "browse", label: "Browse", icon: "preview" },
+  { key: "dashboard", label: "Home", icon: iconHome },
+  { key: "save", label: "Save", icon: iconSave },
+  { key: "delete", label: "Delete", icon: iconDelete },
+  { key: "schedule", label: "Schedule", icon: iconSchedule },
+  { key: "browse", label: "Browse", icon: iconBrowse },
 ];
 
 const TAB_COMPONENTS: Record<AccountTabKey, ComponentType<AccountTabProps>> = {
@@ -684,6 +689,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 4,
     borderRadius: 16,
+  },
+  tabIcon: {
+    width: 24,
+    height: 24,
   },
   tabLabel: {
     fontSize: 12,

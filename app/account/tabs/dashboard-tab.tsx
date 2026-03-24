@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -97,12 +96,12 @@ export function DashboardTab({
   };
 
   return (
-    <>
-      <SpeechBubble message="It's your data.\n\n**What do you want to do with it?**" />
-      <ScrollView
-        contentContainerStyle={[styles.grid, { paddingBottom: 24 }]}
-        showsVerticalScrollIndicator={false}
-      >
+    <View style={styles.container}>
+      <SpeechBubble
+        avatarHeight={80}
+        message="It's your data. **What do you want to do with it?**"
+      />
+      <View style={styles.grid}>
         {CARDS.map((card) => {
           const badge = getBadge(card.key);
           return (
@@ -132,35 +131,43 @@ export function DashboardTab({
                   </Text>
                 </View>
               )}
-              <Image source={card.icon} style={styles.icon} />
-              <View style={styles.textStack}>
-                <Text style={[styles.title, { color: palette.text }]}>
-                  {card.title}
-                </Text>
-                <Text style={[styles.description, { color: palette.icon }]}>
-                  {card.description(handle)}
-                </Text>
+              <View style={styles.iconContainer}>
+                <Image source={card.icon} style={styles.icon} />
               </View>
+              <Text style={[styles.title, { color: palette.text }]}>
+                {card.title}
+              </Text>
+              <Text style={[styles.description, { color: palette.icon }]}>
+                {card.description(handle)}
+              </Text>
             </Pressable>
           );
         })}
-      </ScrollView>
-    </>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   grid: {
-    flexGrow: 1,
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
+    alignContent: "stretch",
   },
   card: {
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 20,
-    flexDirection: "row",
-    gap: 16,
+    padding: 14,
+    flexBasis: "48%",
+    flexGrow: 1,
+    maxWidth: "49%",
     alignItems: "center",
+    justifyContent: "flex-start",
     position: "relative",
     overflow: "hidden",
   },
@@ -168,33 +175,36 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     right: 0,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderBottomLeftRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomLeftRadius: 10,
   },
   badgeText: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
     textTransform: "uppercase",
   },
-  icon: {
-    width: 64,
-    height: 64,
+  iconContainer: {
+    marginTop: 15,
+    marginBottom: 8,
   },
-  textStack: {
-    flex: 1,
+  icon: {
+    width: 60,
+    height: 60,
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
-    marginBottom: 6,
-    textAlign: "left",
+    marginBottom: 4,
+    textAlign: "center",
   },
   description: {
     fontSize: 15,
-    lineHeight: 21,
+    lineHeight: 18,
     textAlign: "left",
+    marginTop: "auto",
+    marginBottom: "auto",
   },
 });
 
