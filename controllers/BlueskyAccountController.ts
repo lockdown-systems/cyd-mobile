@@ -774,6 +774,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           previewPost: update.previewPost,
           previewData: update.previewData,
           progress: update.progress,
+          rateLimitResetAt: update.rateLimitResetAt,
         });
       };
 
@@ -823,6 +824,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
             previewPost: update.previewPost,
             previewData: update.previewData,
             progress: update.progress,
+            rateLimitResetAt: update.rateLimitResetAt,
           });
         };
 

@@ -1,36 +1,37 @@
 import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-    ButtonRow,
-    ErrorCard,
-    InfoBar,
-    StepRow,
-    SuccessCard,
-    styles,
-    type AutomationModalState,
+  ButtonRow,
+  ErrorCard,
+  InfoBar,
+  StepRow,
+  SuccessCard,
+  styles,
+  type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
+import { RateLimitCountdown } from "@/components/account/RateLimitCountdown";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import { ProfilePreview } from "@/components/ProfilePreview";
 import {
-    getBlueskyController,
-    type BlueskyAccountController,
+  getBlueskyController,
+  type BlueskyAccountController,
 } from "@/controllers";
 import type {
-    BlueskyJobRecord,
-    BlueskyJobRunUpdate,
-    DeleteJobOptions,
-    PreviewData,
+  BlueskyJobRecord,
+  BlueskyJobRunUpdate,
+  DeleteJobOptions,
+  PreviewData,
 } from "@/controllers/bluesky/job-types";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 import type { AccountTabPalette } from "@/types/account-tabs";
@@ -83,6 +84,7 @@ export function DeleteAutomationModal({
   const [paused, setPaused] = useState(false);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [rateLimitResetAt, setRateLimitResetAt] = useState<number | null>(null);
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
@@ -130,6 +132,7 @@ export function DeleteAutomationModal({
     setPreviewData(null);
     setCurrentItemIndex(0);
     setTotalItems(totalItemsToDelete);
+    setRateLimitResetAt(null);
     latestJobsRef.current = [];
   }, [totalItemsToDelete]);
 
@@ -244,6 +247,13 @@ export function DeleteAutomationModal({
             if (update.previewData !== undefined) {
               setPreviewData(update.previewData ?? null);
             }
+            if (update.rateLimitResetAt !== undefined) {
+              console.log(
+                "[DeleteAutomationModal] rateLimitResetAt:",
+                update.rateLimitResetAt,
+              );
+              setRateLimitResetAt(update.rateLimitResetAt ?? null);
+            }
             // Track overall progress through items
             if (update.progress && typeof update.progress === "object") {
               const prog = update.progress as {
@@ -318,6 +328,7 @@ export function DeleteAutomationModal({
 
   useEffect(() => {
     setPreviewData(null);
+    setRateLimitResetAt(null);
   }, [activeJobId]);
 
   useEffect(() => {
@@ -467,7 +478,9 @@ export function DeleteAutomationModal({
           bounces={true}
         >
           {/* Render appropriate preview based on previewData type */}
-          {previewData?.type === "post" ? (
+          {rateLimitResetAt ? (
+            <RateLimitCountdown resetAt={rateLimitResetAt} palette={palette} />
+          ) : previewData?.type === "post" ? (
             <PostPreview post={previewData.data} palette={palette} />
           ) : previewData?.type === "message" ? (
             <MessagePreview message={previewData.data} palette={palette} />

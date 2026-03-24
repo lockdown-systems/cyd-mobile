@@ -1,34 +1,35 @@
 import { useKeepAwake } from "expo-keep-awake";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 
 import {
-    ButtonRow,
-    ErrorCard,
-    InfoBar,
-    StepRow,
-    SuccessCard,
-    styles,
-    type AutomationModalState,
+  ButtonRow,
+  ErrorCard,
+  InfoBar,
+  StepRow,
+  SuccessCard,
+  styles,
+  type AutomationModalState,
 } from "@/components/account/AutomationModalShared";
+import { RateLimitCountdown } from "@/components/account/RateLimitCountdown";
 import { ConversationPreview } from "@/components/ConversationPreview";
 import { SpeechBubble } from "@/components/cyd/SpeechBubble";
 import { MessagePreview } from "@/components/MessagePreview";
 import { PostPreview } from "@/components/PostPreview";
 import {
-    getBlueskyController,
-    type BlueskyAccountController,
+  getBlueskyController,
+  type BlueskyAccountController,
 } from "@/controllers";
 import type {
-    BlueskyJobRecord,
-    BlueskyJobRunUpdate,
-    SaveJobOptions,
+  BlueskyJobRecord,
+  BlueskyJobRunUpdate,
+  SaveJobOptions,
 } from "@/controllers/bluesky/job-types";
 import type { PostPreviewData, PreviewData } from "@/controllers/bluesky/types";
 import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
@@ -76,6 +77,7 @@ export function SaveAutomationModal({
   const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
   const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [rateLimitResetAt, setRateLimitResetAt] = useState<number | null>(null);
   const controllerRef = useRef<BlueskyAccountController | null>(null);
   const controllerInitPromiseRef =
     useRef<Promise<BlueskyAccountController> | null>(null);
@@ -109,6 +111,7 @@ export function SaveAutomationModal({
     setPreviewPost(null);
     setPreviewData(null);
     setActiveJobUnknownTotal(false);
+    setRateLimitResetAt(null);
     latestJobsRef.current = [];
   };
 
@@ -243,6 +246,9 @@ export function SaveAutomationModal({
             if (update.previewData !== undefined) {
               setPreviewData(update.previewData);
             }
+            if (update.rateLimitResetAt !== undefined) {
+              setRateLimitResetAt(update.rateLimitResetAt);
+            }
           },
         });
 
@@ -296,6 +302,7 @@ export function SaveAutomationModal({
     setActiveJobProgress(0);
     setPreviewPost(null);
     setPreviewData(null);
+    setRateLimitResetAt(null);
   }, [activeJobId]);
 
   useEffect(() => {
@@ -444,7 +451,9 @@ export function SaveAutomationModal({
           bounces={true}
         >
           {/* Render appropriate preview based on previewData type, or fall back to legacy previewPost */}
-          {previewData?.type === "post" ? (
+          {rateLimitResetAt ? (
+            <RateLimitCountdown resetAt={rateLimitResetAt} palette={palette} />
+          ) : previewData?.type === "post" ? (
             <PostPreview post={previewData.data} palette={palette} />
           ) : previewData?.type === "conversation" ? (
             <ConversationPreview
