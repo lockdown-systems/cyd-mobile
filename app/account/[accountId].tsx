@@ -54,7 +54,7 @@ import { DeleteTab } from "./tabs/delete-tab";
 import { SaveTab } from "./tabs/save-tab";
 import { ScheduleTab } from "./tabs/schedule-tab";
 
-export default function AccountPlaceholderScreen() {
+export default function AccountScreen() {
   const params = useLocalSearchParams<{
     accountId: string | string[];
     initialTab?: AccountTabKey;
