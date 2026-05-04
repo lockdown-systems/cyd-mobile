@@ -1057,7 +1057,7 @@ function DeleteReviewScreen({
                         { color: palette.icon, marginLeft: 28, marginTop: 4 },
                       ]}
                     >
-                      Cyd will your copies of chat messages. People you chat
+                      Cyd will delete your copies of chat messages. People you chat
                       with will still have their copies.
                     </Text>
                   )}
