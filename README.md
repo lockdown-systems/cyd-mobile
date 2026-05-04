@@ -12,7 +12,7 @@ With this app, you can:
 - **Choose what you want to delete.** You can delete it all, or you can be selective, deleting most of it but keeping what went viral.
 - **Schedule automatic deletion**, keeping your online data as ephemeral as you want over time.
 
-**Want to claw back your data from X and Facebook?** [Cyd Desktop](https://github.com/lockdown-systems/cyd), for Windows, Mac, and Linux, helps you control your data on those platforms.
+**Want to claw back your data from X (and soon Facebook)?** [Cyd Desktop](https://github.com/lockdown-systems/cyd), for Windows, Mac, and Linux, helps you control your data on those platforms.
 
 ![Cyd Mobile](./readme/screenshot.png)
 

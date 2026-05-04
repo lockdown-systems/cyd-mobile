@@ -177,7 +177,7 @@ export default function AccountSelectionScreen() {
           style={[styles.footerText, { color: palette.icon }]}
           accessibilityRole="text"
         >
-          Want to claw back your data from X (formerly Twitter) and Facebook?
+          Want to claw back your data from X (formerly Twitter)?
           Use the{" "}
           <Text
             style={[styles.footerLink, { color: palette.tint }]}

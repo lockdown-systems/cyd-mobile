@@ -63,9 +63,9 @@ Cyd is [open source](https://github.com/lockdown-systems/cyd-mobile).`,
 
 The mobile version of Cyd only supports Bluesky. This is possible because Bluesky uses an open protocol and is developer-friendly.
 
-**Delete X (Twitter) and Facebook data with the Cyd desktop app.**
+**Delete X (Twitter) data with the Cyd desktop app.**
 
-If you want to delete your data on enshittified platforms like X or Facebook, you need to use the desktop version of Cyd. Download it from your computer at [cyd.social](https://cyd.social).`,
+If you want to delete your data on enshittified platforms like X (and, soon, Facebook), you need to use the desktop version of Cyd. Download it from your computer at [cyd.social](https://cyd.social).`,
   },
 ];
 
