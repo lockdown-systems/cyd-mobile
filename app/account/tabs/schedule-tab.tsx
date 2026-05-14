@@ -208,8 +208,9 @@ export function ScheduleTab({
             [{ text: "OK" }],
           );
         } else if (result.error?.includes("simulator")) {
-          // Silently skip on simulator
+          // Silently allow on simulator so UI can be tested/screenshotted
           console.log("Push notifications not available in simulator");
+          return true;
         } else if (
           result.error?.includes("projectId") ||
           result.error?.includes("FirebaseApp") ||
