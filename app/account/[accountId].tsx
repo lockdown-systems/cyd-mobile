@@ -504,7 +504,9 @@ export default function AccountScreen() {
               />
             ) : null}
           </View>
-          <View style={styles.tabBarContainer}>
+          <View
+            style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}
+          >
             <View
               style={[
                 styles.tabBar,
