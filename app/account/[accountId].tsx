@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -505,7 +506,10 @@ export default function AccountScreen() {
             ) : null}
           </View>
           <View
-            style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}
+            style={[
+              styles.tabBarContainer,
+              Platform.OS === "android" && { paddingBottom: insets.bottom },
+            ]}
           >
             <View
               style={[
