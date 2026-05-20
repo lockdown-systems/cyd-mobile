@@ -9,6 +9,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,13 +22,18 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 const CYD_DESKTOP_URL = "https://cyd.social/";
+const TABLET_BREAKPOINT = 768;
+const TABLET_CONTENT_MAX_WIDTH = 400;
+const TABLET_CTA_MAX_WIDTH = 520;
 
 export default function AccountSelectionScreen() {
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const palette = getThemePalette(colorScheme);
   const Wordmark = colorScheme === "dark" ? WordmarkDark : WordmarkLight;
   const { accounts, loading, error, refresh } = useAccounts();
   const router = useRouter();
+  const isTablet = width >= TABLET_BREAKPOINT;
   const [navigatingAccountId, setNavigatingAccountId] = useState<string | null>(
     null,
   );
@@ -114,79 +120,101 @@ export default function AccountSelectionScreen() {
       style={[styles.safeArea, { backgroundColor: palette.background }]}
       edges={["top", "left", "right"]}
     >
-      <View style={styles.container}>
+      <View style={[styles.container, isTablet && styles.tabletContainer]}>
         {error ? (
           <View
-            style={[styles.banner, { backgroundColor: palette.icon + "22" }]}
+            style={[
+              styles.banner,
+              isTablet && styles.tabletBanner,
+              { backgroundColor: palette.icon + "22" },
+            ]}
           >
             <Text style={[styles.bannerText, { color: palette.text }]}>
               Unable to load accounts. Pull to refresh.
             </Text>
           </View>
         ) : null}
-        <View style={styles.mainContent}>
-          <View style={styles.wordmarkWrapper}>
-            <Wordmark
-              width="100%"
-              height={72}
-              preserveAspectRatio="xMidYMid meet"
-            />
+        <View
+          style={[styles.contentShell, isTablet && styles.tabletContentShell]}
+        >
+          <View
+            style={[styles.mainContent, isTablet && styles.tabletMainContent]}
+          >
+            <View style={styles.listSection}>
+              <View
+                style={[
+                  styles.wordmarkWrapper,
+                  isTablet && styles.tabletWordmarkWrapper,
+                ]}
+              >
+                <Wordmark
+                  width="100%"
+                  height={72}
+                  preserveAspectRatio="xMidYMid meet"
+                />
+              </View>
+
+              <FlatList
+                data={accounts}
+                keyExtractor={(item) => item.uuid}
+                renderItem={renderAccount}
+                ListEmptyComponent={listEmpty}
+                showsVerticalScrollIndicator={false}
+                style={styles.accountList}
+                contentContainerStyle={
+                  accounts.length === 0 ? styles.emptyListContainer : undefined
+                }
+                refreshControl={
+                  <RefreshControl
+                    refreshing={loading}
+                    onRefresh={handleRefresh}
+                    tintColor={palette.icon}
+                  />
+                }
+              />
+            </View>
+
+            <Pressable
+              onPress={handleAddAccount}
+              style={({ pressed }) => [
+                styles.addAccountButton,
+                isTablet && styles.tabletAddAccountButton,
+                {
+                  backgroundColor: palette.button.background,
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+              android_ripple={{ color: palette.button.ripple }}
+            >
+              <Text
+                style={[
+                  styles.addAccountButtonText,
+                  { color: palette.button.text },
+                ]}
+              >
+                Add Bluesky Account
+              </Text>
+            </Pressable>
           </View>
 
-          <FlatList
-            data={accounts}
-            keyExtractor={(item) => item.uuid}
-            renderItem={renderAccount}
-            ListEmptyComponent={listEmpty}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={
-              accounts.length === 0 ? styles.emptyListContainer : undefined
-            }
-            refreshControl={
-              <RefreshControl
-                refreshing={loading}
-                onRefresh={handleRefresh}
-                tintColor={palette.icon}
-              />
-            }
-          />
-
-          <Pressable
-            onPress={handleAddAccount}
-            style={({ pressed }) => [
-              styles.addAccountButton,
-              {
-                backgroundColor: palette.button.background,
-                opacity: pressed ? 0.9 : 1,
-              },
-            ]}
-            android_ripple={{ color: palette.button.ripple }}
-          >
-            <Text
-              style={[
-                styles.addAccountButtonText,
-                { color: palette.button.text },
-              ]}
-            >
-              Add Bluesky Account
-            </Text>
-          </Pressable>
-        </View>
-
-        <Text
-          style={[styles.footerText, { color: palette.icon }]}
-          accessibilityRole="text"
-        >
-          Want to claw back your data from X (formerly Twitter)?
-          Use the{" "}
           <Text
-            style={[styles.footerLink, { color: palette.tint }]}
-            onPress={handleOpenDesktop}
+            style={[
+              styles.footerText,
+              isTablet && styles.tabletFooterText,
+              { color: palette.icon },
+            ]}
+            accessibilityRole="text"
           >
-            Cyd desktop app
-          </Text>{" "}
-          on a computer.
-        </Text>
+            Want to claw back your data from X (formerly Twitter)? Use the{" "}
+            <Text
+              style={[styles.footerLink, { color: palette.tint }]}
+              onPress={handleOpenDesktop}
+            >
+              Cyd desktop app
+            </Text>{" "}
+            on a computer.
+          </Text>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -285,13 +313,45 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 16,
   },
+  tabletContainer: {
+    alignItems: "center",
+    paddingTop: 48,
+    paddingBottom: 32,
+  },
+  contentShell: {
+    flex: 1,
+    width: "100%",
+    gap: 16,
+  },
+  tabletContentShell: {
+    maxWidth: TABLET_CONTENT_MAX_WIDTH,
+  },
   mainContent: {
     flex: 1,
     gap: 20,
   },
+  tabletMainContent: {
+    paddingTop: 16,
+    paddingBottom: 16,
+  },
+  listSection: {
+    flex: 1,
+    minHeight: 0,
+  },
   wordmarkWrapper: {
-    alignItems: "flex-start",
+    alignItems: "center",
+    alignSelf: "center",
     marginBottom: 20,
+    width: 160,
+  },
+  tabletWordmarkWrapper: {
+    alignItems: "center",
+    alignSelf: "center",
+    width: 180,
+    marginBottom: 24,
+  },
+  accountList: {
+    flex: 1,
   },
   accountCard: {
     flexDirection: "row",
@@ -338,6 +398,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
   },
+  tabletAddAccountButton: {
+    width: "100%",
+    maxWidth: TABLET_CTA_MAX_WIDTH,
+    alignSelf: "center",
+  },
   addAccountButtonText: {
     fontSize: 16,
     fontWeight: "600",
@@ -346,6 +411,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     textAlign: "center",
+  },
+  tabletFooterText: {
+    width: "100%",
+    maxWidth: TABLET_CTA_MAX_WIDTH,
+    alignSelf: "center",
   },
   footerLink: {
     fontWeight: "600",
@@ -363,6 +433,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 16,
+  },
+  tabletBanner: {
+    width: "100%",
   },
   bannerText: {
     fontSize: 13,
