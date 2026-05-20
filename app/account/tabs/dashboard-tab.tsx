@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type ImageSourcePropType,
 } from "react-native";
@@ -54,14 +55,20 @@ const CARDS: DashboardCard[] = [
   },
 ];
 
+const TABLET_BREAKPOINT = 768;
+const TABLET_CONTENT_MAX_WIDTH = 760;
+const TABLET_CARD_MIN_HEIGHT = 240;
+
 export function DashboardTab({
   accountId,
   handle,
   palette,
   onSelectTab,
 }: AccountTabProps) {
+  const { width } = useWindowDimensions();
   const { state: cydState, checkPremiumAccess } = useCydAccount();
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const isTablet = width >= TABLET_BREAKPOINT;
 
   // Load last saved timestamp
   useEffect(() => {
@@ -96,53 +103,85 @@ export function DashboardTab({
   };
 
   return (
-    <View style={styles.container}>
-      <SpeechBubble
-        avatarHeight={80}
-        message="It's your data. **What do you want to do with it?**"
-      />
-      <View style={styles.grid}>
-        {CARDS.map((card) => {
-          const badge = getBadge(card.key);
-          return (
-            <Pressable
-              key={card.key}
-              onPress={() => onSelectTab?.(card.key)}
-              style={({ pressed }) => [
-                styles.card,
-                {
-                  borderColor: palette.icon + "22",
-                  backgroundColor: palette.card,
-                  opacity: pressed ? 0.92 : 1,
-                },
-              ]}
-            >
-              {badge !== null && (
+    <View style={[styles.container, isTablet && styles.tabletContainer]}>
+      <View
+        style={[styles.contentStack, isTablet && styles.tabletContentStack]}
+      >
+        <SpeechBubble
+          avatarHeight={isTablet ? 108 : 80}
+          prominentOnTablet={isTablet}
+          message="It's your data. **What do you want to do with it?**"
+        />
+        <View style={[styles.grid, isTablet && styles.tabletGrid]}>
+          {CARDS.map((card) => {
+            const badge = getBadge(card.key);
+            return (
+              <Pressable
+                key={card.key}
+                onPress={() => onSelectTab?.(card.key)}
+                style={({ pressed }) => [
+                  styles.card,
+                  isTablet && styles.tabletCard,
+                  {
+                    borderColor: palette.icon + "22",
+                    backgroundColor: palette.card,
+                    opacity: pressed ? 0.92 : 1,
+                  },
+                ]}
+              >
+                {badge !== null && (
+                  <View
+                    style={[
+                      styles.badge,
+                      isTablet && styles.tabletBadge,
+                      badge === "startHere"
+                        ? { backgroundColor: palette.tint }
+                        : { backgroundColor: "#9333ea" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        isTablet && styles.tabletBadgeText,
+                      ]}
+                    >
+                      {badge === "startHere" ? "Start Here" : "Premium"}
+                    </Text>
+                  </View>
+                )}
                 <View
                   style={[
-                    styles.badge,
-                    badge === "startHere"
-                      ? { backgroundColor: palette.tint }
-                      : { backgroundColor: "#9333ea" },
+                    styles.iconContainer,
+                    isTablet && styles.tabletIconContainer,
                   ]}
                 >
-                  <Text style={styles.badgeText}>
-                    {badge === "startHere" ? "Start Here" : "Premium"}
-                  </Text>
+                  <Image
+                    source={card.icon}
+                    style={[styles.icon, isTablet && styles.tabletIcon]}
+                  />
                 </View>
-              )}
-              <View style={styles.iconContainer}>
-                <Image source={card.icon} style={styles.icon} />
-              </View>
-              <Text style={[styles.title, { color: palette.text }]}>
-                {card.title}
-              </Text>
-              <Text style={[styles.description, { color: palette.icon }]}>
-                {card.description(handle)}
-              </Text>
-            </Pressable>
-          );
-        })}
+                <Text
+                  style={[
+                    styles.title,
+                    isTablet && styles.tabletTitle,
+                    { color: palette.text },
+                  ]}
+                >
+                  {card.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.description,
+                    isTablet && styles.tabletDescription,
+                    { color: palette.icon },
+                  ]}
+                >
+                  {card.description(handle)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -152,12 +191,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  tabletContainer: {
+    width: "100%",
+    maxWidth: TABLET_CONTENT_MAX_WIDTH,
+    alignSelf: "center",
+  },
+  contentStack: {
+    flex: 1,
+  },
+  tabletContentStack: {
+    justifyContent: "center",
+    paddingTop: 20,
+    paddingBottom: 56,
+  },
   grid: {
     flex: 1,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
     alignContent: "stretch",
+  },
+  tabletGrid: {
+    flex: 0,
+    alignContent: "flex-start",
+    gap: 12,
   },
   card: {
     borderRadius: 16,
@@ -171,6 +228,10 @@ const styles = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
+  tabletCard: {
+    minHeight: TABLET_CARD_MIN_HEIGHT,
+    padding: 22,
+  },
   badge: {
     position: "absolute",
     top: 0,
@@ -179,19 +240,34 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderBottomLeftRadius: 10,
   },
+  tabletBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
   badgeText: {
     color: "#ffffff",
     fontSize: 10,
     fontWeight: "700",
     textTransform: "uppercase",
   },
+  tabletBadgeText: {
+    fontSize: 11,
+  },
   iconContainer: {
     marginTop: 15,
     marginBottom: 8,
   },
+  tabletIconContainer: {
+    marginTop: 22,
+    marginBottom: 14,
+  },
   icon: {
     width: 60,
     height: 60,
+  },
+  tabletIcon: {
+    width: 72,
+    height: 72,
   },
   title: {
     fontSize: 15,
@@ -199,12 +275,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textAlign: "center",
   },
+  tabletTitle: {
+    fontSize: 18,
+    lineHeight: 22,
+    marginBottom: 8,
+  },
   description: {
     fontSize: 15,
     lineHeight: 18,
     textAlign: "left",
     marginTop: "auto",
     marginBottom: "auto",
+  },
+  tabletDescription: {
+    fontSize: 17,
+    lineHeight: 24,
   },
 });
 

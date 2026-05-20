@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Markdown, { type MarkdownProps } from "react-native-markdown-display";
@@ -22,6 +23,10 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const AVATAR_HEIGHT = Math.min(SCREEN_HEIGHT * 0.2, 280);
+const TABLET_BREAKPOINT = 768;
+const TABLET_CONTENT_MAX_WIDTH = 720;
+const TABLET_BUTTONS_MAX_WIDTH = 520;
+const TABLET_MODAL_VERTICAL_PADDING = 150;
 
 type OnboardingModalProps = {
   visible: boolean;
@@ -71,9 +76,11 @@ If you want to delete your data on enshittified platforms like X (and, soon, Fac
 
 export function OnboardingModal({ visible, onClose }: OnboardingModalProps) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const palette = getThemePalette(colorScheme);
   const [currentPage, setCurrentPage] = useState(0);
+  const isTablet = width >= TABLET_BREAKPOINT;
 
   const markdownStyles = useMemo<MarkdownProps["style"]>(
     () => ({
@@ -142,83 +149,97 @@ export function OnboardingModal({ visible, onClose }: OnboardingModalProps) {
           styles.container,
           {
             backgroundColor: palette.background,
-            paddingTop: insets.top + 16,
-            paddingBottom: insets.bottom + 8,
+            paddingTop: insets.top + (isTablet ? 32 : 16),
+            paddingBottom: insets.bottom + (isTablet ? 24 : 8),
           },
         ]}
       >
-        <View style={styles.avatarContainer}>
-          <CydAvatar height={AVATAR_HEIGHT} />
-        </View>
-
-        <ScrollView
-          style={styles.contentContainer}
-          contentContainerStyle={styles.contentContainerInner}
-          showsVerticalScrollIndicator={false}
+        <View
+          style={[styles.contentShell, isTablet && styles.tabletContentShell]}
         >
-          <Markdown
-            style={markdownStyles}
-            onLinkPress={(url) => {
-              void Linking.openURL(url);
-              return false;
-            }}
-          >
-            {ONBOARDING_SCREENS[currentPage].content}
-          </Markdown>
-        </ScrollView>
+          <View style={styles.avatarContainer}>
+            <CydAvatar height={AVATAR_HEIGHT} />
+          </View>
 
-        <View style={styles.buttonContainer}>
-          {!isFirstPage && (
+          <ScrollView
+            style={styles.contentContainer}
+            contentContainerStyle={[
+              styles.contentContainerInner,
+              isTablet && styles.tabletContentContainerInner,
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            <Markdown
+              style={markdownStyles}
+              onLinkPress={(url) => {
+                void Linking.openURL(url);
+                return false;
+              }}
+            >
+              {ONBOARDING_SCREENS[currentPage].content}
+            </Markdown>
+          </ScrollView>
+
+          <View
+            style={[
+              styles.buttonContainer,
+              isTablet && styles.tabletButtonContainer,
+            ]}
+          >
+            {!isFirstPage && (
+              <Pressable
+                onPress={handleBack}
+                style={({ pressed }) => [
+                  styles.button,
+                  styles.secondaryButton,
+                  {
+                    borderColor: palette.icon + "44",
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+              >
+                <Text style={[styles.buttonText, { color: palette.text }]}>
+                  Back
+                </Text>
+              </Pressable>
+            )}
             <Pressable
-              onPress={handleBack}
+              onPress={handleContinue}
               style={({ pressed }) => [
                 styles.button,
-                styles.secondaryButton,
+                styles.primaryButton,
                 {
-                  borderColor: palette.icon + "44",
-                  opacity: pressed ? 0.8 : 1,
+                  backgroundColor: palette.button.background,
+                  opacity: pressed ? 0.9 : 1,
                 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel="Back"
+              accessibilityLabel={isLastPage ? "Finish" : "Continue"}
             >
-              <Text style={[styles.buttonText, { color: palette.text }]}>
-                Back
+              <Text style={[styles.buttonText, { color: palette.button.text }]}>
+                {isLastPage ? "Finish" : "Continue"}
               </Text>
             </Pressable>
-          )}
-          <Pressable
-            onPress={handleContinue}
-            style={({ pressed }) => [
-              styles.button,
-              styles.primaryButton,
-              {
-                backgroundColor: palette.button.background,
-                opacity: pressed ? 0.9 : 1,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={isLastPage ? "Finish" : "Continue"}
-          >
-            <Text style={[styles.buttonText, { color: palette.button.text }]}>
-              {isLastPage ? "Finish" : "Continue"}
-            </Text>
-          </Pressable>
-        </View>
+          </View>
 
-        <View style={styles.dotsContainer}>
-          {ONBOARDING_SCREENS.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor:
-                    index === currentPage ? palette.tint : palette.icon + "44",
-                },
-              ]}
-            />
-          ))}
+          <View style={styles.dotsContainer}>
+            {ONBOARDING_SCREENS.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  {
+                    backgroundColor:
+                      index === currentPage
+                        ? palette.tint
+                        : palette.icon + "44",
+                  },
+                ]}
+              />
+            ))}
+          </View>
         </View>
       </View>
     </Modal>
@@ -258,6 +279,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  contentShell: {
+    flex: 1,
+    width: "100%",
+  },
+  tabletContentShell: {
+    maxWidth: TABLET_CONTENT_MAX_WIDTH,
+    paddingTop: TABLET_MODAL_VERTICAL_PADDING,
+    paddingBottom: TABLET_MODAL_VERTICAL_PADDING,
   },
   avatarContainer: {
     alignItems: "center",
@@ -270,10 +301,18 @@ const styles = StyleSheet.create({
   contentContainerInner: {
     flexGrow: 1,
   },
+  tabletContentContainerInner: {
+    paddingVertical: 16,
+  },
   buttonContainer: {
     flexDirection: "row",
     gap: 12,
     marginTop: 16,
+    width: "100%",
+  },
+  tabletButtonContainer: {
+    maxWidth: TABLET_BUTTONS_MAX_WIDTH,
+    alignSelf: "center",
   },
   button: {
     borderRadius: 16,
