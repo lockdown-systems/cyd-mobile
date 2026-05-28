@@ -34,7 +34,7 @@ jobs:
 
   build_ios:
     name: Build iOS
-    runs-on: macos-26-large
+    runs-on: macos-26
     needs: quality
     env:
       APP_VARIANT: production
@@ -51,11 +51,23 @@ jobs:
 
       - name: Select Xcode 26
         run: |
-          # Pick the latest stable (non-beta) Xcode 26 on the runner.
-          # We resolve symlinks because some aliases (e.g. Xcode_26.4.0.app)
+          # Prefer Xcode 26.3 because 26.4.1 currently crashes the Swift frontend
+          # while compiling ExpoModulesCore during archive on GitHub's macOS 26 image.
+          if [ -d /Applications/Xcode_26.3.app ]; then
+            BEST=/Applications/Xcode_26.3.app
+          elif [ -d /Applications/Xcode_26.3.0.app ]; then
+            BEST=/Applications/Xcode_26.3.0.app
+          else
+            BEST=""
+          fi
+
+          # If 26.3 is unavailable, fall back to the latest stable (non-beta)
+          # Xcode 26 on the runner. We resolve symlinks because some aliases
           # don't contain "beta" in their name but point to a beta install.
-          BEST=""
           for app in $(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V); do
+            if [ -n "$BEST" ]; then
+              break
+            fi
             REAL=$(readlink -f "$app" 2>/dev/null || realpath "$app")
             if basename "$REAL" | grep -qi 'beta'; then
               echo "Skipping $app (resolves to beta: $REAL)"
