@@ -1,12 +1,17 @@
-name: Release
+name: Dev TestFlight
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      app_store_annual_product_id:
+        description: App Store annual subscription product ID
+        required: true
+        default: premium_annual
+
+run-name: Dev TestFlight (${{ github.ref_name }})
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
@@ -33,14 +38,14 @@ jobs:
         run: npm test
 
   build_ios:
-    name: Build iOS
+    name: Build dev-backed iOS TestFlight
     runs-on: macos-26-large
     needs: quality
     env:
       APP_VARIANT: production
-      CYD_API_ENV: prod
+      CYD_API_ENV: dev
       IOS_DISTRIBUTION: app_store
-      APP_STORE_ANNUAL_PRODUCT_ID: premium_annual
+      APP_STORE_ANNUAL_PRODUCT_ID: ${{ inputs.app_store_annual_product_id }}
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
       ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
@@ -165,19 +170,19 @@ jobs:
             exit 1
           fi
 
-          cp "$IOS_BUILD_FILE" cyd-mobile.ipa
+          cp "$IOS_BUILD_FILE" cyd-mobile-dev-testflight.ipa
 
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v5
         with:
-          name: ios-ipa-${{ github.ref_name }}
-          path: cyd-mobile.ipa
+          name: ios-dev-testflight-ipa-${{ github.run_number }}
+          path: cyd-mobile-dev-testflight.ipa
           if-no-files-found: error
 
   submit_ios:
-    name: Submit iOS to App Store
+    name: Upload dev-backed iOS build to TestFlight
     runs-on: macos-latest
-    needs: [build_ios, build_android]
+    needs: build_ios
     env:
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
@@ -190,178 +195,11 @@ jobs:
       - name: Download iOS artifact
         uses: actions/download-artifact@v5
         with:
-          name: ios-ipa-${{ github.ref_name }}
+          name: ios-dev-testflight-ipa-${{ github.run_number }}
           path: dist/ios
 
       - name: Restore App Store Connect API private key
         run: python3 ./scripts/ci/restore-asc-private-key.py
 
       - name: Submit iOS build
-        run: ./scripts/ci/submit-ios.sh dist/ios/cyd-mobile.ipa
-
-  build_android:
-    name: Build Android
-    runs-on: ubuntu-latest-android-builder
-    needs: quality
-    env:
-      APP_VARIANT: production
-      CYD_API_ENV: prod
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate native iOS/Android projects
-        run: npm run prebuild
-
-      - name: Decode upload keystore
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload.jks
-
-      - name: Configure release signing
-        run: |
-          python3 ./scripts/ci/configure-android-signing.py
-          echo "--- Signing config in build.gradle ---"
-          grep -A5 'signingConfigs' android/app/build.gradle | head -25
-
-      - name: Tune Gradle for CI runner
-        run: |
-          cat >> android/gradle.properties <<EOF
-
-          # Upload keystore credentials
-          UPLOAD_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
-          UPLOAD_KEY_ALIAS=$ANDROID_KEY_ALIAS
-          UPLOAD_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
-          EOF
-
-          cat >> android/gradle.properties <<'EOF'
-
-          # CI overrides for 8-core / 32GB runner
-          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
-          org.gradle.workers.max=8
-          org.gradle.caching=true
-          org.gradle.daemon=false
-          EOF
-
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle', 'android/app/build.gradle') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Build Android locally with Gradle
-        run: |
-          export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          cd android
-          chmod +x ./gradlew
-          ./gradlew bundleRelease assembleRelease --build-cache --parallel --max-workers=8
-          cd ..
-
-          ANDROID_BUNDLE_FILE=android/app/build/outputs/bundle/release/app-release.aab
-          ANDROID_APK_FILE=android/app/build/outputs/apk/release/app-release.apk
-
-          if [ ! -f "$ANDROID_BUNDLE_FILE" ]; then
-            echo "No .aab file found after local Android build"
-            exit 1
-          fi
-
-          if [ ! -f "$ANDROID_APK_FILE" ]; then
-            echo "No .apk file found after local Android build"
-            exit 1
-          fi
-
-          cp "$ANDROID_BUNDLE_FILE" cyd-mobile.aab
-          cp "$ANDROID_APK_FILE" cyd-mobile.apk
-
-      - name: Upload Android artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: android-aab-${{ github.ref_name }}
-          path: cyd-mobile.aab
-          if-no-files-found: error
-
-      - name: Upload Android APK artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: android-apk-${{ github.ref_name }}
-          path: cyd-mobile.apk
-          if-no-files-found: error
-
-  upload_release_assets:
-    name: Upload APK to GitHub Release
-    runs-on: ubuntu-latest
-    needs: build_android
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Download Android APK artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: android-apk-${{ github.ref_name }}
-          path: dist/android
-
-      - name: Upload APK to release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/android/cyd-mobile.apk
-          fail_on_unmatched_files: true
-
-  submit_android:
-    name: Submit Android to Google Play
-    runs-on: ubuntu-latest
-    needs: [build_ios, build_android]
-    env:
-      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64 }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Download Android artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: android-aab-${{ github.ref_name }}
-          path: dist/android
-
-      - name: Restore Google Play service account key
-        run: python3 ./scripts/ci/restore-google-play-service-account.py
-
-      - name: Submit Android build
-        run: node ./scripts/ci/submit-android.js dist/android/cyd-mobile.aab
+        run: ./scripts/ci/submit-ios.sh dist/ios/cyd-mobile-dev-testflight.ipa

@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 export type PremiumUpsellMode = "app_store_iap" | "external_checkout";
 
 type AppExtra = {
+  cydApiEnv?: string;
   iosDistribution?: string;
   appStoreAnnualProductId?: string;
 };
@@ -15,6 +16,15 @@ type ConstantsWithExtra = {
 
 const constants = Constants as ConstantsWithExtra;
 const extra = constants.expoConfig?.extra ?? constants.manifest2?.extra ?? {};
+
+export type CydApiEnv = "dev" | "prod";
+
+export const CYD_API_ENV: CydApiEnv =
+  extra.cydApiEnv === "prod" || extra.cydApiEnv === "dev"
+    ? extra.cydApiEnv
+    : __DEV__
+      ? "dev"
+      : "prod";
 
 export const APP_STORE_ANNUAL_PRODUCT_ID =
   extra.appStoreAnnualProductId ?? "premium_annual";
