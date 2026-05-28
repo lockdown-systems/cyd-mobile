@@ -8,12 +8,16 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "IOS_DISTRIBUTION": "app_store",
+        "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual"
       }
     },
     "production": {
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "IOS_DISTRIBUTION": "app_store",
+        "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual"
       }
     }
   },

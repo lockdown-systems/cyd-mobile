@@ -26,6 +26,10 @@ const mockApiClient = {
 
 const mockGetDashboardURL = jest.fn(() => "https://dash.cyd.social/manage");
 const mockCheckPremiumAccess = jest.fn();
+const mockPurchasePremium = jest.fn(() => Promise.resolve({ success: true }));
+const mockRestoreAppStorePurchases = jest.fn(() =>
+  Promise.resolve({ success: true }),
+);
 
 jest.mock("@/contexts/CydAccountProvider", () => ({
   useCydAccount: jest.fn(() => ({
@@ -36,8 +40,20 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
       hasPremiumAccess: null,
     },
     apiClient: mockApiClient,
+    premiumUpsellMode: "external_checkout",
+    appStorePurchaseState: {
+      productId: "premium_annual",
+      product: null,
+      isConnected: false,
+      isLoadingProduct: false,
+      isPurchasing: false,
+      isRestoring: false,
+      error: null,
+    },
     getDashboardURL: mockGetDashboardURL,
     checkPremiumAccess: mockCheckPremiumAccess,
+    purchasePremium: mockPurchasePremium,
+    restoreAppStorePurchases: mockRestoreAppStorePurchases,
   })),
 }));
 
@@ -102,8 +118,20 @@ describe("PremiumRequiredModal", () => {
         hasPremiumAccess: null,
       },
       apiClient: mockApiClient,
+      premiumUpsellMode: "external_checkout",
+      appStorePurchaseState: {
+        productId: "premium_annual",
+        product: null,
+        isConnected: false,
+        isLoadingProduct: false,
+        isPurchasing: false,
+        isRestoring: false,
+        error: null,
+      },
       getDashboardURL: mockGetDashboardURL,
       checkPremiumAccess: mockCheckPremiumAccess,
+      purchasePremium: mockPurchasePremium,
+      restoreAppStorePurchases: mockRestoreAppStorePurchases,
     });
   });
 
@@ -152,8 +180,8 @@ describe("PremiumRequiredModal", () => {
 
       expect(
         screen.getByText(
-          "Deleting data requires a Premium account. Sign in to get started."
-        )
+          "Deleting data requires a Premium account. Sign in to get started.",
+        ),
       ).toBeTruthy();
       expect(screen.getByText("Sign In")).toBeTruthy();
     });
@@ -225,7 +253,7 @@ describe("PremiumRequiredModal", () => {
 
       // Use partial match since text spans multiple lines
       expect(
-        screen.getByText(/Deleting data requires a Premium account/i)
+        screen.getByText(/Deleting data requires a Premium account/i),
       ).toBeTruthy();
     });
 
@@ -253,9 +281,57 @@ describe("PremiumRequiredModal", () => {
       fireEvent.press(screen.getByText("Manage My Account"));
 
       expect(mockOpenURL).toHaveBeenCalledWith(
-        "https://dash.cyd.social/manage"
+        "https://dash.cyd.social/manage",
       );
       mockOpenURL.mockRestore();
+    });
+
+    it("should show App Store subscribe and restore actions in App Store builds", async () => {
+      mockUseCydAccount.mockReturnValue({
+        state: {
+          isSignedIn: true,
+          userEmail: "test@example.com",
+          isLoading: false,
+          hasPremiumAccess: false,
+        },
+        apiClient: mockApiClient,
+        premiumUpsellMode: "app_store_iap",
+        appStorePurchaseState: {
+          productId: "premium_annual",
+          product: {
+            productId: "premium_annual",
+            title: "Cyd Premium Annual",
+            displayPrice: "$35.99",
+          },
+          isConnected: true,
+          isLoadingProduct: false,
+          isPurchasing: false,
+          isRestoring: false,
+          error: null,
+        },
+        getDashboardURL: mockGetDashboardURL,
+        checkPremiumAccess: mockCheckPremiumAccess,
+        purchasePremium: mockPurchasePremium,
+        restoreAppStorePurchases: mockRestoreAppStorePurchases,
+      });
+
+      render(<PremiumRequiredModal {...defaultProps} />);
+
+      expect(screen.getByText("Subscribe $35.99/year")).toBeTruthy();
+      expect(screen.getByText("Restore Purchases")).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(screen.getByText("Subscribe $35.99/year"));
+      });
+
+      expect(mockPurchasePremium).toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.press(screen.getByText("Restore Purchases"));
+      });
+
+      expect(mockRestoreAppStorePurchases).toHaveBeenCalled();
+      expect((Linking.openURL as jest.Mock).mock.calls).toHaveLength(0);
     });
   });
 
@@ -309,7 +385,7 @@ describe("PremiumRequiredModal", () => {
         <PremiumRequiredModal
           {...defaultProps}
           onPremiumConfirmed={onPremiumConfirmed}
-        />
+        />,
       );
 
       expect(screen.getByText("I've Upgraded")).toBeTruthy();
@@ -359,7 +435,7 @@ describe("PremiumRequiredModal", () => {
         <PremiumRequiredModal
           {...defaultProps}
           onPremiumConfirmed={onPremiumConfirmed}
-        />
+        />,
       );
 
       await waitFor(() => {
@@ -387,7 +463,7 @@ describe("PremiumRequiredModal", () => {
         <PremiumRequiredModal
           {...defaultProps}
           onPremiumConfirmed={onPremiumConfirmed}
-        />
+        />,
       );
 
       // User signs in and has premium
@@ -408,7 +484,7 @@ describe("PremiumRequiredModal", () => {
         <PremiumRequiredModal
           {...defaultProps}
           onPremiumConfirmed={onPremiumConfirmed}
-        />
+        />,
       );
 
       await waitFor(() => {
@@ -465,7 +541,7 @@ describe("PremiumRequiredModal", () => {
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
           "Error",
-          "Could not check your account status. Please try again."
+          "Could not check your account status. Please try again.",
         );
       });
     });
@@ -485,7 +561,7 @@ describe("PremiumRequiredModal", () => {
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
           "Error",
-          "Could not check your account status. Please try again."
+          "Could not check your account status. Please try again.",
         );
       });
     });

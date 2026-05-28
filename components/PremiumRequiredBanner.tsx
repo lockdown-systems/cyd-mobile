@@ -21,8 +21,12 @@ type PremiumRequiredBannerProps = {
 export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
   const {
     state: cydState,
+    premiumUpsellMode,
+    appStorePurchaseState,
     getDashboardURL,
     checkPremiumAccess,
+    purchasePremium,
+    restoreAppStorePurchases,
   } = useCydAccount();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(false);
@@ -52,12 +56,30 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
       } catch {
         Alert.alert(
           "Error",
-          "Could not check your account status. Please try again."
+          "Could not check your account status. Please try again.",
         );
         setCheckingPremium(false);
       }
     })();
   }, [checkPremiumAccess]);
+
+  const handleSubscribeWithApple = useCallback(() => {
+    void (async () => {
+      const result = await purchasePremium();
+      if (!result.success && result.error) {
+        Alert.alert("Purchase Failed", result.error);
+      }
+    })();
+  }, [purchasePremium]);
+
+  const handleRestorePurchases = useCallback(() => {
+    void (async () => {
+      const result = await restoreAppStorePurchases();
+      if (!result.success && result.error) {
+        Alert.alert("Restore Failed", result.error);
+      }
+    })();
+  }, [restoreAppStorePurchases]);
 
   // Loading state while checking premium (only show if actively checking, not on initial load)
   if (cydState.isLoading || checkingPremium) {
@@ -145,6 +167,19 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
 
   // User is signed in but doesn't have premium
   if (cydState.hasPremiumAccess === false) {
+    const usesAppStoreIAP = premiumUpsellMode === "app_store_iap";
+    const appStorePrice = appStorePurchaseState?.product?.displayPrice;
+    const appStoreBusy = Boolean(
+      appStorePurchaseState?.isPurchasing || appStorePurchaseState?.isRestoring,
+    );
+    const appStorePrimaryLabel = appStorePurchaseState?.isPurchasing
+      ? "Purchasing…"
+      : appStorePurchaseState?.isLoadingProduct
+        ? "Loading Subscription…"
+        : appStorePrice
+          ? `Subscribe ${appStorePrice}/year`
+          : "Subscribe with Apple";
+
     return (
       <View
         style={[
@@ -161,48 +196,121 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
           </View>
           <View style={styles.contentContainer}>
             <Text style={[styles.messageText, { color: palette.text }]}>
-              Deleting data requires a Premium account. Manage your account to
-              upgrade to Premium.
+              {usesAppStoreIAP
+                ? "Deleting data requires a Premium account. Subscribe with your Apple ID to upgrade to Premium."
+                : "Deleting data requires a Premium account. Manage your account to upgrade to Premium."}
             </Text>
             <View style={styles.buttonColumn}>
-              <Pressable
-                onPress={handleManageAccount}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  {
-                    backgroundColor: palette.button?.background ?? palette.tint,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-                accessibilityRole="button"
-              >
-                <Text
-                  style={[
-                    styles.primaryButtonText,
-                    { color: palette.button?.text ?? "#ffffff" },
-                  ]}
-                >
-                  Manage My Account
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={handleIveUpgraded}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  {
-                    borderColor: palette.icon + "33",
-                    backgroundColor: palette.card,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-                accessibilityRole="button"
-              >
-                <Text
-                  style={[styles.secondaryButtonText, { color: palette.text }]}
-                >
-                  I&apos;ve Upgraded
-                </Text>
-              </Pressable>
+              {usesAppStoreIAP ? (
+                <>
+                  <Pressable
+                    onPress={handleSubscribeWithApple}
+                    disabled={
+                      appStoreBusy || appStorePurchaseState?.isLoadingProduct
+                    }
+                    style={({ pressed }) => [
+                      styles.primaryButton,
+                      {
+                        backgroundColor:
+                          palette.button?.background ?? palette.tint,
+                        opacity:
+                          pressed &&
+                          !appStoreBusy &&
+                          !appStorePurchaseState?.isLoadingProduct
+                            ? 0.85
+                            : appStoreBusy ||
+                                appStorePurchaseState?.isLoadingProduct
+                              ? 0.6
+                              : 1,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      style={[
+                        styles.primaryButtonText,
+                        { color: palette.button?.text ?? "#ffffff" },
+                      ]}
+                    >
+                      {appStorePrimaryLabel}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleRestorePurchases}
+                    disabled={appStoreBusy}
+                    style={({ pressed }) => [
+                      styles.secondaryButton,
+                      {
+                        borderColor: palette.icon + "33",
+                        backgroundColor: palette.card,
+                        opacity:
+                          pressed && !appStoreBusy
+                            ? 0.85
+                            : appStoreBusy
+                              ? 0.6
+                              : 1,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
+                        { color: palette.text },
+                      ]}
+                    >
+                      {appStorePurchaseState?.isRestoring
+                        ? "Restoring…"
+                        : "Restore Purchases"}
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Pressable
+                    onPress={handleManageAccount}
+                    style={({ pressed }) => [
+                      styles.primaryButton,
+                      {
+                        backgroundColor:
+                          palette.button?.background ?? palette.tint,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      style={[
+                        styles.primaryButtonText,
+                        { color: palette.button?.text ?? "#ffffff" },
+                      ]}
+                    >
+                      Manage My Account
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleIveUpgraded}
+                    style={({ pressed }) => [
+                      styles.secondaryButton,
+                      {
+                        borderColor: palette.icon + "33",
+                        backgroundColor: palette.card,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
+                        { color: palette.text },
+                      ]}
+                    >
+                      I&apos;ve Upgraded
+                    </Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           </View>
         </View>

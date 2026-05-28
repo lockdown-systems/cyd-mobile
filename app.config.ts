@@ -6,6 +6,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // EAS Build sets APP_VARIANT for different build profiles
   // For local development, default to "development"
   const isProduction = process.env.APP_VARIANT === "production";
+  const iosDistribution = process.env.IOS_DISTRIBUTION ?? "app_store";
+  const appStoreAnnualProductId =
+    process.env.APP_STORE_ANNUAL_PRODUCT_ID ?? "premium_annual";
 
   return {
     ...config,
@@ -64,6 +67,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       "expo-router",
+      "expo-iap",
       [
         "expo-build-properties",
         {
@@ -115,6 +119,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       reactCompiler: true,
     },
     extra: {
+      iosDistribution,
+      appStoreAnnualProductId,
       router: {},
       eas: {
         projectId: "192811c5-4578-4acb-b55d-4da9d2a5f44a",
