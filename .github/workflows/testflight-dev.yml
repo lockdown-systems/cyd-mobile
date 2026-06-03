@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "npm"
@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Select Xcode 26
         run: |
@@ -82,7 +82,7 @@ jobs:
         run: xcodebuild -downloadPlatform iOS
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "npm"
@@ -173,7 +173,7 @@ jobs:
           cp "$IOS_BUILD_FILE" cyd-mobile-dev-testflight.ipa
 
       - name: Upload iOS artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ios-dev-testflight-ipa-${{ github.run_number }}
           path: cyd-mobile-dev-testflight.ipa
@@ -190,10 +190,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download iOS artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: ios-dev-testflight-ipa-${{ github.run_number }}
           path: dist/ios
