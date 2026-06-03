@@ -8,12 +8,18 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "CYD_API_ENV": "dev",
+        "IOS_DISTRIBUTION": "app_store",
+        "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual"
       }
     },
     "production": {
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "CYD_API_ENV": "prod",
+        "IOS_DISTRIBUTION": "app_store",
+        "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual"
       }
     }
   },

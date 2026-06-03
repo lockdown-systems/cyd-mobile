@@ -61,6 +61,37 @@ export type UserPremiumAPIResponse = {
   subscription_current_period_end: string;
   has_business_subscription: boolean;
   business_organizations: string[];
+  individual_subscription_provider?: "stripe" | "app_store" | "none";
+  individual_subscription_status?: string;
+  individual_subscription_manage_mode?: string;
+};
+
+// API models for /user/app-store/subscription
+export type AppStoreSubscriptionAPIResponse = {
+  original_transaction_id: string;
+  latest_transaction_id: string;
+  product_id: string;
+  environment: string;
+  status: string;
+  entitlement_expires_at: string | null;
+  will_auto_renew: boolean | null;
+};
+
+export type GetAppStoreSubscriptionAPIResponse = {
+  app_account_token: string;
+  subscription: AppStoreSubscriptionAPIResponse | null;
+  premium: UserPremiumAPIResponse;
+};
+
+export type SyncAppStoreSubscriptionAPIRequest = {
+  signed_transaction_jws?: string;
+  transaction_id?: string;
+  original_transaction_id?: string;
+};
+
+export type SyncAppStoreSubscriptionAPIResponse = {
+  subscription: AppStoreSubscriptionAPIResponse | null;
+  premium: UserPremiumAPIResponse;
 };
 
 // API models for POST /newsletter
@@ -161,7 +192,7 @@ export default class CydAPIClient {
   private async doFetch(
     method: string,
     resource: string,
-    body: unknown
+    body: unknown,
   ): Promise<Response> {
     const options: RequestInit = {
       method: method,
@@ -178,7 +209,7 @@ export default class CydAPIClient {
   private async fetchAuthenticated(
     method: string,
     resource: string,
-    body: unknown
+    body: unknown,
   ): Promise<Response> {
     const options: RequestInit = {
       method: method,
@@ -199,7 +230,7 @@ export default class CydAPIClient {
 
     // Try to get a new token, and then try one more time
     console.log(
-      "Failed to authenticate with the server. Trying to get a new API token."
+      "Failed to authenticate with the server. Trying to get a new API token.",
     );
 
     const success = await this.getNewAPIToken();
@@ -258,68 +289,68 @@ export default class CydAPIClient {
   // Auth API (not authenticated)
 
   async authenticate(
-    request: AuthAPIRequest
+    request: AuthAPIRequest,
   ): Promise<boolean | APIErrorResponse> {
     console.log("POST /authenticate");
     try {
       const response = await this.doFetch(
         "POST",
         `${this.apiURL}/authenticate`,
-        request
+        request,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to authenticate with the server.",
-          response.status
+          response.status,
         );
       }
       return true;
     } catch {
       return this.returnError(
-        "Failed to authenticate with the server. Maybe the server is down?"
+        "Failed to authenticate with the server. Maybe the server is down?",
       );
     }
   }
 
   async registerDevice(
-    request: RegisterDeviceAPIRequest
+    request: RegisterDeviceAPIRequest,
   ): Promise<RegisterDeviceAPIResponse | APIErrorResponse> {
     console.log("POST /device");
     try {
       const response = await this.doFetch(
         "POST",
         `${this.apiURL}/device`,
-        request
+        request,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to register device with the server.",
-          response.status
+          response.status,
         );
       }
       const data = (await response.json()) as RegisterDeviceAPIResponse;
       return data;
     } catch {
       return this.returnError(
-        "Failed to register device with the server. Maybe the server is down?"
+        "Failed to register device with the server. Maybe the server is down?",
       );
     }
   }
 
   async getToken(
-    request: TokenAPIRequest
+    request: TokenAPIRequest,
   ): Promise<TokenAPIResponse | APIErrorResponse> {
     console.log("POST /token");
     try {
       const response = await this.doFetch(
         "POST",
         `${this.apiURL}/token`,
-        request
+        request,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to get token with the server.",
-          response.status
+          response.status,
         );
       }
       const data = (await response.json()) as TokenAPIResponse;
@@ -331,7 +362,7 @@ export default class CydAPIClient {
       return data;
     } catch {
       return this.returnError(
-        "Failed to get token with the server. Maybe the server is down?"
+        "Failed to get token with the server. Maybe the server is down?",
       );
     }
   }
@@ -339,7 +370,7 @@ export default class CydAPIClient {
   // Auth API (authenticated)
 
   async deleteDevice(
-    request: DeleteDeviceAPIRequest
+    request: DeleteDeviceAPIRequest,
   ): Promise<void | APIErrorResponse> {
     console.log("DELETE /device");
     if (!(await this.validateAPIToken())) {
@@ -349,17 +380,17 @@ export default class CydAPIClient {
       const response = await this.fetchAuthenticated(
         "DELETE",
         `${this.apiURL}/device`,
-        request
+        request,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to delete device with the server.",
-          response.status
+          response.status,
         );
       }
     } catch {
       return this.returnError(
-        "Failed to delete device with the server. Maybe the server is down?"
+        "Failed to delete device with the server. Maybe the server is down?",
       );
     }
   }
@@ -373,7 +404,7 @@ export default class CydAPIClient {
       const response = await this.fetchAuthenticated(
         "GET",
         `${this.apiURL}/device`,
-        null
+        null,
       );
       if (response.status !== 200) {
         return this.returnError("Failed to get devices.", response.status);
@@ -382,7 +413,7 @@ export default class CydAPIClient {
       return { devices: data };
     } catch {
       return this.returnError(
-        "Failed to get devices. Maybe the server is down?"
+        "Failed to get devices. Maybe the server is down?",
       );
     }
   }
@@ -397,7 +428,7 @@ export default class CydAPIClient {
       const response = await this.fetchAuthenticated(
         "GET",
         `${this.apiURL}/ping`,
-        null
+        null,
       );
       return response.status === 200;
     } catch {
@@ -416,19 +447,77 @@ export default class CydAPIClient {
       const response = await this.fetchAuthenticated(
         "GET",
         `${this.apiURL}/user/premium`,
-        null
+        null,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to get user premium status.",
-          response.status
+          response.status,
         );
       }
       const data = (await response.json()) as UserPremiumAPIResponse;
       return data;
     } catch {
       return this.returnError(
-        "Failed to get user premium status. Maybe the server is down?"
+        "Failed to get user premium status. Maybe the server is down?",
+      );
+    }
+  }
+
+  async getAppStoreSubscription(): Promise<
+    GetAppStoreSubscriptionAPIResponse | APIErrorResponse
+  > {
+    console.log("GET /user/app-store/subscription");
+    if (!(await this.validateAPIToken())) {
+      return this.returnError("Failed to get a new API token.");
+    }
+    try {
+      const response = await this.fetchAuthenticated(
+        "GET",
+        `${this.apiURL}/user/app-store/subscription`,
+        null,
+      );
+      if (response.status !== 200) {
+        return this.returnError(
+          "Failed to get App Store subscription metadata.",
+          response.status,
+        );
+      }
+      const data =
+        (await response.json()) as GetAppStoreSubscriptionAPIResponse;
+      return data;
+    } catch {
+      return this.returnError(
+        "Failed to get App Store subscription metadata. Maybe the server is down?",
+      );
+    }
+  }
+
+  async syncAppStoreSubscription(
+    request: SyncAppStoreSubscriptionAPIRequest,
+  ): Promise<SyncAppStoreSubscriptionAPIResponse | APIErrorResponse> {
+    console.log("POST /user/app-store/subscription");
+    if (!(await this.validateAPIToken())) {
+      return this.returnError("Failed to get a new API token.");
+    }
+    try {
+      const response = await this.fetchAuthenticated(
+        "POST",
+        `${this.apiURL}/user/app-store/subscription`,
+        request,
+      );
+      if (response.status !== 200) {
+        return this.returnError(
+          "Failed to sync App Store subscription.",
+          response.status,
+        );
+      }
+      const data =
+        (await response.json()) as SyncAppStoreSubscriptionAPIResponse;
+      return data;
+    } catch {
+      return this.returnError(
+        "Failed to sync App Store subscription. Maybe the server is down?",
       );
     }
   }
@@ -436,25 +525,25 @@ export default class CydAPIClient {
   // Subscribe to newsletter
 
   async postNewsletter(
-    request: PostNewsletterAPIRequest
+    request: PostNewsletterAPIRequest,
   ): Promise<boolean | APIErrorResponse> {
     console.log("POST /newsletter");
     try {
       const response = await this.doFetch(
         "POST",
         `${this.apiURL}/newsletter`,
-        request
+        request,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to subscribe to newsletter.",
-          response.status
+          response.status,
         );
       }
       return true;
     } catch {
       return this.returnError(
-        "Failed to subscribe to newsletter. Maybe the server is down?"
+        "Failed to subscribe to newsletter. Maybe the server is down?",
       );
     }
   }
@@ -470,18 +559,18 @@ export default class CydAPIClient {
       const response = await this.fetchAuthenticated(
         "POST",
         `${this.apiURL}/user/activity`,
-        null
+        null,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to update user activity.",
-          response.status
+          response.status,
         );
       }
       return true;
     } catch {
       return this.returnError(
-        "Failed to update user activity. Maybe the server is down?"
+        "Failed to update user activity. Maybe the server is down?",
       );
     }
   }
@@ -497,7 +586,7 @@ export default class CydAPIClient {
   // Submit Bluesky progress
 
   async postBlueskyProgress(
-    request: PostBlueskyProgressAPIRequest
+    request: PostBlueskyProgressAPIRequest,
   ): Promise<boolean | APIErrorResponse> {
     console.log("POST /bluesky-progress");
     if (!(await this.validateAPIToken())) {
@@ -506,18 +595,18 @@ export default class CydAPIClient {
         const response = await this.doFetch(
           "POST",
           `${this.apiURL}/bluesky-progress`,
-          request
+          request,
         );
         if (response.status !== 200) {
           return this.returnError(
             "Failed to submit Bluesky progress.",
-            response.status
+            response.status,
           );
         }
         return true;
       } catch {
         return this.returnError(
-          "Failed to submit Bluesky progress. Maybe the server is down?"
+          "Failed to submit Bluesky progress. Maybe the server is down?",
         );
       }
     }
@@ -526,18 +615,18 @@ export default class CydAPIClient {
       const response = await this.fetchAuthenticated(
         "POST",
         `${this.apiURL}/bluesky-progress`,
-        request
+        request,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to submit Bluesky progress.",
-          response.status
+          response.status,
         );
       }
       return true;
     } catch {
       return this.returnError(
-        "Failed to submit Bluesky progress. Maybe the server is down?"
+        "Failed to submit Bluesky progress. Maybe the server is down?",
       );
     }
   }
@@ -548,24 +637,24 @@ export default class CydAPIClient {
    * Register a push notification token with the server
    */
   async registerPushToken(
-    request: RegisterPushTokenAPIRequest
+    request: RegisterPushTokenAPIRequest,
   ): Promise<true | APIErrorResponse> {
     try {
       const response = await this.fetchAuthenticated(
         "POST",
         `${this.apiURL}/push-notification`,
-        request
+        request,
       );
       if (response.status !== 200 && response.status !== 201) {
         return this.returnError(
           "Failed to register push token.",
-          response.status
+          response.status,
         );
       }
       return true;
     } catch {
       return this.returnError(
-        "Failed to register push token. Maybe the server is down?"
+        "Failed to register push token. Maybe the server is down?",
       );
     }
   }
@@ -574,24 +663,24 @@ export default class CydAPIClient {
    * Update schedule settings on the server
    */
   async updateScheduleSettings(
-    request: UpdateScheduleSettingsAPIRequest
+    request: UpdateScheduleSettingsAPIRequest,
   ): Promise<true | APIErrorResponse> {
     try {
       const response = await this.fetchAuthenticated(
         "PUT",
         `${this.apiURL}/push-notification/schedule`,
-        request
+        request,
       );
       if (response.status !== 200) {
         return this.returnError(
           "Failed to update schedule settings.",
-          response.status
+          response.status,
         );
       }
       return true;
     } catch {
       return this.returnError(
-        "Failed to update schedule settings. Maybe the server is down?"
+        "Failed to update schedule settings. Maybe the server is down?",
       );
     }
   }
@@ -600,24 +689,24 @@ export default class CydAPIClient {
    * Unregister push notifications for an account
    */
   async unregisterPushToken(
-    request: UnregisterPushTokenAPIRequest
+    request: UnregisterPushTokenAPIRequest,
   ): Promise<true | APIErrorResponse> {
     try {
       const response = await this.fetchAuthenticated(
         "DELETE",
         `${this.apiURL}/push-notification`,
-        request
+        request,
       );
       if (response.status !== 200 && response.status !== 204) {
         return this.returnError(
           "Failed to unregister push token.",
-          response.status
+          response.status,
         );
       }
       return true;
     } catch {
       return this.returnError(
-        "Failed to unregister push token. Maybe the server is down?"
+        "Failed to unregister push token. Maybe the server is down?",
       );
     }
   }

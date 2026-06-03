@@ -1,3 +1,16 @@
+import {
+  endConnection,
+  fetchProducts,
+  finishTransaction,
+  getAvailablePurchases,
+  initConnection,
+  purchaseErrorListener,
+  purchaseUpdatedListener,
+  requestPurchase,
+  restorePurchases,
+  type ProductSubscription,
+  type Purchase,
+} from "expo-iap";
 import React, {
   createContext,
   useCallback,
@@ -9,11 +22,19 @@ import React, {
 import { Platform } from "react-native";
 
 import {
+  APP_STORE_ANNUAL_PRODUCT_ID,
+  CYD_API_ENV,
+  PREMIUM_UPSELL_MODE,
+  type PremiumUpsellMode,
+} from "@/constants/subscriptions";
+import {
   clearCydAccountCredentials,
   getCydAccountCredentials,
   setCydAccountCredentials,
 } from "@/database/cyd-account";
-import CydAPIClient from "@/services/cyd-api-client";
+import CydAPIClient, {
+  type SyncAppStoreSubscriptionAPIRequest,
+} from "@/services/cyd-api-client";
 import { submitBlueskyProgressForAllAccounts } from "@/services/submit-bluesky-progress";
 
 // Configuration for API environments
@@ -22,8 +43,8 @@ const PROD_DASH_URL = "https://dash.cyd.social";
 const DEV_API_URL = "https://dev-api.cyd.social";
 const DEV_DASH_URL = "https://dev-dash.cyd.social";
 
-const API_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
-const DASH_URL = __DEV__ ? DEV_DASH_URL : PROD_DASH_URL;
+const API_URL = CYD_API_ENV === "dev" ? DEV_API_URL : PROD_API_URL;
+const DASH_URL = CYD_API_ENV === "dev" ? DEV_DASH_URL : PROD_DASH_URL;
 
 export type CydAccountState = {
   isSignedIn: boolean;
@@ -32,21 +53,46 @@ export type CydAccountState = {
   hasPremiumAccess: boolean | null;
 };
 
+export type AppStoreProductSummary = {
+  productId: string;
+  title: string;
+  displayPrice: string;
+};
+
+export type AppStorePurchaseState = {
+  productId: string;
+  product: AppStoreProductSummary | null;
+  isConnected: boolean;
+  isLoadingProduct: boolean;
+  isPurchasing: boolean;
+  isRestoring: boolean;
+  error: string | null;
+};
+
+export type PremiumActionResult = {
+  success: boolean;
+  error?: string;
+};
+
 export type CydAccountContextType = {
   state: CydAccountState;
   apiClient: CydAPIClient;
+  premiumUpsellMode: PremiumUpsellMode;
+  appStorePurchaseState: AppStorePurchaseState;
   signIn: (
     email: string,
     verificationCode: string,
-    subscribeToNewsletter: boolean
+    subscribeToNewsletter: boolean,
   ) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   sendVerificationCode: (
-    email: string
+    email: string,
   ) => Promise<{ success: boolean; error?: string }>;
   refreshState: () => Promise<void>;
   getDashboardURL: () => string;
   checkPremiumAccess: () => Promise<void>;
+  purchasePremium: () => Promise<PremiumActionResult>;
+  restoreAppStorePurchases: () => Promise<PremiumActionResult>;
 };
 
 const CydAccountContext = createContext<CydAccountContextType | null>(null);
@@ -70,6 +116,16 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
     isLoading: true,
     hasPremiumAccess: null,
   });
+  const [appStorePurchaseState, setAppStorePurchaseState] =
+    useState<AppStorePurchaseState>({
+      productId: APP_STORE_ANNUAL_PRODUCT_ID,
+      product: null,
+      isConnected: false,
+      isLoadingProduct: PREMIUM_UPSELL_MODE === "app_store_iap",
+      isPurchasing: false,
+      isRestoring: false,
+      error: null,
+    });
 
   const apiClient = useMemo(() => new CydAPIClient(API_URL, DASH_URL), []);
 
@@ -80,7 +136,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       if (credentials.userEmail && credentials.deviceToken) {
         apiClient.setCredentials(
           credentials.userEmail,
-          credentials.deviceToken
+          credentials.deviceToken,
         );
 
         // Verify the session is still valid
@@ -152,14 +208,14 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         };
       }
     },
-    [apiClient]
+    [apiClient],
   );
 
   const signIn = useCallback(
     async (
       email: string,
       verificationCode: string,
-      subscribeToNewsletter: boolean
+      subscribeToNewsletter: boolean,
     ): Promise<{ success: boolean; error?: string }> => {
       try {
         // Get device description
@@ -242,7 +298,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         };
       }
     },
-    [apiClient]
+    [apiClient],
   );
 
   const signOut = useCallback(async () => {
@@ -301,31 +357,271 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
     }
   }, [state.isSignedIn, apiClient]);
 
+  const syncAppStorePurchase = useCallback(
+    async (purchase: Purchase): Promise<boolean> => {
+      if (purchase.productId !== APP_STORE_ANNUAL_PRODUCT_ID) {
+        return false;
+      }
+
+      const syncRequest = getAppStoreSyncRequest(purchase);
+      if (!syncRequest) {
+        setAppStorePurchaseState((prev) => ({
+          ...prev,
+          error: "Apple did not return a transaction identifier.",
+        }));
+        return false;
+      }
+
+      const syncResponse =
+        await apiClient.syncAppStoreSubscription(syncRequest);
+      if ("error" in syncResponse) {
+        setAppStorePurchaseState((prev) => ({
+          ...prev,
+          error: syncResponse.message,
+        }));
+        return false;
+      }
+
+      await finishTransaction({ purchase, isConsumable: false });
+      setState((prev) => ({
+        ...prev,
+        hasPremiumAccess: syncResponse.premium.premium_access,
+      }));
+      setAppStorePurchaseState((prev) => ({ ...prev, error: null }));
+      return true;
+    },
+    [apiClient],
+  );
+
+  useEffect(() => {
+    if (PREMIUM_UPSELL_MODE !== "app_store_iap") {
+      return;
+    }
+
+    let isActive = true;
+    const purchaseUpdateSubscription = purchaseUpdatedListener((purchase) => {
+      void (async () => {
+        try {
+          await syncAppStorePurchase(purchase);
+        } catch (error) {
+          setAppStorePurchaseState((prev) => ({
+            ...prev,
+            error: getAppStoreErrorMessage(error),
+          }));
+        } finally {
+          setAppStorePurchaseState((prev) => ({
+            ...prev,
+            isPurchasing: false,
+          }));
+        }
+      })();
+    });
+    const purchaseErrorSubscription = purchaseErrorListener((error) => {
+      setAppStorePurchaseState((prev) => ({
+        ...prev,
+        isPurchasing: false,
+        error: isUserCancelledAppStoreError(error)
+          ? null
+          : getAppStoreErrorMessage(error),
+      }));
+    });
+
+    void (async () => {
+      try {
+        await initConnection();
+        const products = (await fetchProducts({
+          skus: [APP_STORE_ANNUAL_PRODUCT_ID],
+          type: "subs",
+        })) as ProductSubscription[];
+        const product = products.find(
+          (candidate) => candidate.id === APP_STORE_ANNUAL_PRODUCT_ID,
+        );
+        if (!isActive) {
+          return;
+        }
+        setAppStorePurchaseState((prev) => ({
+          ...prev,
+          product: product ? summarizeAppStoreProduct(product) : null,
+          isConnected: true,
+          isLoadingProduct: false,
+          error: product
+            ? null
+            : "Premium is not available in the App Store yet.",
+        }));
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+        setAppStorePurchaseState((prev) => ({
+          ...prev,
+          isConnected: false,
+          isLoadingProduct: false,
+          error: getAppStoreErrorMessage(error),
+        }));
+      }
+    })();
+
+    return () => {
+      isActive = false;
+      purchaseUpdateSubscription.remove();
+      purchaseErrorSubscription.remove();
+      void endConnection();
+    };
+  }, [syncAppStorePurchase]);
+
   const getDashboardURL = useCallback(() => {
     return apiClient.getDashboardURL();
   }, [apiClient]);
+
+  const purchasePremium =
+    useCallback(async (): Promise<PremiumActionResult> => {
+      if (PREMIUM_UPSELL_MODE !== "app_store_iap") {
+        return {
+          success: false,
+          error: "Premium uses account management for this build.",
+        };
+      }
+      if (!state.isSignedIn) {
+        return { success: false, error: "Please sign in before subscribing." };
+      }
+
+      setAppStorePurchaseState((prev) => ({
+        ...prev,
+        isPurchasing: true,
+        error: null,
+      }));
+
+      try {
+        if (!appStorePurchaseState.isConnected) {
+          await initConnection();
+          setAppStorePurchaseState((prev) => ({ ...prev, isConnected: true }));
+        }
+
+        const subscriptionMetadata = await apiClient.getAppStoreSubscription();
+        if ("error" in subscriptionMetadata) {
+          setAppStorePurchaseState((prev) => ({
+            ...prev,
+            isPurchasing: false,
+            error: subscriptionMetadata.message,
+          }));
+          return { success: false, error: subscriptionMetadata.message };
+        }
+
+        await requestPurchase({
+          request: {
+            apple: {
+              sku: APP_STORE_ANNUAL_PRODUCT_ID,
+              appAccountToken: subscriptionMetadata.app_account_token,
+            },
+          },
+          type: "subs",
+        });
+        return { success: true };
+      } catch (error) {
+        const message = getAppStoreErrorMessage(error);
+        setAppStorePurchaseState((prev) => ({
+          ...prev,
+          isPurchasing: false,
+          error: message,
+        }));
+        return { success: false, error: message };
+      }
+    }, [apiClient, appStorePurchaseState.isConnected, state.isSignedIn]);
+
+  const restoreAppStorePurchases =
+    useCallback(async (): Promise<PremiumActionResult> => {
+      if (PREMIUM_UPSELL_MODE !== "app_store_iap") {
+        return {
+          success: false,
+          error: "Restore purchases is only available in the App Store build.",
+        };
+      }
+      if (!state.isSignedIn) {
+        return {
+          success: false,
+          error: "Please sign in before restoring purchases.",
+        };
+      }
+
+      setAppStorePurchaseState((prev) => ({
+        ...prev,
+        isRestoring: true,
+        error: null,
+      }));
+
+      try {
+        if (!appStorePurchaseState.isConnected) {
+          await initConnection();
+          setAppStorePurchaseState((prev) => ({ ...prev, isConnected: true }));
+        }
+
+        await restorePurchases();
+        const purchases = await getAvailablePurchases({
+          onlyIncludeActiveItemsIOS: true,
+        });
+        const premiumPurchases = purchases.filter(
+          (purchase) => purchase.productId === APP_STORE_ANNUAL_PRODUCT_ID,
+        );
+
+        if (premiumPurchases.length === 0) {
+          const message =
+            "No active Premium purchase was found for this Apple ID.";
+          setAppStorePurchaseState((prev) => ({ ...prev, error: message }));
+          return { success: false, error: message };
+        }
+
+        for (const purchase of premiumPurchases) {
+          const didSync = await syncAppStorePurchase(purchase);
+          if (didSync) {
+            return { success: true };
+          }
+        }
+
+        const message =
+          "Could not restore Premium from the purchases Apple returned.";
+        setAppStorePurchaseState((prev) => ({ ...prev, error: message }));
+        return { success: false, error: message };
+      } catch (error) {
+        const message = getAppStoreErrorMessage(error);
+        setAppStorePurchaseState((prev) => ({ ...prev, error: message }));
+        return { success: false, error: message };
+      } finally {
+        setAppStorePurchaseState((prev) => ({ ...prev, isRestoring: false }));
+      }
+    }, [
+      appStorePurchaseState.isConnected,
+      state.isSignedIn,
+      syncAppStorePurchase,
+    ]);
 
   const contextValue = useMemo(
     () => ({
       state,
       apiClient,
+      premiumUpsellMode: PREMIUM_UPSELL_MODE,
+      appStorePurchaseState,
       signIn,
       signOut,
       sendVerificationCode,
       refreshState,
       getDashboardURL,
       checkPremiumAccess,
+      purchasePremium,
+      restoreAppStorePurchases,
     }),
     [
       state,
       apiClient,
+      appStorePurchaseState,
       signIn,
       signOut,
       sendVerificationCode,
       refreshState,
       getDashboardURL,
       checkPremiumAccess,
-    ]
+      purchasePremium,
+      restoreAppStorePurchases,
+    ],
   );
 
   return (
@@ -333,4 +629,53 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       {children}
     </CydAccountContext.Provider>
   );
+}
+
+function summarizeAppStoreProduct(
+  product: ProductSubscription,
+): AppStoreProductSummary {
+  return {
+    productId: product.id,
+    title: product.title,
+    displayPrice: product.displayPrice,
+  };
+}
+
+function getAppStoreSyncRequest(
+  purchase: Purchase,
+): SyncAppStoreSubscriptionAPIRequest | null {
+  if (purchase.purchaseToken) {
+    return { signed_transaction_jws: purchase.purchaseToken };
+  }
+  if ("transactionId" in purchase && purchase.transactionId) {
+    return { transaction_id: purchase.transactionId };
+  }
+  if (
+    "originalTransactionIdentifierIOS" in purchase &&
+    purchase.originalTransactionIdentifierIOS
+  ) {
+    return {
+      original_transaction_id: purchase.originalTransactionIdentifierIOS,
+    };
+  }
+  return null;
+}
+
+function isUserCancelledAppStoreError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const code = "code" in error ? String(error.code).toLowerCase() : "";
+  const message = "message" in error ? String(error.message).toLowerCase() : "";
+  return code.includes("cancel") || message.includes("cancel");
+}
+
+function getAppStoreErrorMessage(error: unknown): string {
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return "Could not complete the App Store purchase. Please try again.";
 }

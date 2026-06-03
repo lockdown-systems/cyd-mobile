@@ -38,6 +38,9 @@ jobs:
     needs: quality
     env:
       APP_VARIANT: production
+      CYD_API_ENV: prod
+      IOS_DISTRIBUTION: app_store
+      APP_STORE_ANNUAL_PRODUCT_ID: premium_annual
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
       ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
@@ -214,6 +217,7 @@ jobs:
     needs: quality
     env:
       APP_VARIANT: production
+      CYD_API_ENV: prod
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}

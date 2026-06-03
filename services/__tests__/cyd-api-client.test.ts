@@ -78,7 +78,7 @@ describe("CydAPIClient", () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: "test@example.com" }),
-        })
+        }),
       );
     });
 
@@ -368,6 +368,107 @@ describe("CydAPIClient", () => {
       });
     });
 
+    describe("getAppStoreSubscription", () => {
+      it("should return App Store subscription metadata on success", async () => {
+        const appStoreResponse = {
+          app_account_token: "00000000-0000-4000-8000-000000000000",
+          subscription: null,
+          premium: {
+            premium_price_cents: 1200,
+            premium_business_price_cents: 4900,
+            premium_access: false,
+            has_individual_subscription: false,
+            subscription_cancel_at_period_end: false,
+            subscription_current_period_end: "",
+            has_business_subscription: false,
+            business_organizations: [],
+          },
+        };
+
+        mockFetch.mockImplementation(async (url: string) => {
+          if (url.includes("/token")) {
+            return {
+              status: 200,
+              json: async () => ({
+                api_token: "api-token-xyz",
+                device_uuid: "device-uuid-123",
+                email: "test@example.com",
+              }),
+            };
+          }
+          if (url.includes("/user/app-store/subscription")) {
+            return {
+              status: 200,
+              json: async () => appStoreResponse,
+            };
+          }
+          return { status: 200, json: async () => ({}) };
+        });
+
+        const result = await client.getAppStoreSubscription();
+
+        expect(result).toEqual(appStoreResponse);
+      });
+    });
+
+    describe("syncAppStoreSubscription", () => {
+      it("should post signed transaction data to the App Store sync endpoint", async () => {
+        const syncResponse = {
+          subscription: {
+            original_transaction_id: "original-transaction-id",
+            latest_transaction_id: "transaction-id",
+            product_id: "premium_annual",
+            environment: "Sandbox",
+            status: "active",
+            entitlement_expires_at: "2026-06-01T00:00:00+00:00",
+            will_auto_renew: true,
+          },
+          premium: {
+            premium_price_cents: 1200,
+            premium_business_price_cents: 4900,
+            premium_access: true,
+            has_individual_subscription: true,
+            subscription_cancel_at_period_end: false,
+            subscription_current_period_end: "2026-06-01",
+            has_business_subscription: false,
+            business_organizations: [],
+          },
+        };
+
+        mockFetch.mockImplementation(
+          async (url: string, options?: RequestInit) => {
+            if (url.includes("/token")) {
+              return {
+                status: 200,
+                json: async () => ({
+                  api_token: "api-token-xyz",
+                  device_uuid: "device-uuid-123",
+                  email: "test@example.com",
+                }),
+              };
+            }
+            if (url.includes("/user/app-store/subscription")) {
+              expect(options?.method).toBe("POST");
+              expect(options?.body).toBe(
+                JSON.stringify({ signed_transaction_jws: "transaction-jws" }),
+              );
+              return {
+                status: 200,
+                json: async () => syncResponse,
+              };
+            }
+            return { status: 200, json: async () => ({}) };
+          },
+        );
+
+        const result = await client.syncAppStoreSubscription({
+          signed_transaction_jws: "transaction-jws",
+        });
+
+        expect(result).toEqual(syncResponse);
+      });
+    });
+
     describe("deleteDevice", () => {
       it("should delete device successfully", async () => {
         mockFetch.mockImplementation(async (url: string) => {
@@ -449,7 +550,7 @@ describe("CydAPIClient", () => {
               };
             }
             return { status: 200, json: async () => ({}) };
-          }
+          },
         );
 
         const result = await client.getDevices();
@@ -495,7 +596,7 @@ describe("CydAPIClient", () => {
 
       const url = client.getDashboardURL();
       expect(url).toBe(
-        `${DASH_URL}/#/native-login/${encodeURIComponent("test@example.com")}/${encodeURIComponent("device-token-123")}/manage`
+        `${DASH_URL}/#/native-login/${encodeURIComponent("test@example.com")}/${encodeURIComponent("device-token-123")}/manage`,
       );
     });
   });

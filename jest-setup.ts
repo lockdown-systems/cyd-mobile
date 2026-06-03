@@ -104,6 +104,32 @@ jest.mock("expo-router", () => ({
   Stack: "Stack",
 }));
 
+jest.mock("expo-constants", () => ({
+  __esModule: true,
+  default: {
+    expoConfig: {
+      extra: {
+        iosDistribution: "altstore_pal",
+        appStoreAnnualProductId: "premium_annual",
+        eas: { projectId: "mock-project-id" },
+      },
+    },
+    manifest2: undefined,
+  },
+}));
+
+jest.mock("expo-iap", () => ({
+  initConnection: jest.fn(() => Promise.resolve(true)),
+  endConnection: jest.fn(() => Promise.resolve()),
+  fetchProducts: jest.fn(() => Promise.resolve([])),
+  requestPurchase: jest.fn(() => Promise.resolve()),
+  finishTransaction: jest.fn(() => Promise.resolve()),
+  restorePurchases: jest.fn(() => Promise.resolve()),
+  getAvailablePurchases: jest.fn(() => Promise.resolve([])),
+  purchaseUpdatedListener: jest.fn(() => ({ remove: jest.fn() })),
+  purchaseErrorListener: jest.fn(() => ({ remove: jest.fn() })),
+}));
+
 jest.mock("react-native-safe-area-context", () => {
   const React = require("react");
   return {
