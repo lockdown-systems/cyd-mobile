@@ -7,6 +7,7 @@
     "prebuild": "expo prebuild --clean",
     "android": "expo run:android --device",
     "ios": "expo run:ios --device",
+    "ios-alt": "IOS_DISTRIBUTION=alt expo run:ios --device",
     "ios:release": "npx expo run:ios --configuration Release --device",
     "build:ios": "eas build --platform ios --profile production --local --non-interactive",
     "submit:ios": "./scripts/ci/submit-ios.sh",

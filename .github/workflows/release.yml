@@ -186,6 +186,160 @@ jobs:
           path: cyd-mobile.ipa
           if-no-files-found: error
 
+  build_ios_alt:
+    name: Build iOS (alt store)
+    runs-on: macos-26
+    needs: quality
+    env:
+      APP_VARIANT: production
+      CYD_API_ENV: prod
+      IOS_DISTRIBUTION: alt
+      APP_STORE_ANNUAL_PRODUCT_ID: premium_annual
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Select Xcode 26
+        run: |
+          # Prefer Xcode 26.3 because 26.4.1 currently crashes the Swift frontend
+          # while compiling ExpoModulesCore during archive on GitHub's macOS 26 image.
+          if [ -d /Applications/Xcode_26.3.app ]; then
+            BEST=/Applications/Xcode_26.3.app
+          elif [ -d /Applications/Xcode_26.3.0.app ]; then
+            BEST=/Applications/Xcode_26.3.0.app
+          else
+            BEST=""
+          fi
+
+          # If 26.3 is unavailable, fall back to the latest stable (non-beta)
+          # Xcode 26 on the runner. We resolve symlinks because some aliases
+          # don't contain "beta" in their name but point to a beta install.
+          for app in $(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V); do
+            if [ -n "$BEST" ]; then
+              break
+            fi
+            REAL=$(readlink -f "$app" 2>/dev/null || realpath "$app")
+            if basename "$REAL" | grep -qi 'beta'; then
+              echo "Skipping $app (resolves to beta: $REAL)"
+              continue
+            fi
+            BEST="$app"
+          done
+
+          if [ -z "$BEST" ]; then
+            echo "::error::No non-beta Xcode 26 found on this runner."
+            ls -ld /Applications/Xcode*.app
+            exit 1
+          fi
+          echo "Selecting $BEST"
+          sudo xcode-select -s "$BEST/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native projects (skip pod install)
+        run: npx expo prebuild --clean --no-install
+
+      - name: Configure Xcode Node binary
+        run: |
+          echo "NODE_BINARY=$(command -v node)" > ios/.xcode.env.local
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v5
+        with:
+          path: ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies
+        run: cd ios && pod install
+
+      - name: Restore App Store Connect API private key
+        run: python3 ./scripts/ci/restore-asc-private-key.py
+
+      - name: Build iOS alt store locally with Xcode
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_PATH="$RUNNER_TEMP/CydAlt.xcarchive"
+          EXPORT_DIR="$RUNNER_TEMP/ios-alt-export"
+          EXPORT_OPTS="$RUNNER_TEMP/ExportOptionsAlt.plist"
+
+          cat > "$EXPORT_OPTS" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>marketplace</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>G762K6CH36</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <false/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild \
+            -workspace ios/Cyd.xcworkspace \
+            -scheme Cyd \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
+            CODE_SIGN_IDENTITY=- \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_DIR" \
+            -exportOptionsPlist "$EXPORT_OPTS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID"
+
+          IOS_BUILD_FILE=$(ls -t "$EXPORT_DIR"/*.ipa | head -1)
+          if [ -z "$IOS_BUILD_FILE" ]; then
+            echo "No .ipa file found after alt iOS build"
+            exit 1
+          fi
+
+          cp "$IOS_BUILD_FILE" cyd-mobile-alt.ipa
+
+      - name: Upload iOS alt artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ios-alt-ipa-${{ github.ref_name }}
+          path: cyd-mobile-alt.ipa
+          if-no-files-found: error
+
   submit_ios:
     name: Submit iOS to App Store
     runs-on: macos-latest
@@ -326,9 +480,9 @@ jobs:
           if-no-files-found: error
 
   upload_release_assets:
-    name: Upload APK to GitHub Release
+    name: Upload APK and alt iOS IPA to GitHub Release
     runs-on: ubuntu-latest
-    needs: build_android
+    needs: [build_android, build_ios_alt]
 
     steps:
       - name: Checkout repository
@@ -340,10 +494,18 @@ jobs:
           name: android-apk-${{ github.ref_name }}
           path: dist/android
 
-      - name: Upload APK to release
+      - name: Download iOS alt IPA artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ios-alt-ipa-${{ github.ref_name }}
+          path: dist/ios-alt
+
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/android/cyd-mobile.apk
+          files: |
+            dist/android/cyd-mobile.apk
+            dist/ios-alt/cyd-mobile-alt.ipa
           fail_on_unmatched_files: true
 
   submit_android:

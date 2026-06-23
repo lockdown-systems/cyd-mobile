@@ -8,6 +8,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const isProduction = process.env.APP_VARIANT === "production";
   const cydApiEnv = process.env.CYD_API_ENV ?? (isProduction ? "prod" : "dev");
   const iosDistribution = process.env.IOS_DISTRIBUTION ?? "app_store";
+  const isAltBuild = iosDistribution === "alt";
   const appStoreAnnualProductId =
     process.env.APP_STORE_ANNUAL_PRODUCT_ID ?? "premium_annual";
 
@@ -24,7 +25,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     platforms: ["android", "ios"],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "systems.lockdown.cyd-mobile",
+      bundleIdentifier: isAltBuild
+          ? "systems.lockdown.cyd-mobile-alt"
+          : "systems.lockdown.cyd-mobile",
       appleTeamId: "G762K6CH36",
       entitlements: {
         "aps-environment": isProduction ? "production" : "development",
