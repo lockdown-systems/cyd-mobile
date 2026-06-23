@@ -197,7 +197,7 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
           <View style={styles.contentContainer}>
             <Text style={[styles.messageText, { color: palette.text }]}>
               {usesAppStoreIAP
-                ? "Deleting data requires a Premium account. Subscribe with your Apple ID to upgrade to Premium."
+                ? "Deleting data requires a Premium account."
                 : "Deleting data requires a Premium account. Manage your account to upgrade to Premium."}
             </Text>
             <View style={styles.buttonColumn}>
