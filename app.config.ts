@@ -26,8 +26,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: isAltBuild
-          ? "systems.lockdown.cyd-mobile-alt"
-          : "systems.lockdown.cyd-mobile",
+        ? "systems.lockdown.cyd-mobile-alt"
+        : "systems.lockdown.cyd-mobile",
       appleTeamId: "G762K6CH36",
       entitlements: {
         "aps-environment": isProduction ? "production" : "development",
@@ -43,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       icon: "./assets/images/cyd.icon",
     },
     android: {
-      versionCode: 14,
+      versionCode: 15,
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
