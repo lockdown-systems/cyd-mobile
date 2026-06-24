@@ -286,7 +286,7 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>marketplace</string>
+            <string>app-store-connect</string>
             <key>signingStyle</key>
             <string>automatic</string>
             <key>teamID</key>
@@ -294,7 +294,7 @@ jobs:
             <key>stripSwiftSymbols</key>
             <true/>
             <key>uploadSymbols</key>
-            <false/>
+            <true/>
             <key>manageAppVersionAndBuildNumber</key>
             <true/>
           </dict>
@@ -364,6 +364,31 @@ jobs:
 
       - name: Submit iOS build
         run: ./scripts/ci/submit-ios.sh dist/ios/cyd-mobile.ipa
+
+  submit_ios_alt:
+    name: Submit iOS (alt store) to App Store
+    runs-on: macos-latest
+    needs: [build_ios_alt, build_android]
+    env:
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      ASC_API_PRIVATE_KEY_BASE64: ${{ secrets.ASC_API_PRIVATE_KEY_BASE64 }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download iOS alt artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ios-alt-ipa-${{ github.ref_name }}
+          path: dist/ios-alt
+
+      - name: Restore App Store Connect API private key
+        run: python3 ./scripts/ci/restore-asc-private-key.py
+
+      - name: Submit iOS alt build
+        run: ./scripts/ci/submit-ios.sh dist/ios-alt/cyd-mobile-alt.ipa
 
   build_android:
     name: Build Android
@@ -480,9 +505,9 @@ jobs:
           if-no-files-found: error
 
   upload_release_assets:
-    name: Upload APK and alt iOS IPA to GitHub Release
+    name: Upload APK to GitHub Release
     runs-on: ubuntu-latest
-    needs: [build_android, build_ios_alt]
+    needs: [build_android]
 
     steps:
       - name: Checkout repository
@@ -494,18 +519,11 @@ jobs:
           name: android-apk-${{ github.ref_name }}
           path: dist/android
 
-      - name: Download iOS alt IPA artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: ios-alt-ipa-${{ github.ref_name }}
-          path: dist/ios-alt
-
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/android/cyd-mobile.apk
-            dist/ios-alt/cyd-mobile-alt.ipa
           fail_on_unmatched_files: true
 
   submit_android:
