@@ -5,7 +5,7 @@ import type { BlueskyProgress } from "../types";
 export async function runSaveChatConvosJob(
   controller: BlueskyAccountController,
   _job: BlueskyJobRecord,
-  emit: JobEmit
+  emit: JobEmit,
 ): Promise<void> {
   let lastProgress: BlueskyProgress | null = null;
 
@@ -19,10 +19,17 @@ export async function runSaveChatConvosJob(
   controller.setProgressCallback((progress: BlueskyProgress) => {
     lastProgress = progress;
     const message = progress.currentAction || "Saving conversations...";
+    const currentConversationLabel: string | null =
+      (
+        progress as {
+          currentConversationLabel?: string | null;
+        }
+      ).currentConversationLabel ?? null;
     emit({
       progressMessage: message,
       progressPercent: undefined,
       unknownTotal: true,
+      currentConversationLabel,
       previewData: progress.previewData,
       progress,
     });
@@ -42,6 +49,7 @@ export async function runSaveChatConvosJob(
     progressMessage: "Saved chat conversations",
     progressPercent: 1,
     unknownTotal: false,
+    currentConversationLabel: null,
     previewData: null,
     progress: lastProgress,
   });

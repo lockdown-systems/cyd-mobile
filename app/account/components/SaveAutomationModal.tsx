@@ -75,6 +75,9 @@ export function SaveAutomationModal({
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const [activeJobProgress, setActiveJobProgress] = useState(0);
   const [activeJobUnknownTotal, setActiveJobUnknownTotal] = useState(false);
+  const [currentConversationLabel, setCurrentConversationLabel] = useState<
+    string | null
+  >(null);
   const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [rateLimitResetAt, setRateLimitResetAt] = useState<number | null>(null);
@@ -108,6 +111,7 @@ export function SaveAutomationModal({
     setProgressMessage(null);
     setError(null);
     setJobs([]);
+    setCurrentConversationLabel(null);
     setPreviewPost(null);
     setPreviewData(null);
     setActiveJobUnknownTotal(false);
@@ -237,6 +241,12 @@ export function SaveAutomationModal({
             }
             if (update.unknownTotal !== undefined) {
               setActiveJobUnknownTotal(update.unknownTotal);
+            }
+            if (update.currentConversationLabel !== undefined) {
+              const currentConversationLabel: string | null =
+                (update as { currentConversationLabel?: string | null })
+                  .currentConversationLabel ?? null;
+              setCurrentConversationLabel(currentConversationLabel);
             }
             if (update.previewPost !== undefined) {
               setPreviewPost(
@@ -392,6 +402,11 @@ export function SaveAutomationModal({
     return "Finished";
   })();
 
+  const isEmptyConversationPreview =
+    typeof progressMessage === "string" &&
+    progressMessage.startsWith("Conversation ") &&
+    progressMessage.endsWith(" is empty");
+
   const handlePause = useCallback(async () => {
     const controller = await ensureController();
     controller.pause();
@@ -450,6 +465,13 @@ export function SaveAutomationModal({
           showsVerticalScrollIndicator={true}
           bounces={true}
         >
+          {currentConversationLabel ? (
+            <View style={styles.progressCardWithCount}>
+              <Text style={[styles.statusText, { color: palette.text }]}>
+                {currentConversationLabel}
+              </Text>
+            </View>
+          ) : null}
           {/* Render appropriate preview based on previewData type, or fall back to legacy previewPost */}
           {rateLimitResetAt ? (
             <RateLimitCountdown resetAt={rateLimitResetAt} palette={palette} />
@@ -464,6 +486,22 @@ export function SaveAutomationModal({
             <MessagePreview message={previewData.data} palette={palette} />
           ) : previewPost ? (
             <PostPreview post={previewPost} palette={palette} />
+          ) : isEmptyConversationPreview ? (
+            <View
+              style={[
+                styles.progressCard,
+                {
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: palette.icon + "22",
+                  backgroundColor: palette.card,
+                },
+              ]}
+            >
+              <Text style={[styles.statusText, { color: palette.text }]}>
+                This conversation is empty.
+              </Text>
+            </View>
           ) : null}
         </ScrollView>
 

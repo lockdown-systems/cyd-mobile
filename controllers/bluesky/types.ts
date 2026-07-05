@@ -39,6 +39,7 @@ export interface BlueskyProgress {
 
   // Status
   currentAction: string;
+  currentConversationLabel?: string | null;
   isRunning: boolean;
   error: string | null;
 }
@@ -72,6 +73,7 @@ export function createInitialProgress(): BlueskyProgress {
     previewPost: null,
     previewData: null,
     currentAction: "",
+    currentConversationLabel: null,
     isRunning: false,
     error: null,
   };
