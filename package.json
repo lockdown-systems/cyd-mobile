@@ -1,8 +1,8 @@
 {
   "name": "cyd-mobile",
   "main": "expo-router/entry",
-  "version": "1.0.18",
-  "androidVersionCode": 15,
+  "version": "1.0.19",
+  "androidVersionCode": 16,
   "scripts": {
     "start": "expo start",
     "prebuild": "expo prebuild --clean",
