@@ -138,9 +138,7 @@ describe("EmbeddedPostSnippet", () => {
     );
 
     // Find and press the container - use UNSAFE_root to access the tree
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const authorText = screen.getByText("Quoted Author");
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const container = authorText.parent?.parent;
 
     if (container) {
@@ -202,7 +200,6 @@ describe("EmbeddedPostSnippet", () => {
       externalEmbed,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { UNSAFE_root } = render(
       <EmbeddedPostSnippet post={post} palette={defaultPalette} />,
     );
@@ -227,12 +224,7 @@ describe("EmbeddedPostSnippet", () => {
       return null;
     };
 
-    const pressable = findPressableWithOnPress(
-      UNSAFE_root as unknown as {
-        children?: unknown[];
-        props?: { onPress?: unknown };
-      },
-    );
+    const pressable = findPressableWithOnPress(UNSAFE_root);
     expect(pressable).not.toBeNull();
 
     if (pressable) {

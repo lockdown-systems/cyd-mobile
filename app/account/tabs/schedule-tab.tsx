@@ -144,16 +144,24 @@ export function ScheduleTab({
   }, [accountId]);
 
   useEffect(() => {
-    void loadSettings();
+    let cancelled = false;
+    // Deferred via a microtask so loadSettings' setState calls aren't
+    // synchronously reachable from this effect body.
+    void Promise.resolve().then(() => {
+      if (!cancelled) return loadSettings();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadSettings]);
 
-  // Navigate to review screen if opened from notification
-  useEffect(() => {
-    if (!loading && showReviewOnLoad && !hasInitializedScreen) {
-      setHasInitializedScreen(true);
-      setScreenStack(["form", "review"]);
-    }
-  }, [loading, showReviewOnLoad, hasInitializedScreen]);
+  // Navigate to review screen if opened from notification. Adjusting state
+  // during render (per React docs) instead of a synchronous setState in an
+  // effect.
+  if (!loading && showReviewOnLoad && !hasInitializedScreen) {
+    setHasInitializedScreen(true);
+    setScreenStack(["form", "review"]);
+  }
 
   /**
    * Sync schedule settings to the server for push notification scheduling

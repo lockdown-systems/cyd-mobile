@@ -240,9 +240,7 @@ export function DeleteAutomationModal({
               setSpeech(update.speechText);
             }
             if (update.progressMessage !== undefined) {
-              setProgressMessage(
-                (update.progressMessage as string | undefined) ?? null,
-              );
+              setProgressMessage(update.progressMessage ?? null);
             }
             if (update.previewData !== undefined) {
               setPreviewData(update.previewData ?? null);
@@ -320,16 +318,22 @@ export function DeleteAutomationModal({
     // which changes as items are deleted. Including it would restart the job.
   ]);
 
-  useEffect(() => {
+  // Adjust state during render (per React docs) instead of a synchronous
+  // setState in an effect.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (!visible) {
       setPaused(false);
     }
-  }, [visible]);
+  }
 
-  useEffect(() => {
+  const [lastActiveJobId, setLastActiveJobId] = useState(activeJobId);
+  if (lastActiveJobId !== activeJobId) {
+    setLastActiveJobId(activeJobId);
     setPreviewData(null);
     setRateLimitResetAt(null);
-  }, [activeJobId]);
+  }
 
   useEffect(() => {
     return () => {

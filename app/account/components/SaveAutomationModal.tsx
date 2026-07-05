@@ -232,9 +232,7 @@ export function SaveAutomationModal({
               setSpeech(update.speechText);
             }
             if (update.progressMessage !== undefined) {
-              setProgressMessage(
-                (update.progressMessage as string | undefined) ?? null,
-              );
+              setProgressMessage(update.progressMessage ?? null);
             }
             if (update.progressPercent !== undefined) {
               setActiveJobProgress(update.progressPercent);
@@ -302,18 +300,24 @@ export function SaveAutomationModal({
     };
   }, [visible, options, onFinished, ensureController, accountId]);
 
-  useEffect(() => {
+  // Adjust state during render (per React docs) instead of a synchronous
+  // setState in an effect.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (!visible) {
       setPaused(false);
     }
-  }, [visible]);
+  }
 
-  useEffect(() => {
+  const [lastActiveJobId, setLastActiveJobId] = useState(activeJobId);
+  if (lastActiveJobId !== activeJobId) {
+    setLastActiveJobId(activeJobId);
     setActiveJobProgress(0);
     setPreviewPost(null);
     setPreviewData(null);
     setRateLimitResetAt(null);
-  }, [activeJobId]);
+  }
 
   useEffect(() => {
     return () => {

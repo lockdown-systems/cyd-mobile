@@ -37,13 +37,25 @@ export function RateLimitCountdown({
   );
 
   useEffect(() => {
-    setRemaining(Math.max(0, resetAt - Math.floor(Date.now() / 1000)));
+    let cancelled = false;
+    // Deferred via a microtask so this resync setState call isn't
+    // synchronous within the effect body. Date.now() is impure, so it can't
+    // be computed during render (unlike the lazy useState initializer above,
+    // which only ever runs once on mount).
+    void Promise.resolve().then(() => {
+      if (!cancelled) {
+        setRemaining(Math.max(0, resetAt - Math.floor(Date.now() / 1000)));
+      }
+    });
     const interval = setInterval(() => {
       const left = resetAt - Math.floor(Date.now() / 1000);
       setRemaining(Math.max(0, left));
       if (left <= 0) clearInterval(interval);
     }, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [resetAt]);
 
   return (

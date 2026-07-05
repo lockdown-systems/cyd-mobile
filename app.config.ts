@@ -21,7 +21,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     icon: "./assets/images/icon.png",
     scheme: ["social.cyd.api", "social.cyd.dev-api"],
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
     platforms: ["android", "ios"],
     ios: {
       supportsTablet: true,
