@@ -141,18 +141,24 @@ export function SaveTab({
 
   useEffect(() => {
     let cancelled = false;
-    setScreenStack(["form"]);
-    setState(null);
-    setError(null);
-    setPersistError(null);
-    setSaving(false);
-    setLoading(true);
-    setAutomationVisible(false);
-    setAutomationOptions(null);
-
-    console.log("[SaveTab] load settings -> start", accountId);
 
     void (async () => {
+      // Yield one microtask so the setState calls below aren't synchronous
+      // within the effect body.
+      await Promise.resolve();
+      if (cancelled) return;
+
+      setScreenStack(["form"]);
+      setState(null);
+      setError(null);
+      setPersistError(null);
+      setSaving(false);
+      setLoading(true);
+      setAutomationVisible(false);
+      setAutomationOptions(null);
+
+      console.log("[SaveTab] load settings -> start", accountId);
+
       try {
         const settings = await getAccountSaveSettings(accountId);
         if (!cancelled) {

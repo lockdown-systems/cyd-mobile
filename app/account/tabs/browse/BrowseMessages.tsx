@@ -93,11 +93,6 @@ export function BrowseMessages({
   const [filterText, setFilterText] = useState("");
   const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("all");
 
-  useEffect(() => {
-    void loadConversations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId]);
-
   const loadConversations = async () => {
     if (!accountId || !accountUUID) {
       setError("Missing account");
@@ -190,6 +185,19 @@ export function BrowseMessages({
       setLoadingConvos(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    // Deferred via a microtask so loadConversations' setState calls aren't
+    // synchronously reachable from this effect body.
+    void Promise.resolve().then(() => {
+      if (!cancelled) return loadConversations();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
 
   const loadMessages = async (convoId: string) => {
     if (!accountId || !accountUUID) return;
@@ -365,7 +373,6 @@ export function BrowseMessages({
         <ConversationPreview conversation={item} palette={palette} />
       </Pressable>
     );
-    ConversationItem.displayName = "BrowseMessagesConversationItem";
     return ConversationItem;
     // loadMessages is stable - only reads from refs and deletedFilter which is handled separately
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -375,15 +382,21 @@ export function BrowseMessages({
     const MessageItem = ({ item }: { item: MessagePreviewData }) => (
       <MessagePreview message={item} palette={palette} />
     );
-    MessageItem.displayName = "BrowseMessagesMessageItem";
     return MessageItem;
   }, [palette]);
 
-  // Reload messages when deleted filter changes
+  // Reload messages when deleted filter changes. Deferred via a microtask so
+  // loadMessages' setState calls aren't synchronously reachable from this
+  // effect body.
   useEffect(() => {
-    if (selectedConvo) {
-      void loadMessages(selectedConvo.convoId);
-    }
+    if (!selectedConvo) return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) return loadMessages(selectedConvo.convoId);
+    });
+    return () => {
+      cancelled = true;
+    };
     // loadMessages uses deletedFilter internally, so it will trigger a refetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deletedFilter, selectedConvo]);

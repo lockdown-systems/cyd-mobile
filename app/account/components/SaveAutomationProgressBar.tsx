@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
@@ -27,7 +27,7 @@ function AnimatedStripes({
   width: `${number}%`;
   tintColor: string;
 }) {
-  const translateX = useRef(new Animated.Value(0)).current;
+  const [translateX] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const animation = Animated.loop(

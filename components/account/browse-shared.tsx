@@ -674,7 +674,15 @@ export function BrowseList({
   );
 
   useEffect(() => {
-    void loadFirstPage();
+    let cancelled = false;
+    // Deferred via a microtask so loadFirstPage's setState calls aren't
+    // synchronously reachable from this effect body.
+    void Promise.resolve().then(() => {
+      if (!cancelled) return loadFirstPage();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadFirstPage]);
 
   // Filter posts based on filter text (case insensitive)

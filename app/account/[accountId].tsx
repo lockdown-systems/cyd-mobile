@@ -89,16 +89,18 @@ export default function AccountScreen() {
   const [verifyingAuth, setVerifyingAuth] = useState(false);
   const insets = useSafeAreaInsets();
 
-  // Handle initialTab from deep link
-  useEffect(() => {
-    if (initialTab) {
-      console.log(
-        "[AccountScreen] setting initial tab from deep link:",
-        initialTab,
-      );
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
+  // Handle initialTab changing from a new deep link, without re-applying on
+  // every render (adjusting state during render, per React docs).
+  const [lastAppliedInitialTab, setLastAppliedInitialTab] =
+    useState(initialTab);
+  if (initialTab && initialTab !== lastAppliedInitialTab) {
+    console.log(
+      "[AccountScreen] setting initial tab from deep link:",
+      initialTab,
+    );
+    setLastAppliedInitialTab(initialTab);
+    setActiveTab(initialTab);
+  }
 
   const handleSelectTab = useCallback((tab: AccountTabKey) => {
     console.log("[AccountScreen] select tab", tab);
@@ -222,10 +224,20 @@ export default function AccountScreen() {
     });
   }, [account]);
 
-  useEffect(() => {
+  // Reset auth status when the account disappears (adjusting state during
+  // render, per React docs, instead of a synchronous setState in an effect).
+  const [previousAccountForAuth, setPreviousAccountForAuth] =
+    useState(account);
+  if (previousAccountForAuth !== account) {
+    setPreviousAccountForAuth(account);
     if (!account) {
       setAuthStatus("unknown");
       setVerifyingAuth(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!account) {
       return;
     }
 

@@ -1,6 +1,5 @@
 import {
     useCallback,
-    useEffect,
     useMemo,
     useState,
     type ComponentType,
@@ -77,11 +76,14 @@ export function BrowseTab({
     [],
   );
 
-  // Reset count label and header when switching tabs
-  useEffect(() => {
+  // Reset count label and header when switching tabs (adjusting state during
+  // render, per React docs, instead of a synchronous setState in an effect).
+  const [lastCategory, setLastCategory] = useState(category);
+  if (lastCategory !== category) {
+    setLastCategory(category);
     setCountLabel("");
     setConversationHeader(null);
-  }, [category]);
+  }
 
   const ActiveCategory = useMemo(
     () => CATEGORY_COMPONENTS[category],

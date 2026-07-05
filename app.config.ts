@@ -21,7 +21,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     icon: "./assets/images/icon.png",
     scheme: ["social.cyd.api", "social.cyd.dev-api"],
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
     platforms: ["android", "ios"],
     ios: {
       supportsTablet: true,
@@ -43,14 +42,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       icon: "./assets/images/cyd.icon",
     },
     android: {
-      versionCode: 15,
+      versionCode: packageJson.androidVersionCode,
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
         backgroundImage: "./assets/images/android-icon-background.png",
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
-      edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "systems.lockdown.cydmobile",
       googleServicesFile: "./google-services.json",
@@ -76,7 +74,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "expo-build-properties",
         {
           ios: {
-            deploymentTarget: "15.5",
+            deploymentTarget: "16.4",
             useFrameworks: "static",
           },
           android: {

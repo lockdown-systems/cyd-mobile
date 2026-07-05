@@ -106,12 +106,15 @@ export function OnboardingModal({ visible, onClose }: OnboardingModalProps) {
     [palette.text, palette.tint],
   );
 
-  // Reset to first page when modal opens
-  useEffect(() => {
+  // Reset to first page when modal opens. Adjusting state during render (per
+  // React docs) instead of a synchronous setState in an effect.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (visible) {
       setCurrentPage(0);
     }
-  }, [visible]);
+  }
 
   const handleContinue = useCallback(() => {
     if (currentPage < ONBOARDING_SCREENS.length - 1) {

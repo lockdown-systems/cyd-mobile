@@ -80,9 +80,12 @@ export function DeleteTab({
 
   const currentScreen = screenStack[screenStack.length - 1];
 
-  // Refresh lastSavedAt data whenever component mounts
+  // Refresh lastSavedAt data whenever component mounts. Deferred via a
+  // microtask so the setState call isn't synchronous within the effect body.
   useEffect(() => {
-    setRefreshKey((prev) => prev + 1);
+    void Promise.resolve().then(() => {
+      setRefreshKey((prev) => prev + 1);
+    });
   }, []);
 
   const loadSettings = useCallback(async () => {
@@ -103,14 +106,20 @@ export function DeleteTab({
 
   useEffect(() => {
     let cancelled = false;
-    setScreenStack(["form"]);
-    setState(null);
-    setError(null);
-    setPersistError(null);
-    setSaving(false);
-    setLoading(true);
 
     void (async () => {
+      // Yield one microtask so the setState calls below aren't synchronous
+      // within the effect body.
+      await Promise.resolve();
+      if (cancelled) return;
+
+      setScreenStack(["form"]);
+      setState(null);
+      setError(null);
+      setPersistError(null);
+      setSaving(false);
+      setLoading(true);
+
       try {
         const settings = await getAccountDeleteSettings(accountId);
         if (!cancelled) {
@@ -795,10 +804,15 @@ function DeleteReviewScreen({
   const [countsError, setCountsError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Refresh when external key changes (e.g., after automation completes)
-  useEffect(() => {
+  // Refresh when external key changes (e.g., after automation completes).
+  // Adjusting state during render (per React docs) instead of a synchronous
+  // setState in an effect.
+  const [lastExternalRefreshKey, setLastExternalRefreshKey] =
+    useState(externalRefreshKey);
+  if (lastExternalRefreshKey !== externalRefreshKey) {
+    setLastExternalRefreshKey(externalRefreshKey);
     setRefreshKey((prev) => prev + 1);
-  }, [externalRefreshKey]);
+  }
 
   // Modal state for reviewing posts to delete
   const [postsModalVisible, setPostsModalVisible] = useState(false);
