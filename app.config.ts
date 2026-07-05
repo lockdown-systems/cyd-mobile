@@ -50,7 +50,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundImage: "./assets/images/android-icon-background.png",
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
-      edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "systems.lockdown.cydmobile",
       googleServicesFile: "./google-services.json",
@@ -76,7 +75,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "expo-build-properties",
         {
           ios: {
-            deploymentTarget: "15.5",
+            deploymentTarget: "16.4",
             useFrameworks: "static",
           },
           android: {
