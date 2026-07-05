@@ -1,11 +1,11 @@
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 
 import type {
-  ConversationPreviewData,
-  MessagePreviewData,
-  PostPreviewData,
-  PreviewData,
-  ProfileData,
+    ConversationPreviewData,
+    MessagePreviewData,
+    PostPreviewData,
+    PreviewData,
+    ProfileData,
 } from "./types";
 
 export type BlueskyJobType =
@@ -43,6 +43,7 @@ export type BlueskyJobRecord = {
 export type BlueskyJobRunUpdate = {
   jobs: BlueskyJobRecord[];
   activeJobId: number | null;
+  currentConversationLabel?: string | null;
   speechText?: string | null;
   progressMessage?: string | null;
   progressPercent?: number;
@@ -62,6 +63,7 @@ export type JobEmit = (update: {
   speechText?: string | null;
   progressMessage?: string | null;
   progressPercent?: number;
+  currentConversationLabel?: string | null;
   /** When true, the progress for this job cannot be calculated and should show indeterminate animation */
   unknownTotal?: boolean;
   /** @deprecated Use previewData instead */
@@ -75,11 +77,11 @@ export type JobEmit = (update: {
 }) => void;
 
 export type {
-  ConversationPreviewData,
-  MessagePreviewData,
-  PostPreviewData,
-  PreviewData,
-  ProfileData,
+    ConversationPreviewData,
+    MessagePreviewData,
+    PostPreviewData,
+    PreviewData,
+    ProfileData
 };
 
 export type SaveJobOptions = {

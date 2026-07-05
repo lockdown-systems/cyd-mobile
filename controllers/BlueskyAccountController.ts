@@ -7,49 +7,49 @@ import { zip } from "react-native-zip-archive";
 
 import { getDatabase } from "@/database";
 import {
-  applyAccountMigrations,
-  blueskyAccountMigrations,
+    applyAccountMigrations,
+    blueskyAccountMigrations,
 } from "@/database/account-db";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
 import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import {
-  BaseAccountController,
-  CancelledError,
-  buildAccountPaths,
+    BaseAccountController,
+    CancelledError,
+    buildAccountPaths,
 } from "./BaseAccountController";
 import {
-  calculateBookmarksToDelete,
-  calculateDeletionPreview,
-  calculateDeletionPreviewCounts,
-  calculateFollowsToUnfollow,
-  calculateLikesToDelete,
-  calculateMessagesToDelete,
-  calculatePostsForDeletionReview,
-  calculatePostsToDelete,
-  calculatePostsToDeleteWithPreview,
-  calculateRepostsToDelete,
-  type DeletionPreview,
-  type DeletionPreviewCounts,
-  type PostToDeletePreview,
+    calculateBookmarksToDelete,
+    calculateDeletionPreview,
+    calculateDeletionPreviewCounts,
+    calculateFollowsToUnfollow,
+    calculateLikesToDelete,
+    calculateMessagesToDelete,
+    calculatePostsForDeletionReview,
+    calculatePostsToDelete,
+    calculatePostsToDeleteWithPreview,
+    calculateRepostsToDelete,
+    type DeletionPreview,
+    type DeletionPreviewCounts,
+    type PostToDeletePreview,
 } from "./bluesky/deletion-calculator";
 import { BlueskyIndexer } from "./bluesky/indexer";
 import { mapJobRow, type JobRow } from "./bluesky/job-helpers";
 import { runJob } from "./bluesky/job-runner";
 import {
-  type BlueskyJobRecord,
-  type BlueskyJobRunUpdate,
-  type BlueskyJobStatus,
-  type BlueskyJobType,
-  type DeleteJobOptions,
-  type JobEmit,
-  type SaveAndDeleteJobOptions,
-  type SaveJobOptions,
+    type BlueskyJobRecord,
+    type BlueskyJobRunUpdate,
+    type BlueskyJobStatus,
+    type BlueskyJobType,
+    type DeleteJobOptions,
+    type JobEmit,
+    type SaveAndDeleteJobOptions,
+    type SaveJobOptions,
 } from "./bluesky/job-types";
 import { BlueskyRateLimiter, type ApiRequestFn } from "./bluesky/rate-limiter";
 import type {
-  BlueskyDatabaseStats,
-  BlueskyProgress,
-  RateLimitInfo,
+    BlueskyDatabaseStats,
+    BlueskyProgress,
+    RateLimitInfo,
 } from "./bluesky/types";
 import { createInitialProgress } from "./bluesky/types";
 
@@ -78,25 +78,25 @@ function normalizeFetchUrl(input: FetchRequestInfo): string {
 }
 
 export type {
-  BlueskyDatabaseStats,
-  BlueskyProgress,
-  DeleteLikesOptions,
-  DeleteMessagesOptions,
-  DeletePostsOptions,
-  DeleteRepostsOptions,
-  RateLimitInfo,
+    BlueskyDatabaseStats,
+    BlueskyProgress,
+    DeleteLikesOptions,
+    DeleteMessagesOptions,
+    DeletePostsOptions,
+    DeleteRepostsOptions,
+    RateLimitInfo
 } from "./bluesky/types";
 
 export type {
-  BookmarkToDelete,
-  DeletionPreview,
-  DeletionPreviewCounts,
-  FollowToUnfollow,
-  LikeToDelete,
-  MessageToDelete,
-  PostToDelete,
-  PostToDeletePreview,
-  RepostToDelete,
+    BookmarkToDelete,
+    DeletionPreview,
+    DeletionPreviewCounts,
+    FollowToUnfollow,
+    LikeToDelete,
+    MessageToDelete,
+    PostToDelete,
+    PostToDeletePreview,
+    RepostToDelete
 } from "./bluesky/deletion-calculator";
 
 /**
@@ -351,7 +351,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     const mainDb = await getDatabase();
 
     await mainDb.runAsync(
-      `UPDATE bsky_account 
+      `UPDATE bsky_account
        SET sessionJson = ?, updatedAt = ?
        WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
       [JSON.stringify(newSession), Date.now(), this.accountId],
@@ -412,7 +412,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       deletedPosts: number;
       deletedReposts: number;
     }>(`
-      SELECT 
+      SELECT
         COUNT(*) FILTER (WHERE isRepost = 0 AND deletedPostAt IS NULL) as posts,
         COUNT(*) FILTER (WHERE isRepost = 1 AND deletedRepostAt IS NULL) as reposts,
         COUNT(*) FILTER (WHERE deletedPostAt IS NOT NULL) as deletedPosts,
@@ -430,7 +430,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       total: number;
       deleted: number;
     }>(`
-      SELECT 
+      SELECT
         COUNT(*) FILTER (WHERE viewerLiked = 1 AND deletedLikeAt IS NULL) as total,
         COUNT(*) FILTER (WHERE deletedLikeAt IS NOT NULL) as deleted
       FROM post;
@@ -445,7 +445,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       total: number;
       deleted: number;
     }>(`
-      SELECT 
+      SELECT
         COUNT(*) FILTER (WHERE deletedAt IS NULL) as total,
         COUNT(*) FILTER (WHERE deletedAt IS NOT NULL) as deleted
       FROM bookmark;
@@ -460,7 +460,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       total: number;
       unfollowed: number;
     }>(`
-      SELECT 
+      SELECT
         COUNT(*) FILTER (WHERE unfollowedAt IS NULL) as total,
         COUNT(*) FILTER (WHERE unfollowedAt IS NOT NULL) as unfollowed
       FROM follow;
@@ -483,7 +483,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       total: number;
       deleted: number;
     }>(`
-      SELECT 
+      SELECT
         COUNT(*) FILTER (WHERE deletedAt IS NULL) as total,
         COUNT(*) FILTER (WHERE deletedAt IS NOT NULL) as deleted
       FROM message;
@@ -767,6 +767,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
         params?.onUpdate?.({
           jobs,
           activeJobId: update.activeJobId ?? null,
+          currentConversationLabel: update.currentConversationLabel ?? null,
           speechText: update.speechText,
           progressMessage: update.progressMessage,
           progressPercent: update.progressPercent,
@@ -817,6 +818,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
           emit({
             activeJobId: job.id,
+            currentConversationLabel: update.currentConversationLabel,
             speechText: update.speechText,
             progressMessage: update.progressMessage,
             progressPercent: update.progressPercent,
@@ -1785,7 +1787,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
           did: string | null;
           lastSavedAt: number | null;
         }>(
-          `SELECT 
+          `SELECT
             b.createdAt, b.updatedAt, b.accessedAt, b.handle, b.displayName,
             b.postsCount, b.settingSavePosts, b.settingSaveLikes, b.settingSaveBookmarks,
             b.settingSaveChats, b.settingDeletePosts, b.settingDeletePostsDaysOldEnabled,

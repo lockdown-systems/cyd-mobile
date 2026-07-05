@@ -111,10 +111,10 @@ describe("ChatIndexer", () => {
 
     it("should paginate through multiple pages of conversations", async () => {
       const page1 = Array.from({ length: 50 }, (_, i) =>
-        createConversation({ id: `convo${i}` })
+        createConversation({ id: `convo${i}` }),
       );
       const page2 = Array.from({ length: 25 }, (_, i) =>
-        createConversation({ id: `convo${50 + i}` })
+        createConversation({ id: `convo${50 + i}` }),
       );
 
       (mockAgent.chat!.bsky.convo.listConvos as jest.Mock)
@@ -156,7 +156,7 @@ describe("ChatIndexer", () => {
         (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
-          call[0].includes("profile")
+          call[0].includes("profile"),
       );
       expect(profileInserts.length).toBeGreaterThan(0);
     });
@@ -180,7 +180,7 @@ describe("ChatIndexer", () => {
 
     it("should handle errors gracefully", async () => {
       (mockAgent.chat!.bsky.convo.listConvos as jest.Mock).mockRejectedValue(
-        new Error("API Error")
+        new Error("API Error"),
       );
 
       const indexer = new ChatIndexer(deps);
@@ -198,7 +198,7 @@ describe("ChatIndexer", () => {
       const indexer = new ChatIndexer(deps);
 
       await expect(indexer.indexChatConvos()).rejects.toThrow(
-        "Database not initialized"
+        "Database not initialized",
       );
     });
 
@@ -207,7 +207,7 @@ describe("ChatIndexer", () => {
       const indexer = new ChatIndexer(deps);
 
       await expect(indexer.indexChatConvos()).rejects.toThrow(
-        "Agent not initialized"
+        "Agent not initialized",
       );
     });
   });
@@ -248,6 +248,69 @@ describe("ChatIndexer", () => {
       });
     });
 
+    it("should clear the preview when starting a new conversation", async () => {
+      const messages1 = [createChatMessage({ text: "Message one" })];
+      const messages2 = [createChatMessage({ text: "Message two" })];
+
+      (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
+        { convoId: "convo1" },
+        { convoId: "convo2" },
+      ]);
+      (mockAgent.chat!.bsky.convo.getMessages as jest.Mock)
+        .mockResolvedValueOnce({
+          data: { messages: messages1, cursor: undefined },
+        })
+        .mockResolvedValueOnce({
+          data: { messages: messages2, cursor: undefined },
+        });
+
+      const indexer = new ChatIndexer(deps);
+      await indexer.indexChatMessages();
+
+      const conversationStartUpdates = updateProgressCalls.filter(
+        (call): call is { currentAction?: string; previewData?: unknown } =>
+          typeof call === "object" &&
+          call !== null &&
+          "currentAction" in call &&
+          typeof call.currentAction === "string" &&
+          call.currentAction.startsWith("Saving messages from conversation"),
+      );
+
+      expect(conversationStartUpdates).toHaveLength(2);
+      expect(
+        conversationStartUpdates.every((call) => call.previewData === null),
+      ).toBe(true);
+    });
+
+    it("should still emit a preview for messages without an id", async () => {
+      const messages = [
+        {
+          text: "Message without an id",
+          sentAt: "2026-01-04T12:00:00.000Z",
+          sender: { did: "did:plc:sender" },
+        },
+      ];
+
+      (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
+        { convoId: "convo1" },
+      ]);
+      (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
+        data: { messages, cursor: undefined },
+      });
+
+      const indexer = new ChatIndexer(deps);
+      await indexer.indexChatMessages();
+
+      const previewUpdates = updateProgressCalls.filter(
+        (call): call is { previewData?: { type?: string } | null } =>
+          typeof call === "object" && call !== null && "previewData" in call,
+      );
+
+      expect(
+        previewUpdates.some((call) => call.previewData?.type === "message"),
+      ).toBe(true);
+    });
+
     it("should handle messages with facets", async () => {
       const messages = [createChatMessageWithFacets()];
 
@@ -268,7 +331,7 @@ describe("ChatIndexer", () => {
         (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
-          call[0].includes("message")
+          call[0].includes("message"),
       );
       expect(messageInsert).toBeDefined();
 
@@ -301,7 +364,7 @@ describe("ChatIndexer", () => {
         (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
-          call[0].includes("message")
+          call[0].includes("message"),
       );
       expect(messageInsert).toBeDefined();
 
@@ -316,10 +379,10 @@ describe("ChatIndexer", () => {
 
     it("should paginate through message pages", async () => {
       const page1 = Array.from({ length: 100 }, (_, i) =>
-        createChatMessage({ text: `Message ${i}` })
+        createChatMessage({ text: `Message ${i}` }),
       );
       const page2 = Array.from({ length: 50 }, (_, i) =>
-        createChatMessage({ text: `Message ${100 + i}` })
+        createChatMessage({ text: `Message ${100 + i}` }),
       );
 
       (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
@@ -351,6 +414,24 @@ describe("ChatIndexer", () => {
       });
     });
 
+    it("should emit an empty conversation message when a conversation has no messages", async () => {
+      (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
+        { convoId: "convo1" },
+      ]);
+      (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockResolvedValue({
+        data: { messages: [], cursor: undefined },
+      });
+
+      const indexer = new ChatIndexer(deps);
+      await indexer.indexChatMessages();
+
+      const lastProgress = updateProgressCalls[updateProgressCalls.length - 1];
+      expect(lastProgress).toMatchObject({
+        currentAction: "Conversation 1/1 is empty",
+        isRunning: false,
+      });
+    });
+
     it("should save sender profiles", async () => {
       const senderProfile = createProfile({
         did: "did:plc:sender",
@@ -377,7 +458,7 @@ describe("ChatIndexer", () => {
         (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
-          call[0].includes("profile")
+          call[0].includes("profile"),
       );
       expect(profileInserts.length).toBeGreaterThan(0);
     });
@@ -420,7 +501,7 @@ describe("ChatIndexer", () => {
         (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
-          call[0].includes("message")
+          call[0].includes("message"),
       );
       expect(messageInsert).toBeDefined();
 
@@ -434,7 +515,7 @@ describe("ChatIndexer", () => {
         { convoId: "convo1" },
       ]);
       (mockAgent.chat!.bsky.convo.getMessages as jest.Mock).mockRejectedValue(
-        new Error("API Error")
+        new Error("API Error"),
       );
 
       const indexer = new ChatIndexer(deps);
@@ -475,7 +556,7 @@ describe("ChatIndexer", () => {
         (call: unknown[]) =>
           typeof call[0] === "string" &&
           call[0].includes("INSERT") &&
-          call[0].includes("message")
+          call[0].includes("message"),
       );
       expect(messageInserts.length).toBe(2);
     });

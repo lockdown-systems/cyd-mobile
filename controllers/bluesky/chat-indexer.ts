@@ -127,6 +127,8 @@ export class ChatIndexer {
       isRunning: true,
       error: null,
       messagesProgress: { current: 0, total: null, unknownTotal: true },
+      currentConversationLabel: null,
+      previewData: null,
     });
 
     try {
@@ -145,10 +147,15 @@ export class ChatIndexer {
 
       let totalSaved = 0;
       let convoIndex = 0;
+      let lastEmptyConversationMessage: string | null = null;
 
       for (const { convoId } of convos) {
         convoIndex++;
         let cursor: string | undefined;
+        const conversationLabel = await this.buildConversationLabel(
+          db,
+          convoId,
+        );
 
         this.deps.updateProgress({
           currentAction: `Saving messages from conversation ${convoIndex}/${convos.length}...`,
@@ -157,6 +164,8 @@ export class ChatIndexer {
             total: null,
             unknownTotal: true,
           },
+          currentConversationLabel: conversationLabel,
+          previewData: null,
         });
 
         while (true) {
@@ -174,6 +183,20 @@ export class ChatIndexer {
           const messages = response.messages ?? [];
           const nextCursor = response.cursor;
 
+          if (messages.length === 0) {
+            lastEmptyConversationMessage = `Conversation ${convoIndex.toLocaleString()}/${convos.length.toLocaleString()} is empty`;
+            this.deps.updateProgress({
+              currentAction: lastEmptyConversationMessage,
+              messagesProgress: {
+                current: totalSaved,
+                total: null,
+                unknownTotal: true,
+              },
+              currentConversationLabel: conversationLabel,
+              previewData: null,
+            });
+          }
+
           if (messages.length > 0) {
             await this.saveMessages(db, convoId, messages, async (message) => {
               totalSaved++;
@@ -189,6 +212,7 @@ export class ChatIndexer {
                   total: null,
                   unknownTotal: true,
                 },
+                currentConversationLabel: conversationLabel,
                 previewData: previewData
                   ? { type: "message", data: previewData }
                   : undefined,
@@ -205,8 +229,12 @@ export class ChatIndexer {
       }
 
       this.deps.updateProgress({
-        currentAction: `Finished saving ${totalSaved} messages`,
+        currentAction:
+          totalSaved === 0 && lastEmptyConversationMessage
+            ? lastEmptyConversationMessage
+            : `Finished saving ${totalSaved} messages`,
         isRunning: false,
+        currentConversationLabel: null,
         previewData: null,
         messagesProgress: {
           current: totalSaved,
@@ -410,6 +438,37 @@ export class ChatIndexer {
     return savedCount;
   }
 
+  private async buildConversationLabel(
+    db: SQLiteDatabase,
+    convoId: string,
+  ): Promise<string | null> {
+    const row = await db.getFirstAsync<{ memberDids: string }>(
+      `SELECT memberDids FROM conversation WHERE convoId = ?`,
+      [convoId],
+    );
+
+    if (!row?.memberDids) return null;
+
+    let memberDids: string[] = [];
+    try {
+      memberDids = JSON.parse(row.memberDids) as string[];
+    } catch {
+      return null;
+    }
+
+    const userDid = this.deps.getDid();
+    const otherDid = memberDids.find((did) => did !== userDid) ?? memberDids[0];
+    if (!otherDid) return null;
+
+    const profile = await db.getFirstAsync<{ handle: string }>(
+      `SELECT handle FROM profile WHERE did = ?`,
+      [otherDid],
+    );
+
+    const handle = profile?.handle ?? otherDid;
+    return `Conversation with @${handle}`;
+  }
+
   private requireDb(): SQLiteDatabase {
     const db = this.deps.getDb();
     if (!db) {
@@ -475,7 +534,7 @@ export class ChatIndexer {
         }
       | undefined;
 
-    if (!msg?.text || !msg?.id || !msg.sender?.did) return null;
+    if (!msg?.text || !msg.sender?.did) return null;
 
     // Fetch the profile from the database
     const profile = await db.getFirstAsync<{
@@ -495,8 +554,10 @@ export class ChatIndexer {
       avatarUrl: profile?.avatarUrl ?? null,
     };
 
+    const fallbackMessageId = `${convoId}:${msg.sentAt ?? Date.now()}`;
+
     return {
-      messageId: msg.id,
+      messageId: msg.id ?? fallbackMessageId,
       convoId,
       text: msg.text,
       sentAt: msg.sentAt ?? new Date().toISOString(),
