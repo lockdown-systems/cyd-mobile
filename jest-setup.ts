@@ -111,6 +111,7 @@ jest.mock("expo-constants", () => ({
       extra: {
         iosDistribution: "altstore_pal",
         appStoreAnnualProductId: "premium_annual",
+        appStoreMonthlyProductId: "premium_monthly",
         eas: { projectId: "mock-project-id" },
       },
     },
@@ -121,7 +122,20 @@ jest.mock("expo-constants", () => ({
 jest.mock("expo-iap", () => ({
   initConnection: jest.fn(() => Promise.resolve(true)),
   endConnection: jest.fn(() => Promise.resolve()),
-  fetchProducts: jest.fn(() => Promise.resolve([])),
+  fetchProducts: jest.fn(() =>
+    Promise.resolve([
+      {
+        id: "premium_annual",
+        title: "Cyd Premium Annual",
+        displayPrice: "$35.99",
+      },
+      {
+        id: "premium_monthly",
+        title: "Cyd Premium Monthly",
+        displayPrice: "$4.99",
+      },
+    ]),
+  ),
   requestPurchase: jest.fn(() => Promise.resolve()),
   finishTransaction: jest.fn(() => Promise.resolve()),
   restorePurchases: jest.fn(() => Promise.resolve()),

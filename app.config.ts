@@ -11,6 +11,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const isAltBuild = iosDistribution === "alt";
   const appStoreAnnualProductId =
     process.env.APP_STORE_ANNUAL_PRODUCT_ID ?? "premium_annual";
+  const appStoreMonthlyProductId =
+    process.env.APP_STORE_MONTHLY_PRODUCT_ID ?? "premium_monthly";
 
   return {
     ...config,
@@ -124,6 +126,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       cydApiEnv,
       iosDistribution,
       appStoreAnnualProductId,
+      appStoreMonthlyProductId,
       router: {},
       eas: {
         projectId: "192811c5-4578-4acb-b55d-4da9d2a5f44a",

@@ -11,7 +11,9 @@ import {
 } from "react-native";
 
 import { CydSignInModal } from "@/components/CydSignInModal";
+import { PremiumPlanSelector } from "@/components/PremiumPlanSelector";
 import { CydAvatar } from "@/components/cyd/CydAvatar";
+import type { BillingPeriod } from "@/constants/subscriptions";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
@@ -39,6 +41,8 @@ export function PremiumRequiredModal({
   } = useCydAccount();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(false);
+  const [selectedBillingPeriod, setSelectedBillingPeriod] =
+    useState<BillingPeriod>("annual");
 
   // Check premium status when modal becomes visible (only if not already checked)
   useEffect(() => {
@@ -86,12 +90,12 @@ export function PremiumRequiredModal({
 
   const handleSubscribeWithApple = useCallback(() => {
     void (async () => {
-      const result = await purchasePremium();
+      const result = await purchasePremium(selectedBillingPeriod);
       if (!result.success && result.error) {
         Alert.alert("Purchase Failed", result.error);
       }
     })();
-  }, [purchasePremium]);
+  }, [purchasePremium, selectedBillingPeriod]);
 
   const handleRestorePurchases = useCallback(() => {
     void (async () => {
@@ -170,7 +174,8 @@ export function PremiumRequiredModal({
 
     // User is signed in but doesn't have premium
     const usesAppStoreIAP = premiumUpsellMode === "app_store_iap";
-    const appStorePrice = appStorePurchaseState?.product?.displayPrice;
+    const selectedProduct =
+      appStorePurchaseState?.products?.[selectedBillingPeriod] ?? null;
     const appStoreBusy = Boolean(
       appStorePurchaseState?.isPurchasing || appStorePurchaseState?.isRestoring,
     );
@@ -178,9 +183,9 @@ export function PremiumRequiredModal({
       ? "Purchasing…"
       : appStorePurchaseState?.isLoadingProduct
         ? "Loading Subscription…"
-        : appStorePrice
-          ? `Subscribe ${appStorePrice}/year`
-          : "Subscribe with Apple";
+        : selectedBillingPeriod === "annual"
+          ? "Subscribe Annually"
+          : "Subscribe Monthly";
 
     return (
       <View style={styles.contentContainer}>
@@ -192,10 +197,19 @@ export function PremiumRequiredModal({
         <View style={styles.buttonColumn}>
           {usesAppStoreIAP ? (
             <>
+              <PremiumPlanSelector
+                palette={palette}
+                products={appStorePurchaseState.products}
+                selectedBillingPeriod={selectedBillingPeriod}
+                onSelect={setSelectedBillingPeriod}
+                disabled={appStoreBusy || appStorePurchaseState.isLoadingProduct}
+              />
               <Pressable
                 onPress={handleSubscribeWithApple}
                 disabled={
-                  appStoreBusy || appStorePurchaseState?.isLoadingProduct
+                  appStoreBusy ||
+                  appStorePurchaseState.isLoadingProduct ||
+                  !selectedProduct
                 }
                 style={({ pressed }) => [
                   styles.primaryButton,
@@ -204,10 +218,12 @@ export function PremiumRequiredModal({
                     opacity:
                       pressed &&
                       !appStoreBusy &&
-                      !appStorePurchaseState?.isLoadingProduct
+                      !appStorePurchaseState.isLoadingProduct &&
+                      selectedProduct
                         ? 0.85
                         : appStoreBusy ||
-                            appStorePurchaseState?.isLoadingProduct
+                            appStorePurchaseState.isLoadingProduct ||
+                            !selectedProduct
                           ? 0.6
                           : 1,
                   },

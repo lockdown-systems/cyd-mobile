@@ -53,17 +53,21 @@ export type DeleteDeviceAPIRequest = {
 
 // API models for GET /user/premium
 export type UserPremiumAPIResponse = {
-  premium_price_cents: number;
+  premium_price_annual_cents: number;
+  premium_price_monthly_cents: number;
   premium_business_price_cents: number;
   premium_access: boolean;
   has_individual_subscription: boolean;
+  individual_subscription_provider: "stripe" | "app_store" | "none";
+  individual_subscription_status: string;
+  individual_subscription_manage_mode: string;
+  current_billing_period: "annual" | "monthly" | "none";
   subscription_cancel_at_period_end: boolean;
-  subscription_current_period_end: string;
+  subscription_current_period_end: string | null;
   has_business_subscription: boolean;
   business_organizations: string[];
-  individual_subscription_provider?: "stripe" | "app_store" | "none";
-  individual_subscription_status?: string;
-  individual_subscription_manage_mode?: string;
+  partner: boolean;
+  stored_credit_cents: number;
 };
 
 // API models for /user/app-store/subscription

@@ -22,9 +22,11 @@ import React, {
 import { Platform } from "react-native";
 
 import {
-  APP_STORE_ANNUAL_PRODUCT_ID,
+  APP_STORE_SUBSCRIPTION_PLANS,
+  APP_STORE_SUBSCRIPTION_PRODUCT_IDS,
   CYD_API_ENV,
   PREMIUM_UPSELL_MODE,
+  type BillingPeriod,
   type PremiumUpsellMode,
 } from "@/constants/subscriptions";
 import {
@@ -60,8 +62,7 @@ export type AppStoreProductSummary = {
 };
 
 export type AppStorePurchaseState = {
-  productId: string;
-  product: AppStoreProductSummary | null;
+  products: Record<BillingPeriod, AppStoreProductSummary | null>;
   isConnected: boolean;
   isLoadingProduct: boolean;
   isPurchasing: boolean;
@@ -91,7 +92,9 @@ export type CydAccountContextType = {
   refreshState: () => Promise<void>;
   getDashboardURL: () => string;
   checkPremiumAccess: () => Promise<void>;
-  purchasePremium: () => Promise<PremiumActionResult>;
+  purchasePremium: (
+    billingPeriod: BillingPeriod,
+  ) => Promise<PremiumActionResult>;
   restoreAppStorePurchases: () => Promise<PremiumActionResult>;
 };
 
@@ -118,8 +121,10 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
   });
   const [appStorePurchaseState, setAppStorePurchaseState] =
     useState<AppStorePurchaseState>({
-      productId: APP_STORE_ANNUAL_PRODUCT_ID,
-      product: null,
+      products: {
+        annual: null,
+        monthly: null,
+      },
       isConnected: false,
       isLoadingProduct: PREMIUM_UPSELL_MODE === "app_store_iap",
       isPurchasing: false,
@@ -359,7 +364,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
 
   const syncAppStorePurchase = useCallback(
     async (purchase: Purchase): Promise<boolean> => {
-      if (purchase.productId !== APP_STORE_ANNUAL_PRODUCT_ID) {
+      if (!APP_STORE_SUBSCRIPTION_PRODUCT_IDS.includes(purchase.productId)) {
         return false;
       }
 
@@ -430,21 +435,35 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       try {
         await initConnection();
         const products = (await fetchProducts({
-          skus: [APP_STORE_ANNUAL_PRODUCT_ID],
+          skus: APP_STORE_SUBSCRIPTION_PRODUCT_IDS,
           type: "subs",
         })) as ProductSubscription[];
-        const product = products.find(
-          (candidate) => candidate.id === APP_STORE_ANNUAL_PRODUCT_ID,
+        const productsByBillingPeriod = APP_STORE_SUBSCRIPTION_PLANS.reduce<
+          Record<BillingPeriod, AppStoreProductSummary | null>
+        >(
+          (result, plan) => {
+            const product = products.find(
+              (candidate) => candidate.id === plan.productId,
+            );
+            result[plan.billingPeriod] = product
+              ? summarizeAppStoreProduct(product)
+              : null;
+            return result;
+          },
+          { annual: null, monthly: null },
         );
+        const hasAvailableProduct = Object.values(
+          productsByBillingPeriod,
+        ).some(Boolean);
         if (!isActive) {
           return;
         }
         setAppStorePurchaseState((prev) => ({
           ...prev,
-          product: product ? summarizeAppStoreProduct(product) : null,
+          products: productsByBillingPeriod,
           isConnected: true,
           isLoadingProduct: false,
-          error: product
+          error: hasAvailableProduct
             ? null
             : "Premium is not available in the App Store yet.",
         }));
@@ -473,8 +492,8 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
     return apiClient.getDashboardURL();
   }, [apiClient]);
 
-  const purchasePremium =
-    useCallback(async (): Promise<PremiumActionResult> => {
+  const purchasePremium = useCallback(
+    async (billingPeriod: BillingPeriod): Promise<PremiumActionResult> => {
       if (PREMIUM_UPSELL_MODE !== "app_store_iap") {
         return {
           success: false,
@@ -483,6 +502,16 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       }
       if (!state.isSignedIn) {
         return { success: false, error: "Please sign in before subscribing." };
+      }
+
+      const plan = APP_STORE_SUBSCRIPTION_PLANS.find(
+        (candidate) => candidate.billingPeriod === billingPeriod,
+      );
+      if (!plan || !appStorePurchaseState.products[billingPeriod]) {
+        return {
+          success: false,
+          error: "That Premium plan is not available in the App Store yet.",
+        };
       }
 
       setAppStorePurchaseState((prev) => ({
@@ -510,7 +539,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         await requestPurchase({
           request: {
             apple: {
-              sku: APP_STORE_ANNUAL_PRODUCT_ID,
+              sku: plan.productId,
               appAccountToken: subscriptionMetadata.app_account_token,
             },
           },
@@ -526,7 +555,9 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         }));
         return { success: false, error: message };
       }
-    }, [apiClient, appStorePurchaseState.isConnected, state.isSignedIn]);
+    },
+    [apiClient, appStorePurchaseState, state.isSignedIn],
+  );
 
   const restoreAppStorePurchases =
     useCallback(async (): Promise<PremiumActionResult> => {
@@ -560,7 +591,8 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
           onlyIncludeActiveItemsIOS: true,
         });
         const premiumPurchases = purchases.filter(
-          (purchase) => purchase.productId === APP_STORE_ANNUAL_PRODUCT_ID,
+          (purchase) =>
+            APP_STORE_SUBSCRIPTION_PRODUCT_IDS.includes(purchase.productId),
         );
 
         if (premiumPurchases.length === 0) {
