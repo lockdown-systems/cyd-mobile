@@ -40,6 +40,60 @@ describe("CydAPIClient", () => {
       expect(client.getUserEmail()).toBeNull();
       expect(client.getDeviceToken()).toBeNull();
     });
+
+    it("should fetch and use a new API token after switching accounts", async () => {
+      mockFetch.mockImplementation(
+        async (url: string, options?: RequestInit) => {
+          if (url.endsWith("/token")) {
+            const request = JSON.parse(String(options?.body)) as {
+              email: string;
+            };
+            return {
+              status: 200,
+              json: async () => ({
+                api_token: `api-token-for-${request.email}`,
+                device_uuid: `device-for-${request.email}`,
+                email: request.email,
+              }),
+            };
+          }
+          if (url.endsWith("/ping")) {
+            return { status: 200 };
+          }
+          if (url.endsWith("/user/premium")) {
+            return {
+              status: 200,
+              json: async () => ({ premium_access: true }),
+            };
+          }
+          throw new Error(`Unexpected URL: ${url}`);
+        },
+      );
+
+      client.setCredentials("account-a@example.com", "device-token-a");
+      await client.ping();
+
+      client.setCredentials("account-b@example.com", "device-token-b");
+      const premium = await client.getUserPremium();
+
+      const tokenRequests = mockFetch.mock.calls.filter(([url]) =>
+        String(url).endsWith("/token"),
+      );
+      expect(tokenRequests).toHaveLength(2);
+      expect(JSON.parse(String(tokenRequests[1][1]?.body))).toEqual({
+        email: "account-b@example.com",
+        device_token: "device-token-b",
+      });
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${API_URL}/user/premium`,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer api-token-for-account-b@example.com",
+          }),
+        }),
+      );
+      expect(premium).toEqual({ premium_access: true });
+    });
   });
 
   describe("setUserEmail", () => {
