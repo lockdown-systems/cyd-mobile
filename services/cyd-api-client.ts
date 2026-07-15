@@ -160,11 +160,17 @@ export default class CydAPIClient {
   }
 
   setCredentials(userEmail: string | null, deviceToken: string | null): void {
+    if (this.userEmail !== userEmail || this.deviceToken !== deviceToken) {
+      this.invalidateAuthentication();
+    }
     this.userEmail = userEmail;
     this.deviceToken = deviceToken;
   }
 
   setUserEmail(userEmail: string): void {
+    if (this.userEmail !== userEmail) {
+      this.invalidateAuthentication();
+    }
     this.userEmail = userEmail;
   }
 
@@ -173,6 +179,9 @@ export default class CydAPIClient {
   }
 
   async setDeviceToken(deviceToken: string): Promise<void> {
+    if (this.deviceToken !== deviceToken) {
+      this.invalidateAuthentication();
+    }
     this.deviceToken = deviceToken;
     await this.getNewAPIToken();
   }
@@ -183,6 +192,11 @@ export default class CydAPIClient {
 
   getDeviceUUID(): string | null {
     return this.deviceUUID;
+  }
+
+  private invalidateAuthentication(): void {
+    this.apiToken = null;
+    this.deviceUUID = null;
   }
 
   private returnError(message: string, status?: number): APIErrorResponse {
