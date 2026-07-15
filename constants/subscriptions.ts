@@ -7,6 +7,7 @@ type AppExtra = {
   cydApiEnv?: string;
   iosDistribution?: string;
   appStoreAnnualProductId?: string;
+  appStoreMonthlyProductId?: string;
 };
 
 type ConstantsWithExtra = {
@@ -28,6 +29,35 @@ export const CYD_API_ENV: CydApiEnv =
 
 export const APP_STORE_ANNUAL_PRODUCT_ID =
   extra.appStoreAnnualProductId ?? "premium_annual";
+export const APP_STORE_MONTHLY_PRODUCT_ID =
+  extra.appStoreMonthlyProductId ?? "premium_monthly";
+
+export type BillingPeriod = "annual" | "monthly";
+
+export type AppStoreSubscriptionPlan = {
+  billingPeriod: BillingPeriod;
+  productId: string;
+  periodLabel: "year" | "month";
+  displayName: string;
+};
+
+export const APP_STORE_SUBSCRIPTION_PLANS: AppStoreSubscriptionPlan[] = [
+  {
+    billingPeriod: "annual",
+    productId: APP_STORE_ANNUAL_PRODUCT_ID,
+    periodLabel: "year",
+    displayName: "Annual",
+  },
+  {
+    billingPeriod: "monthly",
+    productId: APP_STORE_MONTHLY_PRODUCT_ID,
+    periodLabel: "month",
+    displayName: "Monthly",
+  },
+];
+
+export const APP_STORE_SUBSCRIPTION_PRODUCT_IDS =
+  APP_STORE_SUBSCRIPTION_PLANS.map((plan) => plan.productId);
 
 export const IOS_DISTRIBUTION = extra.iosDistribution ?? "app_store";
 

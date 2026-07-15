@@ -12,6 +12,7 @@
         "CYD_API_ENV": "dev",
         "IOS_DISTRIBUTION": "app_store",
         "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual",
+        "APP_STORE_MONTHLY_PRODUCT_ID": "premium_monthly",
         "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     },
@@ -21,6 +22,7 @@
         "CYD_API_ENV": "prod",
         "IOS_DISTRIBUTION": "app_store",
         "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual",
+        "APP_STORE_MONTHLY_PRODUCT_ID": "premium_monthly",
         "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     }

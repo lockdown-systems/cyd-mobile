@@ -2,9 +2,30 @@
  * @fileoverview Tests for CydAccountProvider context
  */
 
+import { act, render, waitFor } from "@testing-library/react-native";
+import {
+  fetchProducts,
+  finishTransaction,
+  getAvailablePurchases,
+  requestPurchase,
+} from "expo-iap";
 import React from "react";
 
-import { CydAccountProvider, useCydAccount } from "../CydAccountProvider";
+import { getCydAccountCredentials } from "@/database/cyd-account";
+import {
+  CydAccountProvider,
+  type CydAccountContextType,
+  useCydAccount,
+} from "../CydAccountProvider";
+
+const mockSyncAppStoreSubscription = jest.fn();
+const mockGetAppStoreSubscription = jest.fn();
+const mockPing = jest.fn(() => Promise.resolve(false));
+
+jest.mock("@/constants/subscriptions", () => ({
+  ...jest.requireActual("@/constants/subscriptions"),
+  PREMIUM_UPSELL_MODE: "app_store_iap",
+}));
 
 // Mock the database functions
 jest.mock("@/database/cyd-account", () => ({
@@ -13,7 +34,7 @@ jest.mock("@/database/cyd-account", () => ({
       userEmail: null,
       deviceToken: null,
       deviceUUID: null,
-    })
+    }),
   ),
   setCydAccountCredentials: jest.fn(() => Promise.resolve()),
   clearCydAccountCredentials: jest.fn(() => Promise.resolve()),
@@ -25,18 +46,20 @@ jest.mock("@/services/cyd-api-client", () => {
     setCredentials: jest.fn(),
     setUserEmail: jest.fn(),
     getUserEmail: jest.fn(() => null),
-    ping: jest.fn(() => Promise.resolve(false)),
+    ping: mockPing,
     authenticate: jest.fn(() => Promise.resolve(true)),
     registerDevice: jest.fn(() =>
       Promise.resolve({
         uuid: "test-uuid",
         device_token: "test-device-token",
-      })
+      }),
     ),
     postNewsletter: jest.fn(() => Promise.resolve(true)),
     postUserActivity: jest.fn(() => Promise.resolve(true)),
     deleteDevice: jest.fn(() => Promise.resolve()),
     getDashboardURL: jest.fn(() => "https://dash.cyd.social"),
+    getAppStoreSubscription: mockGetAppStoreSubscription,
+    syncAppStoreSubscription: mockSyncAppStoreSubscription,
   }));
 });
 
@@ -114,6 +137,80 @@ describe("CydAccountProvider", () => {
       expect(mockState.isSignedIn).toBe(false);
       expect(mockState.userEmail).toBeNull();
       expect(mockState.isLoading).toBe(true);
+    });
+  });
+
+  describe("App Store purchases", () => {
+    it("fetches, purchases, and restores a monthly subscription", async () => {
+      mockPing.mockResolvedValue(true);
+      (getCydAccountCredentials as jest.Mock).mockResolvedValue({
+        userEmail: "subscriber@example.com",
+        deviceToken: "device-token",
+        deviceUUID: "device-uuid",
+      });
+      mockSyncAppStoreSubscription.mockResolvedValue({
+        subscription: { product_id: "premium_monthly" },
+        premium: { premium_access: true },
+      });
+      mockGetAppStoreSubscription.mockResolvedValue({
+        app_account_token: "00000000-0000-4000-8000-000000000000",
+        subscription: null,
+        premium: { premium_access: false },
+      });
+
+      const monthlyPurchase = {
+        productId: "premium_monthly",
+        transactionId: "monthly-transaction-id",
+      };
+      (getAvailablePurchases as jest.Mock).mockResolvedValue([monthlyPurchase]);
+
+      let context: CydAccountContextType | null = null;
+      function ContextReader() {
+        context = useCydAccount();
+        return null;
+      }
+
+      render(
+        <CydAccountProvider>
+          <ContextReader />
+        </CydAccountProvider>,
+      );
+
+      await waitFor(() => {
+        expect(context?.state.isSignedIn).toBe(true);
+        expect(context?.appStorePurchaseState.isConnected).toBe(true);
+      });
+      expect(fetchProducts).toHaveBeenCalledWith({
+        skus: ["premium_annual", "premium_monthly"],
+        type: "subs",
+      });
+
+      await act(async () => {
+        await context?.purchasePremium("monthly");
+      });
+      expect(requestPurchase).toHaveBeenCalledWith({
+        request: {
+          apple: {
+            sku: "premium_monthly",
+            appAccountToken: "00000000-0000-4000-8000-000000000000",
+          },
+        },
+        type: "subs",
+      });
+
+      let result;
+      await act(async () => {
+        result = await context?.restoreAppStorePurchases();
+      });
+
+      expect(result).toEqual({ success: true });
+      expect(mockSyncAppStoreSubscription).toHaveBeenCalledWith({
+        transaction_id: "monthly-transaction-id",
+      });
+      expect(finishTransaction).toHaveBeenCalledWith({
+        purchase: monthlyPurchase,
+        isConsumable: false,
+      });
     });
   });
 });

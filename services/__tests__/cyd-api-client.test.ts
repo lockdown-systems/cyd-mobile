@@ -307,14 +307,21 @@ describe("CydAPIClient", () => {
     describe("getUserPremium", () => {
       it("should return premium info on success", async () => {
         const premiumResponse = {
-          premium_price_cents: 1200,
+          premium_price_annual_cents: 3599,
+          premium_price_monthly_cents: 499,
           premium_business_price_cents: 4900,
           premium_access: true,
           has_individual_subscription: true,
+          individual_subscription_provider: "stripe",
+          individual_subscription_status: "active",
+          individual_subscription_manage_mode: "stripe",
+          current_billing_period: "annual",
           subscription_cancel_at_period_end: false,
           subscription_current_period_end: "2025-12-31",
           has_business_subscription: false,
           business_organizations: [],
+          partner: false,
+          stored_credit_cents: 0,
         };
 
         mockFetch.mockImplementation(async (url: string) => {
@@ -374,14 +381,21 @@ describe("CydAPIClient", () => {
           app_account_token: "00000000-0000-4000-8000-000000000000",
           subscription: null,
           premium: {
-            premium_price_cents: 1200,
+            premium_price_annual_cents: 3599,
+            premium_price_monthly_cents: 499,
             premium_business_price_cents: 4900,
             premium_access: false,
             has_individual_subscription: false,
+            individual_subscription_provider: "none",
+            individual_subscription_status: "none",
+            individual_subscription_manage_mode: "none",
+            current_billing_period: "none",
             subscription_cancel_at_period_end: false,
-            subscription_current_period_end: "",
+            subscription_current_period_end: null,
             has_business_subscription: false,
             business_organizations: [],
+            partner: false,
+            stored_credit_cents: 0,
           },
         };
 
@@ -417,21 +431,28 @@ describe("CydAPIClient", () => {
           subscription: {
             original_transaction_id: "original-transaction-id",
             latest_transaction_id: "transaction-id",
-            product_id: "premium_annual",
+            product_id: "premium_monthly",
             environment: "Sandbox",
             status: "active",
             entitlement_expires_at: "2026-06-01T00:00:00+00:00",
             will_auto_renew: true,
           },
           premium: {
-            premium_price_cents: 1200,
+            premium_price_annual_cents: 3599,
+            premium_price_monthly_cents: 499,
             premium_business_price_cents: 4900,
             premium_access: true,
             has_individual_subscription: true,
+            individual_subscription_provider: "app_store",
+            individual_subscription_status: "active",
+            individual_subscription_manage_mode: "app_store",
+            current_billing_period: "monthly",
             subscription_cancel_at_period_end: false,
             subscription_current_period_end: "2026-06-01",
             has_business_subscription: false,
             business_organizations: [],
+            partner: false,
+            stored_credit_cents: 0,
           },
         };
 

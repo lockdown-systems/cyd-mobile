@@ -43,8 +43,7 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
     apiClient: mockApiClient,
     premiumUpsellMode: "external_checkout",
     appStorePurchaseState: {
-      productId: "premium_annual",
-      product: null,
+      products: { annual: null, monthly: null },
       isConnected: false,
       isLoadingProduct: false,
       isPurchasing: false,
@@ -113,8 +112,7 @@ describe("PremiumRequiredBanner", () => {
       apiClient: mockApiClient,
       premiumUpsellMode: "external_checkout",
       appStorePurchaseState: {
-        productId: "premium_annual",
-        product: null,
+        products: { annual: null, monthly: null },
         isConnected: false,
         isLoadingProduct: false,
         isPurchasing: false,
@@ -269,11 +267,17 @@ describe("PremiumRequiredBanner", () => {
         apiClient: mockApiClient,
         premiumUpsellMode: "app_store_iap",
         appStorePurchaseState: {
-          productId: "premium_annual",
-          product: {
-            productId: "premium_annual",
-            title: "Cyd Premium Annual",
-            displayPrice: "$35.99",
+          products: {
+            annual: {
+              productId: "premium_annual",
+              title: "Cyd Premium Annual",
+              displayPrice: "$35.99",
+            },
+            monthly: {
+              productId: "premium_monthly",
+              title: "Cyd Premium Monthly",
+              displayPrice: "$4.99",
+            },
           },
           isConnected: true,
           isLoadingProduct: false,
@@ -289,14 +293,22 @@ describe("PremiumRequiredBanner", () => {
 
       render(<PremiumRequiredBanner palette={defaultPalette} />);
 
-      expect(screen.getByText("Subscribe $35.99/year")).toBeTruthy();
+      expect(screen.getByText("$35.99/year")).toBeTruthy();
+      expect(screen.getByText("$4.99/month")).toBeTruthy();
+      expect(screen.getByText("Subscribe Annually")).toBeTruthy();
       expect(screen.getByText("Restore Purchases")).toBeTruthy();
 
       await act(async () => {
-        fireEvent.press(screen.getByText("Subscribe $35.99/year"));
+        fireEvent.press(screen.getByText("Monthly"));
+      });
+      await waitFor(() => {
+        expect(screen.getByText("Subscribe Monthly")).toBeTruthy();
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByText("Subscribe Monthly"));
       });
 
-      expect(mockPurchasePremium).toHaveBeenCalled();
+      expect(mockPurchasePremium).toHaveBeenCalledWith("monthly");
 
       await act(async () => {
         fireEvent.press(screen.getByText("Restore Purchases"));
