@@ -195,7 +195,12 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
           },
         ]}
       >
-        <View style={styles.topRow}>
+        <View
+          style={[
+            styles.topRow,
+            usesAppStoreIAP && styles.centeredPremiumHeader,
+          ]}
+        >
           <View style={styles.avatarContainer}>
             <CydAvatar height={100} />
           </View>
@@ -205,132 +210,120 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
                 ? "Deleting data requires a Premium account."
                 : "Deleting data requires a Premium account. Manage your account to upgrade to Premium."}
             </Text>
-            <View style={styles.buttonColumn}>
-              {usesAppStoreIAP ? (
-                <>
-                  <PremiumPlanSelector
-                    palette={palette}
-                    products={appStorePurchaseState.products}
-                    selectedBillingPeriod={selectedBillingPeriod}
-                    onSelect={setSelectedBillingPeriod}
-                    disabled={
-                      appStoreBusy || appStorePurchaseState.isLoadingProduct
-                    }
-                  />
-                  <Pressable
-                    onPress={handleSubscribeWithApple}
-                    disabled={
-                      appStoreBusy ||
-                      appStorePurchaseState.isLoadingProduct ||
-                      !selectedProduct
-                    }
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      {
-                        backgroundColor:
-                          palette.button?.background ?? palette.tint,
-                        opacity:
-                          pressed &&
-                          !appStoreBusy &&
-                          !appStorePurchaseState.isLoadingProduct &&
-                          selectedProduct
-                            ? 0.85
-                            : appStoreBusy ||
-                                appStorePurchaseState.isLoadingProduct ||
-                                !selectedProduct
-                              ? 0.6
-                              : 1,
-                      },
-                    ]}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        styles.primaryButtonText,
-                        { color: palette.button?.text ?? "#ffffff" },
-                      ]}
-                    >
-                      {appStorePrimaryLabel}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleRestorePurchases}
-                    disabled={appStoreBusy}
-                    style={({ pressed }) => [
-                      styles.secondaryButton,
-                      {
-                        borderColor: palette.icon + "33",
-                        backgroundColor: palette.card,
-                        opacity:
-                          pressed && !appStoreBusy
-                            ? 0.85
-                            : appStoreBusy
-                              ? 0.6
-                              : 1,
-                      },
-                    ]}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        styles.secondaryButtonText,
-                        { color: palette.text },
-                      ]}
-                    >
-                      {appStorePurchaseState?.isRestoring
-                        ? "Restoring…"
-                        : "Restore Purchases"}
-                    </Text>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <Pressable
-                    onPress={handleManageAccount}
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      {
-                        backgroundColor:
-                          palette.button?.background ?? palette.tint,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        styles.primaryButtonText,
-                        { color: palette.button?.text ?? "#ffffff" },
-                      ]}
-                    >
-                      Manage My Account
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleIveUpgraded}
-                    style={({ pressed }) => [
-                      styles.secondaryButton,
-                      {
-                        borderColor: palette.icon + "33",
-                        backgroundColor: palette.card,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        styles.secondaryButtonText,
-                        { color: palette.text },
-                      ]}
-                    >
-                      I&apos;ve Upgraded
-                    </Text>
-                  </Pressable>
-                </>
-              )}
-            </View>
           </View>
+        </View>
+        <View style={styles.buttonColumn}>
+          {usesAppStoreIAP ? (
+            <>
+              <PremiumPlanSelector
+                palette={palette}
+                products={appStorePurchaseState.products}
+                selectedBillingPeriod={selectedBillingPeriod}
+                onSelect={setSelectedBillingPeriod}
+                disabled={
+                  appStoreBusy || appStorePurchaseState.isLoadingProduct
+                }
+              />
+              <Pressable
+                onPress={handleSubscribeWithApple}
+                disabled={
+                  appStoreBusy ||
+                  appStorePurchaseState.isLoadingProduct ||
+                  !selectedProduct
+                }
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  {
+                    backgroundColor: palette.button?.background ?? palette.tint,
+                    opacity:
+                      pressed &&
+                      !appStoreBusy &&
+                      !appStorePurchaseState.isLoadingProduct &&
+                      selectedProduct
+                        ? 0.85
+                        : appStoreBusy ||
+                            appStorePurchaseState.isLoadingProduct ||
+                            !selectedProduct
+                          ? 0.6
+                          : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    styles.primaryButtonText,
+                    { color: palette.button?.text ?? "#ffffff" },
+                  ]}
+                >
+                  {appStorePrimaryLabel}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleRestorePurchases}
+                disabled={appStoreBusy}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  {
+                    borderColor: palette.icon + "33",
+                    backgroundColor: palette.card,
+                    opacity:
+                      pressed && !appStoreBusy ? 0.85 : appStoreBusy ? 0.6 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[styles.secondaryButtonText, { color: palette.text }]}
+                >
+                  {appStorePurchaseState?.isRestoring
+                    ? "Restoring…"
+                    : "Restore Purchases"}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Pressable
+                onPress={handleManageAccount}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  {
+                    backgroundColor: palette.button?.background ?? palette.tint,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[
+                    styles.primaryButtonText,
+                    { color: palette.button?.text ?? "#ffffff" },
+                  ]}
+                >
+                  Manage My Account
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleIveUpgraded}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  {
+                    borderColor: palette.icon + "33",
+                    backgroundColor: palette.card,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={[styles.secondaryButtonText, { color: palette.text }]}
+                >
+                  I&apos;ve Upgraded
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
         <Text style={[styles.hintText, { color: palette.icon }]}>
           In the meantime, feel free to explore the delete features below.
@@ -356,6 +349,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     alignItems: "flex-start",
+  },
+  centeredPremiumHeader: {
+    alignItems: "center",
   },
   avatarContainer: {
     flexShrink: 0,
