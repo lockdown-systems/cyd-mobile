@@ -285,6 +285,7 @@ describe("ChatIndexer", () => {
     it("should still emit a preview for messages without an id", async () => {
       const messages = [
         {
+          $type: "chat.bsky.convo.defs#messageView",
           text: "Message without an id",
           sentAt: "2026-01-04T12:00:00.000Z",
           sender: { did: "did:plc:sender" },
@@ -528,14 +529,25 @@ describe("ChatIndexer", () => {
       });
     });
 
-    it("should skip messages without text", async () => {
+    it("should save empty-text messages but skip non-message views", async () => {
       const messages = [
         createChatMessage({ text: "Valid message" }),
+        // A message that is only a shared-post embed has empty text but is a
+        // real message that must be saved (and later deletable).
+        createChatMessage({
+          id: "embed-only",
+          text: "",
+          embed: { $type: "app.bsky.embed.record#view" },
+        }),
+        // A deletedMessageView placeholder (returned after deleteMessageForSelf)
+        // has no content and must be skipped.
         {
-          id: "msg2",
+          $type: "chat.bsky.convo.defs#deletedMessageView",
+          id: "deleted1",
+          rev: "1",
           sender: { did: "did:plc:sender" },
           sentAt: new Date().toISOString(),
-        }, // No text
+        },
         createChatMessage({ text: "Another valid message" }),
       ];
 
@@ -549,7 +561,8 @@ describe("ChatIndexer", () => {
       const indexer = new ChatIndexer(deps);
       await indexer.indexChatMessages();
 
-      // Should only save messages with text (2, not 3)
+      // Should save the 3 real messages (including the empty-text embed) and
+      // skip the deletedMessageView placeholder.
       const runAsyncCalls = (mockDb.runAsync as jest.Mock).mock
         .calls as unknown[][];
       const messageInserts = runAsyncCalls.filter(
@@ -558,7 +571,7 @@ describe("ChatIndexer", () => {
           call[0].includes("INSERT") &&
           call[0].includes("message"),
       );
-      expect(messageInserts.length).toBe(2);
+      expect(messageInserts.length).toBe(3);
     });
   });
 });

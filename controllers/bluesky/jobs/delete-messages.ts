@@ -31,21 +31,8 @@ export async function runDeleteMessagesJob(
   const messagesToDelete = controller.getMessagesToDelete(settings);
   const total = messagesToDelete.length;
 
-  if (total === 0) {
-    emit({
-      progressMessage: "No messages to delete",
-      progressPercent: 1,
-      unknownTotal: false,
-      progress: { currentItemIndex: 0, totalItems: 0 },
-    });
-    return;
-  }
-
   let deleted = 0;
   let errors = 0;
-
-  // Track unique conversation IDs for cleanup check
-  const conversationIds = new Set<string>();
 
   // Get signed-in user info for display (includes avatar from local DB)
   const userProfile = controller.getUserProfileData();
@@ -70,9 +57,6 @@ export async function runDeleteMessagesJob(
 
   for (const message of messagesToDelete) {
     await controller.waitForPause();
-
-    // Track this conversation for later cleanup check
-    conversationIds.add(message.convoId);
 
     // Find the recipient (the other person in the conversation, not the current user)
     let recipient: {
@@ -146,15 +130,18 @@ export async function runDeleteMessagesJob(
     }
   }
 
-  // Check for empty conversations and clean them up
+  // Check for empty conversations and clean them up. This is sourced from the
+  // DB (not from messagesToDelete) so it also covers conversations that have no
+  // saved messages at all — those never appear in messagesToDelete.
   let conversationsLeft = 0;
-  const conversationArray = Array.from(conversationIds);
+  const conversationArray = controller.getConversationIdsToCleanup();
 
-  for (const convoId of conversationArray) {
+  for (let i = 0; i < conversationArray.length; i++) {
+    const convoId = conversationArray[i];
     await controller.waitForPause();
 
     emit({
-      progressMessage: `Checking conversation ${(conversationsLeft + 1).toLocaleString()} of ${conversationArray.length.toLocaleString()} for cleanup…`,
+      progressMessage: `Checking conversation ${(i + 1).toLocaleString()} of ${conversationArray.length.toLocaleString()} for cleanup…`,
       progressPercent: 1,
       unknownTotal: false,
     });
@@ -165,7 +152,7 @@ export async function runDeleteMessagesJob(
 
       if (messageCount === 0) {
         emit({
-          progressMessage: `Leaving empty conversation ${(conversationsLeft + 1).toLocaleString()} of ${conversationArray.length.toLocaleString()}…`,
+          progressMessage: `Leaving empty conversation ${(i + 1).toLocaleString()} of ${conversationArray.length.toLocaleString()}…`,
           progressPercent: 1,
           unknownTotal: false,
         });
@@ -192,6 +179,6 @@ export async function runDeleteMessagesJob(
     progressMessage: `Deleted ${deleted.toLocaleString()} messages${errors > 0 ? ` (${errors.toLocaleString()} failed)` : ""}${conversationMessage}`,
     progressPercent: 1,
     unknownTotal: false,
-    progress: { currentItemIndex: deleted, totalItems: total },
+    progress: { currentItemIndex: deleted, totalItems: total, conversationsLeft },
   });
 }

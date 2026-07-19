@@ -1,4 +1,8 @@
-import { Agent, type AppBskyActorDefs } from "@atproto/api";
+import {
+  Agent,
+  type AppBskyActorDefs,
+  ChatBskyConvoDefs,
+} from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
 import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -606,7 +610,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       jobTypes.push("deleteBookmarks");
     }
 
-    if (settings.deleteChats && counts && counts.messages > 0) {
+    // Schedule the delete-messages job whenever chat deletion is enabled, even
+    // when there are no messages to delete: the job also cleans up (leaves)
+    // empty conversations, which have no rows in the message table.
+    if (settings.deleteChats) {
       jobTypes.push("deleteMessages");
     }
 
@@ -1320,7 +1327,31 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
-   * Get the count of messages remaining in a conversation from the Bluesky API
+   * Get the convoIds of conversations that are candidates for cleanup: those
+   * that haven't been left yet and have no remaining un-deleted messages locally.
+   * This includes both empty conversations (never had saved messages) and
+   * conversations we just emptied, while skipping conversations that still hold
+   * un-deleted messages (e.g. when a date filter kept some).
+   */
+  getConversationIdsToCleanup(): string[] {
+    const db = this.requireDb();
+    const rows = db.getAllSync<{ convoId: string }>(
+      `SELECT c.convoId FROM conversation c
+       WHERE c.leftAt IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM message m
+           WHERE m.convoId = c.convoId AND m.deletedAt IS NULL
+         );`,
+    );
+    return rows.map((r) => r.convoId);
+  }
+
+  /**
+   * Get the count of real messages remaining in a conversation from the
+   * Bluesky API. Only counts messageView entries — placeholders such as
+   * deletedMessageView (returned for messages the user deleted for themselves)
+   * and systemMessageView don't count, so a conversation whose messages have
+   * all been deleted is correctly reported as empty and can be left.
    */
   async getConversationMessageCount(convoId: string): Promise<number> {
     const agent = this.requireAgent();
@@ -1333,13 +1364,15 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       agent.chat.bsky.convo.getMessages(
         {
           convoId,
-          limit: 1,
+          limit: 100,
         },
         { headers: DM_SERVICE_HEADERS },
       ),
     );
 
-    return response.messages?.length ?? 0;
+    return (response.messages ?? []).filter((message) =>
+      ChatBskyConvoDefs.isMessageView(message),
+    ).length;
   }
 
   /**
