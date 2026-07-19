@@ -262,7 +262,7 @@ describe("BlueskyAccountController job pipeline", () => {
 
     (controller as unknown as { agent: unknown }).agent = {};
 
-    let resolveIndexPosts: (() => void) | null = null;
+    let resolveIndexPosts!: () => void;
     const indexPostsPromise = new Promise<void>((resolve) => {
       resolveIndexPosts = resolve;
     });
@@ -277,9 +277,7 @@ describe("BlueskyAccountController job pipeline", () => {
       "Automation already running for this account.",
     );
 
-    if (resolveIndexPosts) {
-      resolveIndexPosts();
-    }
+    resolveIndexPosts();
 
     await expect(firstRunPromise).resolves.toBeUndefined();
   });

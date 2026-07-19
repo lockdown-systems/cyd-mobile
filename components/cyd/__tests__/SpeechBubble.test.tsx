@@ -1,5 +1,6 @@
 import React from "react";
 
+import type { AppColorScheme } from "@/hooks/use-color-scheme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { SpeechBubble } from "../SpeechBubble";
 
@@ -129,7 +130,9 @@ describe("SpeechBubble", () => {
     });
 
     it("should work with null color scheme (fallback)", () => {
-      mockUseColorScheme.mockReturnValue(null);
+      // The app hook always normalizes to a concrete scheme, but verify the
+      // component tolerates an unexpected null at runtime.
+      mockUseColorScheme.mockReturnValue(null as unknown as AppColorScheme);
 
       expect(() =>
         React.createElement(SpeechBubble, { message: "Test" })
