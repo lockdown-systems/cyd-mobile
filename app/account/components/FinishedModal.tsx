@@ -2,12 +2,12 @@ import { useModalBottomPadding } from "@/hooks/use-modal-bottom-padding";
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import {
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
@@ -84,6 +84,7 @@ type MaybeProgress = {
   messagesProgress?: { current?: number | null };
   currentItemIndex?: number | null;
   totalItems?: number | null;
+  conversationsLeft?: number | null;
 };
 
 function extractSavedCount(job: BlueskyJobRecord): number | null {
@@ -144,8 +145,17 @@ function formattedSavedCount(job: BlueskyJobRecord): string | null {
       return `Deleted ${count.toLocaleString()} likes`;
     case "deleteBookmarks":
       return `Deleted ${count.toLocaleString()} bookmarks`;
-    case "deleteMessages":
-      return `Deleted ${count.toLocaleString()} messages`;
+    case "deleteMessages": {
+      const progress = job.progress as MaybeProgress | undefined;
+      const conversationsLeft = progress?.conversationsLeft ?? 0;
+      const conversationSuffix =
+        conversationsLeft > 0
+          ? `, left ${conversationsLeft.toLocaleString()} conversation${
+              conversationsLeft > 1 ? "s" : ""
+            }`
+          : "";
+      return `Deleted ${count.toLocaleString()} messages${conversationSuffix}`;
+    }
     case "unfollowUsers":
       return `Unfollowed ${count.toLocaleString()} accounts`;
     default:

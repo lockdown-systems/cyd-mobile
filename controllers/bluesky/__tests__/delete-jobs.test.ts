@@ -84,6 +84,9 @@ function createMockController(overrides?: Partial<BlueskyAccountController>) {
     getMessagesToDelete: jest.fn().mockReturnValue([]),
     deleteMessage: jest.fn().mockResolvedValue(undefined),
     getProfilesByDids: jest.fn().mockReturnValue(new Map()),
+    getConversationIdsToCleanup: jest.fn().mockReturnValue([]),
+    getConversationMessageCount: jest.fn().mockResolvedValue(0),
+    leaveConversation: jest.fn().mockResolvedValue(undefined),
     // Follow-related
     fetchFollowsFromApi: jest.fn().mockResolvedValue([]),
     unfollowUser: jest.fn().mockResolvedValue(undefined),
@@ -536,7 +539,49 @@ describe("Delete Job Runners", () => {
       );
 
       const lastCall = calls[calls.length - 1];
-      expect(lastCall.progressMessage).toBe("No messages to delete");
+      expect(lastCall.progressMessage).toBe("Deleted 0 messages");
+    });
+
+    it("should leave empty conversations even when there are no messages to delete", async () => {
+      const controller = createMockController({
+        getMessagesToDelete: jest.fn().mockReturnValue([]),
+        getConversationIdsToCleanup: jest.fn().mockReturnValue(["convo-empty"]),
+        getConversationMessageCount: jest.fn().mockResolvedValue(0),
+      });
+      const { emit, calls } = createMockEmit();
+
+      await runDeleteMessagesJob(
+        controller,
+        { ...mockJob, jobType: "deleteMessages" },
+        emit,
+      );
+
+      expect(controller.leaveConversation).toHaveBeenCalledWith("convo-empty");
+
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall.progressMessage).toBe(
+        "Deleted 0 messages, left 1 empty conversation",
+      );
+    });
+
+    it("should not leave conversations that still have messages on the server", async () => {
+      const controller = createMockController({
+        getMessagesToDelete: jest.fn().mockReturnValue([]),
+        getConversationIdsToCleanup: jest.fn().mockReturnValue(["convo-full"]),
+        getConversationMessageCount: jest.fn().mockResolvedValue(3),
+      });
+      const { emit, calls } = createMockEmit();
+
+      await runDeleteMessagesJob(
+        controller,
+        { ...mockJob, jobType: "deleteMessages" },
+        emit,
+      );
+
+      expect(controller.leaveConversation).not.toHaveBeenCalled();
+
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall.progressMessage).toBe("Deleted 0 messages");
     });
 
     it("should delete messages and emit progress", async () => {

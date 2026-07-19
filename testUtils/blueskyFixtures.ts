@@ -353,6 +353,7 @@ export function createPostWithEngagement(counts: {
 // Chat message fixtures
 
 export interface MockChatMessage {
+  $type: string;
   id: string;
   rev: string;
   text: string;
@@ -366,6 +367,9 @@ export function createChatMessage(
   overrides?: Partial<MockChatMessage>
 ): MockChatMessage {
   return {
+    // Real getMessages responses always tag entries with a $type; the indexer
+    // relies on it to distinguish real messages from placeholders.
+    $type: overrides?.$type ?? "chat.bsky.convo.defs#messageView",
     id: overrides?.id ?? `msg${Date.now()}`,
     rev: overrides?.rev ?? "1",
     text: overrides?.text ?? "Hello, this is a test message",

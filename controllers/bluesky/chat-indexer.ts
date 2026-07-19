@@ -1,6 +1,7 @@
 import {
   Agent,
   type AppBskyActorDefs,
+  ChatBskyConvoDefs,
   type ChatBskyConvoGetMessages,
   type ChatBskyConvoListConvos,
 } from "@atproto/api";
@@ -354,23 +355,15 @@ export class ChatIndexer {
     const now = Date.now();
 
     for (const message of messages) {
-      // Type guard and extract message data
-      const msg = message as
-        | {
-            id?: string;
-            rev?: string;
-            text?: string;
-            sentAt?: string;
-            sender?: { did?: string };
-            facets?: unknown[];
-            embed?: unknown;
-          }
-        | undefined;
-
-      // Only process messages that have text content
-      if (!msg?.text) {
+      // Only persist real messages. getMessages also returns placeholders such
+      // as deletedMessageView (for messages deleted-for-self) and
+      // systemMessageView, which have no content to save. Note a real
+      // messageView may still have empty text (e.g. a message that's only a
+      // shared-post embed), so we must NOT filter on text content.
+      if (!ChatBskyConvoDefs.isMessageView(message)) {
         continue;
       }
+      const msg = message;
 
       await db.runAsync(
         `INSERT OR REPLACE INTO message (
@@ -534,7 +527,9 @@ export class ChatIndexer {
         }
       | undefined;
 
-    if (!msg?.text || !msg.sender?.did) return null;
+    // A message may legitimately have empty text (e.g. a shared-post embed),
+    // so only require a sender to build a preview.
+    if (!msg?.sender?.did) return null;
 
     // Fetch the profile from the database
     const profile = await db.getFirstAsync<{
@@ -559,7 +554,7 @@ export class ChatIndexer {
     return {
       messageId: msg.id ?? fallbackMessageId,
       convoId,
-      text: msg.text,
+      text: msg.text ?? "",
       sentAt: msg.sentAt ?? new Date().toISOString(),
       savedAt: new Date().toISOString(),
       deletedAt: null,
