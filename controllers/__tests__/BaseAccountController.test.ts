@@ -170,7 +170,8 @@ describe("BaseAccountController", () => {
       expect(dbB).toBeTruthy();
       expect(dbA).toBe(dbB);
 
-      const closeAsync = (dbA as { closeAsync: jest.Mock }).closeAsync;
+      const closeAsync = (dbA as unknown as { closeAsync: jest.Mock })
+        .closeAsync;
 
       await controllerA.cleanup();
       expect(closeAsync).toHaveBeenCalledTimes(0);

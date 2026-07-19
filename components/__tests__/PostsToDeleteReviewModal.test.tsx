@@ -1,6 +1,7 @@
 import { render, waitFor } from "@testing-library/react-native";
 import React from "react";
 
+import { Colors } from "@/constants/theme";
 import { PostsToDeleteReviewModal } from "../PostsToDeleteReviewModal";
 
 const mockGetBlueskyController = jest.fn();
@@ -33,13 +34,7 @@ jest.mock("@/controllers", () => ({
   }),
 }));
 
-const palette = {
-  background: "#fff",
-  card: "#fff",
-  text: "#111",
-  tint: "#00f",
-  icon: "#666",
-} as const;
+const palette = Colors.light;
 
 const selections = {
   deletePosts: true,
