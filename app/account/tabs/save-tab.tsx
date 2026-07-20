@@ -11,6 +11,7 @@ import {
 import { FinishedModal } from "@/app/account/components/FinishedModal";
 import { SaveAutomationModal } from "@/app/account/components/SaveAutomationModal";
 import {
+  CheckboxRow,
   PrimaryButton,
   SecondaryButton,
   StackHeader,
@@ -18,6 +19,7 @@ import {
 import { sharedTabStyles } from "@/components/account/shared-tab-styles";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { useCydAccount } from "@/contexts";
+import { withBlueskyController } from "@/controllers";
 import type {
   BlueskyJobRecord,
   SaveJobOptions,
@@ -58,6 +60,26 @@ const SAVE_OPTION_DEFINITIONS = [
 
 type SaveOptionKey = (typeof SAVE_OPTION_DEFINITIONS)[number]["key"];
 type SaveOptionState = Record<SaveOptionKey, boolean>;
+
+// Optional follow suggestions shown at the bottom of the save form. DIDs are
+// hardcoded (rather than resolved from handles) so the app can never follow
+// the wrong account if a handle changes hands; handles are display-only.
+const FOLLOW_SUGGESTIONS = [
+  {
+    did: "did:plc:4s3vbdjzno5a3dmawzblaj4z",
+    handle: "cyd.social",
+    label: "Follow @cyd.social",
+    hint: "Updates about Cyd",
+  },
+  {
+    did: "did:plc:izxbs36as3lcjc2x7hamltnq",
+    handle: "lockdown.systems",
+    label: "Follow @lockdown.systems",
+    hint: "News from the collective that makes Cyd",
+  },
+] as const;
+
+type FollowSuggestion = (typeof FOLLOW_SUGGESTIONS)[number];
 
 const DEFAULT_STATE: SaveOptionState = {
   posts: true,
@@ -104,6 +126,13 @@ export function SaveTab({
   const [automationKey, setAutomationKey] = useState(0);
   const [finishedModalVisible, setFinishedModalVisible] = useState(false);
   const [finishedJobs, setFinishedJobs] = useState<BlueskyJobRecord[]>([]);
+  // DIDs the user is confirmed NOT to follow yet. Suggestions stay hidden
+  // until confirmed (fail closed), so we never pitch a follow to someone who
+  // already follows — or show anything while the check is loading or failed.
+  const [unfollowedDids, setUnfollowedDids] = useState<Set<string>>(new Set());
+  // In-memory only, deliberately not persisted: these are one-shot actions,
+  // not settings, and a stale checked intent must never fire on a later visit.
+  const [followChecks, setFollowChecks] = useState<Record<string, boolean>>({});
 
   const selectedOptions = useMemo(() => {
     if (!state) {
@@ -182,6 +211,77 @@ export function SaveTab({
     };
   }, [accountId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      // Yield one microtask so the setState calls below aren't synchronous
+      // within the effect body.
+      await Promise.resolve();
+      if (cancelled) return;
+
+      setUnfollowedDids(new Set());
+      setFollowChecks({});
+
+      const ownHandle = handle.replace(/^@/, "").toLowerCase();
+      const suggestions = FOLLOW_SUGGESTIONS.filter(
+        (suggestion) => suggestion.handle !== ownHandle,
+      );
+      if (suggestions.length === 0) {
+        return;
+      }
+
+      try {
+        const dids = await withBlueskyController(
+          accountId,
+          accountUUID,
+          async (controller) => {
+            if (!controller.isAgentReady()) {
+              await controller.initAgent();
+            }
+            const results = await Promise.all(
+              suggestions.map(async (suggestion): Promise<string | null> => {
+                const profile = await controller.getProfile(suggestion.did);
+                return profile && !profile.viewer?.following
+                  ? suggestion.did
+                  : null;
+              }),
+            );
+            return results.filter((did): did is string => did !== null);
+          },
+        );
+        if (!cancelled) {
+          setUnfollowedDids(new Set(dids));
+        }
+      } catch (err) {
+        // Fail closed: the optional follow suggestions just don't appear.
+        console.log("[SaveTab] follow status check failed", accountId, err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, accountUUID, handle]);
+
+  const followSuggestions = useMemo(
+    () =>
+      FOLLOW_SUGGESTIONS.filter((suggestion) =>
+        unfollowedDids.has(suggestion.did),
+      ),
+    [unfollowedDids],
+  );
+
+  const checkedFollowSuggestions = useMemo(
+    () =>
+      followSuggestions.filter((suggestion) => followChecks[suggestion.did]),
+    [followSuggestions, followChecks],
+  );
+
+  const handleToggleFollow = useCallback((did: string) => {
+    setFollowChecks((prev) => ({ ...prev, [did]: !prev[did] }));
+  }, []);
+
   const pushScreen = useCallback(
     (next: SaveFlowScreen) => {
       console.log("[SaveTab] push screen", accountId, next);
@@ -226,15 +326,44 @@ export function SaveTab({
     }
   }, [accountId, canContinue, state, pushScreen]);
 
+  const followCheckedAccounts = useCallback(() => {
+    const targets = checkedFollowSuggestions;
+    if (targets.length === 0) {
+      return;
+    }
+    // Fire-and-forget: silent on success and failure. A failed follow just
+    // means the checkbox reappears on the next visit.
+    void withBlueskyController(accountId, accountUUID, async (controller) => {
+      if (!controller.isAgentReady()) {
+        await controller.initAgent();
+      }
+      for (const target of targets) {
+        try {
+          await controller.followUser(target.did);
+          setUnfollowedDids((prev) => {
+            const next = new Set(prev);
+            next.delete(target.did);
+            return next;
+          });
+        } catch (err) {
+          console.warn("[SaveTab] optional follow failed", target.handle, err);
+        }
+      }
+    }).catch((err) => {
+      console.warn("[SaveTab] optional follows failed", accountId, err);
+    });
+  }, [accountId, accountUUID, checkedFollowSuggestions]);
+
   const handleConfirm = useCallback(() => {
     if (!state) return;
     console.log("[SaveTab] confirm automation", accountId);
+    followCheckedAccounts();
     setFinishedModalVisible(false);
     setFinishedJobs([]);
     setAutomationOptions(state);
     setAutomationKey((prev) => prev + 1); // Force new modal instance
     setAutomationVisible(true);
-  }, [accountId, state]);
+  }, [accountId, state, followCheckedAccounts]);
 
   const closeFinishedModal = useCallback(() => {
     setFinishedModalVisible(false);
@@ -269,12 +398,16 @@ export function SaveTab({
           canContinue={canContinue}
           saving={saving}
           persistError={persistError}
+          followSuggestions={followSuggestions}
+          followChecks={followChecks}
+          onToggleFollow={handleToggleFollow}
         />
       )}
       {currentScreen === "review" && state && (
         <SaveReviewScreen
           palette={palette}
           selections={state}
+          followSelections={checkedFollowSuggestions}
           onBack={popScreen}
           onConfirm={handleConfirm}
         />
@@ -367,6 +500,9 @@ type SaveOptionsFormProps = {
   onContinue: () => void | Promise<void>;
   saving: boolean;
   persistError: string | null;
+  followSuggestions: readonly FollowSuggestion[];
+  followChecks: Record<string, boolean>;
+  onToggleFollow: (did: string) => void;
 };
 
 function SaveOptionsForm({
@@ -382,6 +518,9 @@ function SaveOptionsForm({
   onContinue,
   saving,
   persistError,
+  followSuggestions,
+  followChecks,
+  onToggleFollow,
 }: SaveOptionsFormProps) {
   return (
     <View style={styles.stackScreen}>
@@ -484,6 +623,34 @@ function SaveOptionsForm({
           palette={palette}
           actionType="save"
         />
+
+        {!loading && !error && followSuggestions.length > 0 ? (
+          <>
+            <Text style={[styles.optionHint, { color: palette.icon }]}>
+              Optional
+            </Text>
+            <View
+              style={[
+                styles.optionCard,
+                {
+                  borderColor: palette.icon + "22",
+                  backgroundColor: palette.card,
+                },
+              ]}
+            >
+              {followSuggestions.map((suggestion) => (
+                <CheckboxRow
+                  key={suggestion.did}
+                  label={suggestion.label}
+                  hint={suggestion.hint}
+                  checked={Boolean(followChecks[suggestion.did])}
+                  onToggle={() => onToggleFollow(suggestion.did)}
+                  palette={palette}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
       </ScrollView>
       <View
         style={[
@@ -514,6 +681,7 @@ function SaveOptionsForm({
 type SaveReviewScreenProps = {
   palette: AccountTabPalette;
   selections: SaveOptionState;
+  followSelections: readonly FollowSuggestion[];
   onBack: () => void;
   onConfirm: () => void;
 };
@@ -521,6 +689,7 @@ type SaveReviewScreenProps = {
 function SaveReviewScreen({
   palette,
   selections,
+  followSelections,
   onBack,
   onConfirm,
 }: SaveReviewScreenProps) {
@@ -556,6 +725,36 @@ function SaveReviewScreen({
             </View>
           ))}
         </View>
+
+        {followSelections.length > 0 ? (
+          <>
+            <Text style={[styles.optionHint, { color: palette.icon }]}>
+              Optional
+            </Text>
+            <View
+              style={[styles.reviewCard, { borderColor: palette.icon + "22" }]}
+            >
+              {followSelections.map((suggestion) => (
+                <View key={suggestion.did} style={sharedTabStyles.reviewRow}>
+                  <MaterialIcons
+                    name="person-add"
+                    size={20}
+                    color={palette.icon}
+                    style={sharedTabStyles.reviewIcon}
+                  />
+                  <Text
+                    style={[
+                      sharedTabStyles.reviewLabel,
+                      { color: palette.icon },
+                    ]}
+                  >
+                    {suggestion.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
       </ScrollView>
       <View
         style={[
