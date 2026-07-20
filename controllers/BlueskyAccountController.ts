@@ -372,16 +372,19 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
-   * Get the user's profile from the API
+   * Get a profile from the API. Defaults to the logged-in user's own profile
+   * when no actor is given.
    */
-  async getProfile(): Promise<AppBskyActorDefs.ProfileViewDetailed | null> {
+  async getProfile(
+    actor?: string,
+  ): Promise<AppBskyActorDefs.ProfileViewDetailed | null> {
     if (!this.agent || !this.did) {
       return null;
     }
 
-    const did = this.did;
+    const target = actor ?? this.did;
     return this.rateLimiter.makeApiRequest(() =>
-      this.agent!.getProfile({ actor: did }),
+      this.agent!.getProfile({ actor: target }),
     );
   }
 
@@ -1497,6 +1500,28 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
     // Filter out any follows where we couldn't get the URI (shouldn't happen normally)
     return follows.filter((f) => f.uri !== "");
+  }
+
+  /**
+   * Follow a user by their DID
+   * @param subjectDid - The DID of the user to follow
+   */
+  async followUser(subjectDid: string): Promise<void> {
+    const agent = this.requireAgent();
+    const did = this.did;
+    if (!did) throw new Error("DID not available");
+
+    await this.makeApiRequest(() =>
+      agent.api.com.atproto.repo.createRecord({
+        repo: did,
+        collection: "app.bsky.graph.follow",
+        record: {
+          $type: "app.bsky.graph.follow",
+          subject: subjectDid,
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    );
   }
 
   /**
