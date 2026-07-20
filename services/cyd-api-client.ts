@@ -153,6 +153,7 @@ export default class CydAPIClient {
   private deviceToken: string | null = null;
   private apiToken: string | null = null;
   private deviceUUID: string | null = null;
+  private lastAPITokenErrorStatus: number | undefined;
 
   constructor(apiURL: string, dashURL: string) {
     this.apiURL = apiURL;
@@ -277,6 +278,7 @@ export default class CydAPIClient {
 
   private async getNewAPIToken(): Promise<boolean> {
     console.log("Getting a new API token");
+    this.lastAPITokenErrorStatus = undefined;
     if (
       typeof this.userEmail === "string" &&
       this.userEmail !== "" &&
@@ -288,6 +290,7 @@ export default class CydAPIClient {
         device_token: this.deviceToken,
       });
       if ("error" in getTokenResp) {
+        this.lastAPITokenErrorStatus = getTokenResp.status;
         console.log("Failed to get a new API token", getTokenResp.message);
         return false;
       }
@@ -302,6 +305,22 @@ export default class CydAPIClient {
       return true;
     }
     return await this.getNewAPIToken();
+  }
+
+  async refreshAuthentication(): Promise<true | APIErrorResponse> {
+    this.invalidateAuthentication();
+    if (!this.userEmail || !this.deviceToken) {
+      return this.returnError("Cyd account credentials are missing.", 401);
+    }
+
+    const response = await this.getToken({
+      email: this.userEmail,
+      device_token: this.deviceToken,
+    });
+    if ("error" in response) {
+      return response;
+    }
+    return true;
   }
 
   // Auth API (not authenticated)
@@ -459,7 +478,10 @@ export default class CydAPIClient {
   async getUserPremium(): Promise<UserPremiumAPIResponse | APIErrorResponse> {
     console.log("GET /user/premium");
     if (!(await this.validateAPIToken())) {
-      return this.returnError("Failed to get a new API token.");
+      return this.returnError(
+        "Failed to get a new API token.",
+        this.lastAPITokenErrorStatus,
+      );
     }
     try {
       const response = await this.fetchAuthenticated(

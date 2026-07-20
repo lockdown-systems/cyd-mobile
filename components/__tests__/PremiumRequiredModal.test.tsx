@@ -108,6 +108,7 @@ describe("PremiumRequiredModal", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCheckPremiumAccess.mockResolvedValue({ status: "signed_out" });
     // Reset to default signed out state
     mockUseCydAccount.mockReturnValue({
       state: {
@@ -178,7 +179,7 @@ describe("PremiumRequiredModal", () => {
 
       expect(
         screen.getByText(
-          "Deleting data requires a Premium account. Sign in to get started.",
+          "Selected features require a Premium account. Sign in to get started.",
         ),
       ).toBeTruthy();
       expect(screen.getByText("Sign In")).toBeTruthy();
@@ -251,7 +252,7 @@ describe("PremiumRequiredModal", () => {
 
       // Use partial match since text spans multiple lines
       expect(
-        screen.getByText(/Deleting data requires a Premium account/i),
+        screen.getByText(/Selected features require a Premium account/i),
       ).toBeTruthy();
     });
 

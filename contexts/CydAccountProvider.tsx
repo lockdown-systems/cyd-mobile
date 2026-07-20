@@ -75,6 +75,12 @@ export type PremiumActionResult = {
   error?: string;
 };
 
+export type PremiumAccessCheckResult =
+  | { status: "premium" }
+  | { status: "not_premium" }
+  | { status: "signed_out" }
+  | { status: "error"; message: string };
+
 export type CydAccountContextType = {
   state: CydAccountState;
   apiClient: CydAPIClient;
@@ -91,7 +97,7 @@ export type CydAccountContextType = {
   ) => Promise<{ success: boolean; error?: string }>;
   refreshState: () => Promise<void>;
   getDashboardURL: () => string;
-  checkPremiumAccess: () => Promise<void>;
+  checkPremiumAccess: () => Promise<PremiumAccessCheckResult>;
   purchasePremium: (
     billingPeriod: BillingPeriod,
   ) => Promise<PremiumActionResult>;
@@ -345,20 +351,59 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
   const checkPremiumAccess = useCallback(async () => {
     if (!state.isSignedIn) {
       setState((prev) => ({ ...prev, hasPremiumAccess: false }));
-      return;
+      return { status: "signed_out" } as const;
     }
     try {
+      const authentication = await apiClient.refreshAuthentication();
+      if (authentication !== true) {
+        if (authentication.status === 401 || authentication.status === 403) {
+          await clearCydAccountCredentials();
+          apiClient.setCredentials(null, null);
+          setState((prev) => ({
+            ...prev,
+            isSignedIn: false,
+            userEmail: null,
+            hasPremiumAccess: false,
+          }));
+          return { status: "signed_out" } as const;
+        }
+        return {
+          status: "error",
+          message: authentication.message,
+        } as const;
+      }
+
       const response = await apiClient.getUserPremium();
       if ("error" in response) {
-        setState((prev) => ({ ...prev, hasPremiumAccess: false }));
+        if (response.status === 401 || response.status === 403) {
+          await clearCydAccountCredentials();
+          apiClient.setCredentials(null, null);
+          setState((prev) => ({
+            ...prev,
+            isSignedIn: false,
+            userEmail: null,
+            hasPremiumAccess: false,
+          }));
+          return { status: "signed_out" } as const;
+        }
+        return { status: "error", message: response.message } as const;
       } else {
         setState((prev) => ({
           ...prev,
           hasPremiumAccess: response.premium_access,
         }));
+        return {
+          status: response.premium_access ? "premium" : "not_premium",
+        } as const;
       }
-    } catch {
-      setState((prev) => ({ ...prev, hasPremiumAccess: false }));
+    } catch (error) {
+      return {
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to check Premium access.",
+      } as const;
     }
   }, [state.isSignedIn, apiClient]);
 

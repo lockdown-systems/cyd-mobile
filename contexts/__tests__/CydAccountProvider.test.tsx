@@ -11,7 +11,10 @@ import {
 } from "expo-iap";
 import React from "react";
 
-import { getCydAccountCredentials } from "@/database/cyd-account";
+import {
+  clearCydAccountCredentials,
+  getCydAccountCredentials,
+} from "@/database/cyd-account";
 import {
   CydAccountProvider,
   type CydAccountContextType,
@@ -20,6 +23,8 @@ import {
 
 const mockSyncAppStoreSubscription = jest.fn();
 const mockGetAppStoreSubscription = jest.fn();
+const mockGetUserPremium = jest.fn();
+const mockRefreshAuthentication = jest.fn();
 const mockPing = jest.fn(() => Promise.resolve(false));
 
 jest.mock("@/constants/subscriptions", () => ({
@@ -58,12 +63,25 @@ jest.mock("@/services/cyd-api-client", () => {
     postUserActivity: jest.fn(() => Promise.resolve(true)),
     deleteDevice: jest.fn(() => Promise.resolve()),
     getDashboardURL: jest.fn(() => "https://dash.cyd.social"),
+    getUserPremium: mockGetUserPremium,
+    refreshAuthentication: mockRefreshAuthentication,
     getAppStoreSubscription: mockGetAppStoreSubscription,
     syncAppStoreSubscription: mockSyncAppStoreSubscription,
   }));
 });
 
 describe("CydAccountProvider", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPing.mockResolvedValue(false);
+    mockRefreshAuthentication.mockResolvedValue(true);
+    (getCydAccountCredentials as jest.Mock).mockResolvedValue({
+      userEmail: null,
+      deviceToken: null,
+      deviceUUID: null,
+    });
+  });
+
   describe("exports", () => {
     it("should export CydAccountProvider component", () => {
       expect(CydAccountProvider).toBeDefined();
@@ -210,6 +228,160 @@ describe("CydAccountProvider", () => {
       expect(finishTransaction).toHaveBeenCalledWith({
         purchase: monthlyPurchase,
         isConsumable: false,
+      });
+    });
+  });
+
+  describe("Premium access verification", () => {
+    it("returns the fresh non-Premium result instead of cached access", async () => {
+      mockPing.mockResolvedValue(true);
+      (getCydAccountCredentials as jest.Mock).mockResolvedValue({
+        userEmail: "expired@example.com",
+        deviceToken: "device-token",
+        deviceUUID: "device-uuid",
+      });
+      mockGetUserPremium.mockResolvedValue({ premium_access: false });
+
+      let context: CydAccountContextType | null = null;
+      function ContextReader() {
+        context = useCydAccount();
+        return null;
+      }
+
+      render(
+        <CydAccountProvider>
+          <ContextReader />
+        </CydAccountProvider>,
+      );
+
+      await waitFor(() => expect(context?.state.isSignedIn).toBe(true));
+
+      let result;
+      await act(async () => {
+        result = await context?.checkPremiumAccess();
+      });
+
+      expect(result).toEqual({ status: "not_premium" });
+      expect(context?.state.hasPremiumAccess).toBe(false);
+    });
+
+    it("signs out and clears credentials when the server rejects the device session", async () => {
+      mockPing.mockResolvedValue(true);
+      (getCydAccountCredentials as jest.Mock).mockResolvedValue({
+        userEmail: "revoked@example.com",
+        deviceToken: "revoked-device-token",
+        deviceUUID: "device-uuid",
+      });
+      mockGetUserPremium.mockResolvedValue({
+        error: true,
+        message: "Authentication failed",
+        status: 401,
+      });
+
+      let context: CydAccountContextType | null = null;
+      function ContextReader() {
+        context = useCydAccount();
+        return null;
+      }
+
+      render(
+        <CydAccountProvider>
+          <ContextReader />
+        </CydAccountProvider>,
+      );
+      await waitFor(() => expect(context?.state.isSignedIn).toBe(true));
+
+      let result;
+      await act(async () => {
+        result = await context?.checkPremiumAccess();
+      });
+
+      expect(result).toEqual({ status: "signed_out" });
+      expect(clearCydAccountCredentials).toHaveBeenCalled();
+      expect(context?.state).toMatchObject({
+        isSignedIn: false,
+        userEmail: null,
+        hasPremiumAccess: false,
+      });
+    });
+
+    it("refreshes device authentication before checking Premium access", async () => {
+      mockPing.mockResolvedValue(true);
+      (getCydAccountCredentials as jest.Mock).mockResolvedValue({
+        userEmail: "revoked@example.com",
+        deviceToken: "revoked-device-token",
+        deviceUUID: "device-uuid",
+      });
+      mockRefreshAuthentication.mockResolvedValue({
+        error: true,
+        message: "Failed to get token with the server.",
+        status: 401,
+      });
+      mockGetUserPremium.mockResolvedValue({ premium_access: true });
+
+      let context: CydAccountContextType | null = null;
+      function ContextReader() {
+        context = useCydAccount();
+        return null;
+      }
+
+      render(
+        <CydAccountProvider>
+          <ContextReader />
+        </CydAccountProvider>,
+      );
+      await waitFor(() => expect(context?.state.isSignedIn).toBe(true));
+
+      let result;
+      await act(async () => {
+        result = await context?.checkPremiumAccess();
+      });
+
+      expect(result).toEqual({ status: "signed_out" });
+      expect(mockRefreshAuthentication).toHaveBeenCalledTimes(1);
+      expect(mockGetUserPremium).not.toHaveBeenCalled();
+      expect(clearCydAccountCredentials).toHaveBeenCalled();
+    });
+
+    it("preserves the signed-in state when verification fails temporarily", async () => {
+      mockPing.mockResolvedValue(true);
+      (getCydAccountCredentials as jest.Mock).mockResolvedValue({
+        userEmail: "subscriber@example.com",
+        deviceToken: "device-token",
+        deviceUUID: "device-uuid",
+      });
+      mockGetUserPremium.mockResolvedValue({
+        error: true,
+        message: "Premium service unavailable",
+        status: 503,
+      });
+
+      let context: CydAccountContextType | null = null;
+      function ContextReader() {
+        context = useCydAccount();
+        return null;
+      }
+
+      render(
+        <CydAccountProvider>
+          <ContextReader />
+        </CydAccountProvider>,
+      );
+      await waitFor(() => expect(context?.state.isSignedIn).toBe(true));
+
+      let result;
+      await act(async () => {
+        result = await context?.checkPremiumAccess();
+      });
+
+      expect(result).toEqual({
+        status: "error",
+        message: "Premium service unavailable",
+      });
+      expect(context?.state).toMatchObject({
+        isSignedIn: true,
+        userEmail: "subscriber@example.com",
+        hasPremiumAccess: null,
       });
     });
   });
