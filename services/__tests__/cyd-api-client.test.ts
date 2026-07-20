@@ -94,6 +94,38 @@ describe("CydAPIClient", () => {
       );
       expect(premium).toEqual({ premium_access: true });
     });
+
+    it("force-refreshes authentication instead of reusing a cached bearer token", async () => {
+      client.setCredentials("revoked@example.com", "revoked-device-token");
+      mockFetch
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({
+            api_token: "cached-api-token",
+            device_uuid: "device-uuid",
+            email: "revoked@example.com",
+          }),
+        })
+        .mockResolvedValueOnce({ status: 200 })
+        .mockResolvedValueOnce({ status: 401 });
+
+      expect(await client.ping()).toBe(true);
+
+      expect(await client.refreshAuthentication()).toEqual({
+        error: true,
+        message: "Failed to get token with the server.",
+        status: 401,
+      });
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        `${API_URL}/token`,
+        expect.objectContaining({
+          body: JSON.stringify({
+            email: "revoked@example.com",
+            device_token: "revoked-device-token",
+          }),
+        }),
+      );
+    });
   });
 
   describe("setUserEmail", () => {
@@ -359,6 +391,19 @@ describe("CydAPIClient", () => {
     });
 
     describe("getUserPremium", () => {
+      it("preserves the authentication status when the device token is rejected", async () => {
+        client.setCredentials("revoked@example.com", "revoked-device-token");
+        mockFetch.mockResolvedValue({ status: 401 });
+
+        const result = await client.getUserPremium();
+
+        expect(result).toEqual({
+          error: true,
+          message: "Failed to get a new API token.",
+          status: 401,
+        });
+      });
+
       it("should return premium info on success", async () => {
         const premiumResponse = {
           premium_price_annual_cents: 3599,

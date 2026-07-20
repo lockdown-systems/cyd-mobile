@@ -74,7 +74,13 @@ export function PremiumRequiredModal({
     setCheckingPremium(true);
     void (async () => {
       try {
-        await checkPremiumAccess();
+        const result = await checkPremiumAccess();
+        if (result.status === "error") {
+          Alert.alert(
+            "Couldn’t verify Premium",
+            "Check your connection and try again.",
+          );
+        }
         // The useEffect above will call onPremiumConfirmed if hasPremiumAccess becomes true
         // We just need to show appropriate feedback
         setCheckingPremium(false);
@@ -117,7 +123,14 @@ export function PremiumRequiredModal({
   const handleSignInClose = useCallback(() => {
     setShowSignInModal(false);
     // Re-check premium after sign-in modal closes
-    void checkPremiumAccess();
+    void checkPremiumAccess().then((result) => {
+      if (result.status === "error") {
+        Alert.alert(
+          "Couldn’t verify Premium",
+          "Check your connection and try again.",
+        );
+      }
+    });
   }, [checkPremiumAccess]);
 
   const renderContent = () => {
@@ -139,7 +152,8 @@ export function PremiumRequiredModal({
         <>
           <View style={styles.contentContainer}>
             <Text style={[styles.messageText, { color: palette.text }]}>
-              Deleting data requires a Premium account. Sign in to get started.
+              Selected features require a Premium account. Sign in to get
+              started.
             </Text>
             <View style={styles.buttonColumn}>
               <Pressable
@@ -191,8 +205,8 @@ export function PremiumRequiredModal({
       <View style={styles.contentContainer}>
         <Text style={[styles.messageText, { color: palette.text }]}>
           {usesAppStoreIAP
-            ? "Deleting data requires a Premium account."
-            : "Deleting data requires a Premium account. Manage your account to upgrade to Premium."}
+            ? "Selected features require a Premium account."
+            : "Selected features require a Premium account. Manage your account to upgrade to Premium."}
         </Text>
         <View style={styles.buttonColumn}>
           {usesAppStoreIAP ? (

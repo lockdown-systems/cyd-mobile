@@ -18,6 +18,7 @@ import {
   waitFor,
 } from "@testing-library/react-native";
 import React from "react";
+import { Alert } from "react-native";
 
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 
@@ -241,6 +242,7 @@ describe("DeleteTab Premium Integration", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCheckPremiumAccess.mockResolvedValue({ status: "signed_out" });
     mockWithBlueskyController.mockImplementation(
       async (_accountId, _accountUUID, fn) => {
         return fn({
@@ -370,6 +372,7 @@ describe("DeleteTab Premium Integration", () => {
     });
 
     it("should show PremiumRequiredModal when signed in without premium", async () => {
+      mockCheckPremiumAccess.mockResolvedValue({ status: "not_premium" });
       mockUseCydAccount.mockReturnValue({
         state: {
           isSignedIn: true,
@@ -476,6 +479,7 @@ describe("DeleteTab Premium Integration", () => {
       });
 
       // Confirm premium
+      mockCheckPremiumAccess.mockResolvedValue({ status: "premium" });
       await act(async () => {
         fireEvent.press(screen.getByTestId("premium-modal-confirm"));
       });
@@ -490,6 +494,7 @@ describe("DeleteTab Premium Integration", () => {
 
   describe("Delete My Data button - with premium", () => {
     beforeEach(() => {
+      mockCheckPremiumAccess.mockResolvedValue({ status: "premium" });
       mockUseCydAccount.mockReturnValue({
         state: {
           isSignedIn: true,
@@ -561,6 +566,25 @@ describe("DeleteTab Premium Integration", () => {
 
       expect(screen.queryByTestId("premium-required-modal")).toBeNull();
     });
+
+    it("blocks deletion when cached Premium access has expired", async () => {
+      mockCheckPremiumAccess.mockResolvedValue({ status: "not_premium" });
+      render(<DeleteTab {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Continue to Review")).toBeTruthy();
+      });
+      fireEvent.press(screen.getByText("Continue to Review"));
+      await waitFor(() => expect(screen.getByText("Delete My Data")).toBeTruthy());
+
+      fireEvent.press(screen.getByText("Delete My Data"));
+
+      await waitFor(() => {
+        expect(mockCheckPremiumAccess).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId("premium-required-modal")).toBeTruthy();
+      });
+      expect(screen.queryByTestId("delete-automation-modal")).toBeNull();
+    });
   });
 
   describe("Continue to Review button", () => {
@@ -585,7 +609,12 @@ describe("DeleteTab Premium Integration", () => {
   });
 
   describe("premium check error handling", () => {
-    it("should show PremiumRequiredModal when premium check fails with error", async () => {
+    it("should show a retryable error when premium verification fails", async () => {
+      const alertSpy = jest.spyOn(Alert, "alert").mockImplementation();
+      mockCheckPremiumAccess.mockResolvedValue({
+        status: "error",
+        message: "Server error",
+      });
       mockUseCydAccount.mockReturnValue({
         state: {
           isSignedIn: true,
@@ -618,13 +647,19 @@ describe("DeleteTab Premium Integration", () => {
         fireEvent.press(screen.getByText("Delete My Data"));
       });
 
-      // Should show premium modal (since hasPremiumAccess is false)
       await waitFor(() => {
-        expect(screen.getByTestId("premium-required-modal")).toBeTruthy();
+        expect(alertSpy).toHaveBeenCalledWith(
+          "Couldn’t verify Premium",
+          "Check your connection and try again.",
+          expect.any(Array),
+        );
       });
+      expect(screen.queryByTestId("premium-required-modal")).toBeNull();
     });
 
-    it("should show PremiumRequiredModal when premium check throws", async () => {
+    it("fails closed when the premium check throws", async () => {
+      const alertSpy = jest.spyOn(Alert, "alert").mockImplementation();
+      mockCheckPremiumAccess.mockRejectedValue(new Error("Network error"));
       mockUseCydAccount.mockReturnValue({
         state: {
           isSignedIn: true,
@@ -657,10 +692,10 @@ describe("DeleteTab Premium Integration", () => {
         fireEvent.press(screen.getByText("Delete My Data"));
       });
 
-      // Should show premium modal (since hasPremiumAccess is false)
       await waitFor(() => {
-        expect(screen.getByTestId("premium-required-modal")).toBeTruthy();
+        expect(alertSpy).toHaveBeenCalled();
       });
+      expect(screen.queryByTestId("delete-automation-modal")).toBeNull();
     });
   });
 });

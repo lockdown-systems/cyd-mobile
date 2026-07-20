@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Localization from "expo-localization";
 import { useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -30,12 +30,14 @@ import {
 } from "@/components/account/shared-tab-styles";
 import { LastActionTimestamp } from "@/components/LastActionTimestamp";
 import { PremiumRequiredBanner } from "@/components/PremiumRequiredBanner";
+import { PremiumRequiredModal } from "@/components/PremiumRequiredModal";
 import { SaveAndDeleteStatusBanner } from "@/components/SaveAndDeleteStatusBanner";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 import type {
   BlueskyJobRecord,
   SaveAndDeleteJobOptions,
 } from "@/controllers/bluesky/job-types";
+import { saveAndDeleteOptionsRequirePremium } from "@/controllers/bluesky/premium-feature-policy";
 import {
   getAccountHandle,
   getLastDeletedAt,
@@ -89,7 +91,7 @@ export function ScheduleTab({
   palette,
   onSelectTab,
 }: AccountTabProps) {
-  const { apiClient, state: cydState } = useCydAccount();
+  const { apiClient, state: cydState, checkPremiumAccess } = useCydAccount();
   const params = useLocalSearchParams<{ scheduleShowReview?: string }>();
   const showReviewOnLoad = params.scheduleShowReview === "true";
   const [screenStack, setScreenStack] = useState<ScheduleFlowScreen[]>([
@@ -114,6 +116,11 @@ export function ScheduleTab({
   const [automationOptions, setAutomationOptions] =
     useState<SaveAndDeleteJobOptions | null>(null);
   const [automationKey, setAutomationKey] = useState(0);
+  const [checkingPremium, setCheckingPremium] = useState(false);
+  const [premiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [pendingAutomationOptions, setPendingAutomationOptions] =
+    useState<SaveAndDeleteJobOptions | null>(null);
+  const premiumCheckInFlightRef = useRef(false);
 
   // Finished modal state
   const [finishedModalVisible, setFinishedModalVisible] = useState(false);
@@ -333,7 +340,7 @@ export function ScheduleTab({
     setAutomationOptions(null);
   }, []);
 
-  const handleStartAutomation = useCallback(
+  const startAutomation = useCallback(
     (options: SaveAndDeleteJobOptions) => {
       setAutomationOptions(options);
       setAutomationKey((prev) => prev + 1);
@@ -341,6 +348,88 @@ export function ScheduleTab({
     },
     [],
   );
+
+  const verifyAndStartAutomationRef = useRef<
+    (options: SaveAndDeleteJobOptions) => void
+  >(() => undefined);
+
+  const verifyAndStartAutomation = useCallback(
+    async (options: SaveAndDeleteJobOptions) => {
+      if (premiumCheckInFlightRef.current) return;
+
+      if (!saveAndDeleteOptionsRequirePremium(options)) {
+        startAutomation(options);
+        return;
+      }
+
+      setPendingAutomationOptions(options);
+      premiumCheckInFlightRef.current = true;
+      setCheckingPremium(true);
+
+      const showVerificationError = () => {
+        Alert.alert(
+          "Couldn’t verify Premium",
+          "Check your connection and try again.",
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => setPendingAutomationOptions(null),
+            },
+            {
+              text: "Retry",
+              onPress: () => verifyAndStartAutomationRef.current(options),
+            },
+          ],
+        );
+      };
+
+      try {
+        const result = await checkPremiumAccess();
+        if (result.status === "premium") {
+          setPremiumModalVisible(false);
+          setPendingAutomationOptions(null);
+          startAutomation(options);
+        } else if (
+          result.status === "not_premium" ||
+          result.status === "signed_out"
+        ) {
+          setPremiumModalVisible(true);
+        } else {
+          showVerificationError();
+        }
+      } catch {
+        showVerificationError();
+      } finally {
+        premiumCheckInFlightRef.current = false;
+        setCheckingPremium(false);
+      }
+    },
+    [checkPremiumAccess, startAutomation],
+  );
+  useEffect(() => {
+    verifyAndStartAutomationRef.current = (options) => {
+      void verifyAndStartAutomation(options);
+    };
+  }, [verifyAndStartAutomation]);
+
+  const handleStartAutomation = useCallback(
+    (options: SaveAndDeleteJobOptions) => {
+      void verifyAndStartAutomation(options);
+    },
+    [verifyAndStartAutomation],
+  );
+
+  const handlePremiumDismiss = useCallback(() => {
+    setPremiumModalVisible(false);
+    setPendingAutomationOptions(null);
+  }, []);
+
+  const handlePremiumConfirmed = useCallback(() => {
+    if (pendingAutomationOptions) {
+      void verifyAndStartAutomation(pendingAutomationOptions);
+    }
+  }, [pendingAutomationOptions, verifyAndStartAutomation]);
 
   const showFinishedModalWithJobs = useCallback(
     (jobs: BlueskyJobRecord[]) => {
@@ -442,6 +531,7 @@ export function ScheduleTab({
             onBack={popScreen}
             onSelectTab={onSelectTab}
             onStartAutomation={handleStartAutomation}
+            checkingPremium={checkingPremium}
           />
         )}
       {automationOptions && (
@@ -459,6 +549,12 @@ export function ScheduleTab({
           onRestart={handleAutomationRestart}
         />
       )}
+      <PremiumRequiredModal
+        visible={premiumModalVisible}
+        palette={palette}
+        onDismiss={handlePremiumDismiss}
+        onPremiumConfirmed={handlePremiumConfirmed}
+      />
       <FinishedModal
         visible={finishedModalVisible}
         palette={palette}
@@ -719,6 +815,7 @@ type ScheduleReviewScreenProps = {
   onBack: () => void;
   onSelectTab?: (tab: AccountTabKey) => void;
   onStartAutomation: (options: SaveAndDeleteJobOptions) => void;
+  checkingPremium: boolean;
 };
 
 function ScheduleReviewScreen({
@@ -730,6 +827,7 @@ function ScheduleReviewScreen({
   onBack,
   onSelectTab,
   onStartAutomation,
+  checkingPremium,
 }: ScheduleReviewScreenProps) {
   const handleSaveAndDelete = useCallback(() => {
     const options: SaveAndDeleteJobOptions = {
@@ -814,8 +912,13 @@ function ScheduleReviewScreen({
           palette={palette}
         />
         <PrimaryButton
-          label="Save and Delete Data Now"
+          label={
+            checkingPremium
+              ? "Checking Premium…"
+              : "Save and Delete Data Now"
+          }
           onPress={handleSaveAndDelete}
+          disabled={checkingPremium}
           palette={palette}
         />
       </View>

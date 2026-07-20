@@ -1,7 +1,8 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     Pressable,
     ScrollView,
     Text,
@@ -29,6 +30,7 @@ import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { withBlueskyController } from "@/controllers";
 import type { DeletionPreviewCounts } from "@/controllers/bluesky/deletion-calculator";
 import type { BlueskyJobRecord } from "@/controllers/bluesky/job-types";
+import { deleteSettingsRequirePremium } from "@/controllers/bluesky/premium-feature-policy";
 import { getLastSavedAt, setLastDeletedAt } from "@/database/accounts";
 import {
     getAccountDeleteSettings,
@@ -51,7 +53,7 @@ export function DeleteTab({
   palette,
   onSelectTab,
 }: AccountTabProps) {
-  const { apiClient } = useCydAccount();
+  const { apiClient, checkPremiumAccess } = useCydAccount();
   const [screenStack, setScreenStack] = useState<DeleteFlowScreen[]>(["form"]);
   const [state, setState] = useState<AccountDeleteSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -198,19 +200,12 @@ export function DeleteTab({
 
   // Premium modal state
   const [premiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [checkingPremium, setCheckingPremium] = useState(false);
+  const premiumCheckInFlightRef = useRef(false);
   const [pendingDeleteSettings, setPendingDeleteSettings] =
     useState<AccountDeleteSettings | null>(null);
   const [pendingDeleteCounts, setPendingDeleteCounts] =
     useState<DeletionPreviewCounts | null>(null);
-
-  const handlePremiumRequired = useCallback(
-    (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
-      setPendingDeleteSettings(settings);
-      setPendingDeleteCounts(counts);
-      setPremiumModalVisible(true);
-    },
-    [],
-  );
 
   const handlePremiumDismiss = useCallback(() => {
     setPremiumModalVisible(false);
@@ -220,27 +215,7 @@ export function DeleteTab({
     resetToForm();
   }, [resetToForm]);
 
-  const handlePremiumConfirmed = useCallback(() => {
-    setPremiumModalVisible(false);
-    // Start deletion with the pending settings and counts
-    if (pendingDeleteSettings && pendingDeleteCounts) {
-      setAutomationSettings(pendingDeleteSettings);
-      setAutomationCounts({
-        posts: pendingDeleteCounts.posts,
-        reposts: pendingDeleteCounts.reposts,
-        likes: pendingDeleteCounts.likes,
-        bookmarks: pendingDeleteCounts.bookmarks,
-        messages: pendingDeleteCounts.messages,
-        follows: pendingDeleteCounts.follows,
-      });
-      setAutomationKey((prev) => prev + 1);
-      setAutomationVisible(true);
-    }
-    setPendingDeleteSettings(null);
-    setPendingDeleteCounts(null);
-  }, [pendingDeleteSettings, pendingDeleteCounts]);
-
-  const handleStartDelete = useCallback(
+  const startDeleteAutomation = useCallback(
     (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
       setAutomationSettings(settings);
       setAutomationCounts({
@@ -255,6 +230,89 @@ export function DeleteTab({
       setAutomationVisible(true);
     },
     [],
+  );
+
+  const verifyAndStartDeleteRef = useRef<
+    (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => void
+  >(() => undefined);
+
+  const verifyAndStartDelete = useCallback(
+    async (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
+      if (premiumCheckInFlightRef.current) return;
+
+      if (!deleteSettingsRequirePremium(settings)) {
+        startDeleteAutomation(settings, counts);
+        return;
+      }
+
+      setPendingDeleteSettings(settings);
+      setPendingDeleteCounts(counts);
+      premiumCheckInFlightRef.current = true;
+      setCheckingPremium(true);
+
+      const showVerificationError = () => {
+        Alert.alert(
+          "Couldn’t verify Premium",
+          "Check your connection and try again.",
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => {
+                setPendingDeleteSettings(null);
+                setPendingDeleteCounts(null);
+              },
+            },
+            {
+              text: "Retry",
+              onPress: () =>
+                verifyAndStartDeleteRef.current(settings, counts),
+            },
+          ],
+        );
+      };
+
+      try {
+        const result = await checkPremiumAccess();
+        if (result.status === "premium") {
+          setPremiumModalVisible(false);
+          setPendingDeleteSettings(null);
+          setPendingDeleteCounts(null);
+          startDeleteAutomation(settings, counts);
+        } else if (
+          result.status === "not_premium" ||
+          result.status === "signed_out"
+        ) {
+          setPremiumModalVisible(true);
+        } else {
+          showVerificationError();
+        }
+      } catch {
+        showVerificationError();
+      } finally {
+        premiumCheckInFlightRef.current = false;
+        setCheckingPremium(false);
+      }
+    },
+    [checkPremiumAccess, startDeleteAutomation],
+  );
+  useEffect(() => {
+    verifyAndStartDeleteRef.current = (settings, counts) => {
+      void verifyAndStartDelete(settings, counts);
+    };
+  }, [verifyAndStartDelete]);
+
+  const handlePremiumConfirmed = useCallback(() => {
+    if (pendingDeleteSettings && pendingDeleteCounts) {
+      void verifyAndStartDelete(pendingDeleteSettings, pendingDeleteCounts);
+    }
+  }, [pendingDeleteSettings, pendingDeleteCounts, verifyAndStartDelete]);
+
+  const handleStartDelete = useCallback(
+    (settings: AccountDeleteSettings, counts: DeletionPreviewCounts) => {
+      void verifyAndStartDelete(settings, counts);
+    },
+    [verifyAndStartDelete],
   );
 
   const showFinishedModalWithJobs = useCallback(
@@ -353,7 +411,7 @@ export function DeleteTab({
           selections={state}
           onBack={popScreen}
           onConfirm={handleStartDelete}
-          onPremiumRequired={handlePremiumRequired}
+          checkingPremium={checkingPremium}
           refreshKey={refreshKey}
         />
       )}
@@ -754,10 +812,7 @@ type DeleteReviewScreenProps = {
     settings: AccountDeleteSettings,
     counts: DeletionPreviewCounts,
   ) => void;
-  onPremiumRequired: (
-    settings: AccountDeleteSettings,
-    counts: DeletionPreviewCounts,
-  ) => void;
+  checkingPremium: boolean;
   refreshKey: number;
 };
 
@@ -795,10 +850,9 @@ function DeleteReviewScreen({
   selections,
   onBack,
   onConfirm,
-  onPremiumRequired,
+  checkingPremium,
   refreshKey: externalRefreshKey,
 }: DeleteReviewScreenProps) {
-  const { state: cydState } = useCydAccount();
   const [counts, setCounts] = useState<DeletionPreviewCounts | null>(null);
   const [countsLoading, setCountsLoading] = useState(true);
   const [countsError, setCountsError] = useState<string | null>(null);
@@ -867,32 +921,11 @@ function DeleteReviewScreen({
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  // Handle Delete My Data button - check premium first
+  // The parent owns the fresh entitlement check at the execution boundary.
   const handleDeletePress = useCallback(() => {
     if (!counts) return;
-
-    // If not signed in, show premium modal
-    if (!cydState.isSignedIn) {
-      onPremiumRequired(selections, counts);
-      return;
-    }
-
-    // Check if user has premium (from context state)
-    if (cydState.hasPremiumAccess === true) {
-      // Has premium, proceed with deletion
-      onConfirm(selections, counts);
-    } else {
-      // No premium or unknown, show the modal
-      onPremiumRequired(selections, counts);
-    }
-  }, [
-    counts,
-    cydState.isSignedIn,
-    cydState.hasPremiumAccess,
-    selections,
-    onConfirm,
-    onPremiumRequired,
-  ]);
+    onConfirm(selections, counts);
+  }, [counts, selections, onConfirm]);
 
   type DeletionItem = {
     label: string;
@@ -1121,9 +1154,9 @@ function DeleteReviewScreen({
           palette={palette}
         />
         <PrimaryButton
-          label="Delete My Data"
+          label={checkingPremium ? "Checking Premium…" : "Delete My Data"}
           onPress={handleDeletePress}
-          disabled={chosen.length === 0 || !counts}
+          disabled={chosen.length === 0 || !counts || checkingPremium}
           palette={palette}
         />
       </View>
