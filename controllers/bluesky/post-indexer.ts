@@ -27,6 +27,7 @@ export interface PostIndexerDeps {
   updateProgress: (updates: Partial<BlueskyProgress>) => void;
   waitForPause: () => Promise<void>;
   makeApiRequest: RequestExecutor;
+  downloadMedia: (blobCid: string, did: string) => Promise<string>;
   downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
 }
 
@@ -39,6 +40,7 @@ export class PostIndexer {
 
   constructor(private readonly deps: PostIndexerDeps) {
     this.postPersistence = new PostPersistence({
+      downloadMedia: deps.downloadMedia,
       downloadMediaFromUrl: deps.downloadMediaFromUrl,
       getDid: deps.getDid,
     });

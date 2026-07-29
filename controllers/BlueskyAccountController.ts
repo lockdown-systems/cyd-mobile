@@ -10,6 +10,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { zip } from "react-native-zip-archive";
 
 import { getDatabase } from "@/database";
+import { resolveBlobDownloadUrl } from "./bluesky/blob-url";
 import {
     applyAccountMigrations,
     blueskyAccountMigrations,
@@ -136,6 +137,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       waitForPause: () => this.waitForPause(),
       makeApiRequest: <T>(requestFn: ApiRequestFn<T>) =>
         this.makeApiRequest<T>(requestFn),
+      downloadMedia: (blobCid: string, did: string) =>
+        this.downloadMedia(blobCid, did),
       downloadMediaFromUrl: (url: string, did: string) =>
         this.downloadMediaFromUrl(url, did),
     });
@@ -1661,9 +1664,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       throw new Error("Invalid blobCid or did");
     }
 
+    const url = await resolveBlobDownloadUrl(did, blobCid);
     return this.downloadToAccountMedia({
       filename: blobCid,
-      url: `https://cdn.bsky.app/blob/${encodeURIComponent(did)}/${encodeURIComponent(blobCid)}`,
+      url,
     });
   }
 

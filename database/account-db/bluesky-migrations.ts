@@ -237,6 +237,33 @@ export const blueskyAccountMigrations: AccountMigration[] = [
       `CREATE INDEX IF NOT EXISTS idx_message_sent ON message(sentAt);`,
     ],
   },
+  {
+    version: 2,
+    name: "preserve media assets",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS media_asset (
+        contentCid TEXT PRIMARY KEY,
+        mediaType TEXT NOT NULL CHECK (mediaType IN ('image', 'video')),
+        mimeType TEXT,
+        byteLength INTEGER,
+        localPath TEXT,
+        sourceUrl TEXT,
+        sourceDid TEXT,
+        sourceMetadataJSON TEXT,
+        downloadState TEXT NOT NULL DEFAULT 'pending'
+          CHECK (downloadState IN ('pending', 'downloading', 'complete', 'failed')),
+        lastError TEXT,
+        attemptCount INTEGER NOT NULL DEFAULT 0,
+        downloadedAt INTEGER
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_media_asset_state
+       ON media_asset(downloadState);`,
+      `ALTER TABLE post_media ADD COLUMN assetCid TEXT
+       REFERENCES media_asset(contentCid);`,
+      `CREATE INDEX IF NOT EXISTS idx_post_media_asset
+       ON post_media(assetCid);`,
+    ],
+  },
 ];
 
 /**

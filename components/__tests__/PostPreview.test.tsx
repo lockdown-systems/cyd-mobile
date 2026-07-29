@@ -9,7 +9,8 @@ import type {
   PostPreviewData,
 } from "@/controllers/bluesky/types";
 import type { AccountTabPalette } from "@/types/account-tabs";
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
+import { useVideoPlayer } from "expo-video";
 import React from "react";
 import { PostPreview } from "../PostPreview";
 
@@ -181,6 +182,72 @@ describe("PostPreview", () => {
     expect(
       screen.getByText("This is a test post with some content."),
     ).toBeTruthy();
+  });
+
+  it("should use saved local media while browsing", () => {
+    const post: PostPreviewData = {
+      ...basePost,
+      media: [
+        {
+          type: "image",
+          localUri: "file:///account/media/bafy-image",
+          fullsizeUrl: "https://cdn.bsky.app/full.jpg",
+          downloadState: "complete",
+        },
+      ],
+    };
+
+    const rendered = render(
+      <PostPreview post={post} palette={defaultPalette} browseMode />,
+    );
+
+    expect(JSON.stringify(rendered.toJSON())).toContain(
+      "file:///account/media/bafy-image",
+    );
+    expect(JSON.stringify(rendered.toJSON())).not.toContain(
+      "https://cdn.bsky.app/full.jpg",
+    );
+  });
+
+  it("should play saved video from its local asset while offline", () => {
+    const post: PostPreviewData = {
+      ...basePost,
+      media: [
+        {
+          type: "video",
+          localUri: "file:///account/media/bafy-video",
+          playlistUrl: "https://video.bsky.app/playlist.m3u8",
+          downloadState: "complete",
+        },
+      ],
+    };
+
+    render(<PostPreview post={post} palette={defaultPalette} browseMode />);
+    fireEvent.press(screen.getByText("▶"));
+
+    expect(jest.mocked(useVideoPlayer)).toHaveBeenCalledWith(
+      "file:///account/media/bafy-video",
+      expect.any(Function),
+    );
+  });
+
+  it("should explicitly show failed saved media and how to retry", () => {
+    const post: PostPreviewData = {
+      ...basePost,
+      media: [
+        {
+          type: "video",
+          downloadState: "failed",
+          downloadError: "source unavailable",
+          playlistUrl: "https://video.bsky.app/playlist.m3u8",
+        },
+      ],
+    };
+
+    render(<PostPreview post={post} palette={defaultPalette} browseMode />);
+
+    expect(screen.getByText("Media unavailable — save again to retry")).toBeTruthy();
+    expect(screen.getByText("source unavailable")).toBeTruthy();
   });
 
   it("should render post with external embed (link preview)", () => {

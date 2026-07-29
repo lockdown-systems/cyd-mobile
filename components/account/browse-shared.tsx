@@ -76,6 +76,10 @@ export type MediaRow = {
   thumbUrl: string | null;
   fullsizeUrl: string | null;
   playlistUrl: string | null;
+  contentCid?: string | null;
+  localPath?: string | null;
+  downloadState?: "pending" | "downloading" | "complete" | "failed" | null;
+  lastError?: string | null;
 };
 
 export type ExternalRow = {
@@ -193,6 +197,13 @@ export function mapRowToPreview(
 function mapMediaRowToAttachment(row: MediaRow): MediaAttachment {
   return {
     type: row.mediaType,
+    contentCid: row.contentCid ?? null,
+    localUri: row.localPath ?? null,
+    downloadState:
+      row.downloadState === "complete" || row.downloadState === "failed"
+        ? row.downloadState
+        : "pending",
+    downloadError: row.lastError ?? null,
     alt: row.alt,
     width: row.width,
     height: row.height,
@@ -212,11 +223,13 @@ export async function fetchMediaForPosts(
 
   const placeholders = postUris.map(() => "?").join(",");
   const mediaRows = await db.getAllAsync<MediaRow>(
-    `SELECT postUri, position, mediaType, alt, width, height,
-            thumbUrl, fullsizeUrl, playlistUrl
-     FROM post_media
-     WHERE postUri IN (${placeholders})
-     ORDER BY postUri, position;`,
+    `SELECT pm.postUri, pm.position, pm.mediaType, pm.alt, pm.width, pm.height,
+            pm.thumbUrl, pm.fullsizeUrl, pm.playlistUrl,
+            ma.contentCid, ma.localPath, ma.downloadState, ma.lastError
+     FROM post_media pm
+     LEFT JOIN media_asset ma ON ma.contentCid = pm.assetCid
+     WHERE pm.postUri IN (${placeholders})
+     ORDER BY pm.postUri, pm.position;`,
     postUris,
   );
 

@@ -23,6 +23,7 @@ export interface PostPersistenceOptions {
 }
 
 export interface PostPersistenceDeps {
+  downloadMedia?: (blobCid: string, did: string) => Promise<string>;
   downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
   getDid: () => string | null;
 }
@@ -52,7 +53,7 @@ export class PostPersistence {
       return null;
     }
 
-    const did = this.requireDid();
+    this.requireDid();
     await this.upsertProfile(db, postView.author);
 
     const postRecord = recordInfo.kind === "post" ? recordInfo.record : null;
@@ -179,7 +180,7 @@ export class PostPersistence {
       db,
       postView.uri,
       media,
-      did
+      postView.author.did
     );
 
     // Extract and save external link embeds
@@ -276,96 +277,136 @@ export class PostPersistence {
     db: SQLiteDatabase,
     postUri: string,
     media: ExtractedMedia[],
-    _did: string
+    sourceDid: string
   ): Promise<ExtractedMedia[]> {
     return await Promise.all(
       media.map(async (attachment, position) => {
-        if (attachment.type === "image") {
-          // Insert into post_media table
-          await db.runAsync(
-            `INSERT INTO post_media (
-              postUri, position, mediaType, blobCid, mimeType, alt,
-              width, height, aspectRatioWidth, aspectRatioHeight,
-              thumbUrl, fullsizeUrl, playlistUrl, downloadedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(postUri, position) DO UPDATE SET
-              mediaType = excluded.mediaType,
-              blobCid = excluded.blobCid,
-              mimeType = excluded.mimeType,
-              alt = excluded.alt,
-              width = excluded.width,
-              height = excluded.height,
-              aspectRatioWidth = excluded.aspectRatioWidth,
-              aspectRatioHeight = excluded.aspectRatioHeight,
-              thumbUrl = excluded.thumbUrl,
-              fullsizeUrl = excluded.fullsizeUrl,
-              playlistUrl = excluded.playlistUrl,
-              downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt);`,
-            [
-              postUri,
-              position,
-              attachment.type,
-              attachment.blobCid,
-              attachment.mimeType ?? null,
-              attachment.alt ?? null,
-              attachment.width ?? null,
-              attachment.height ?? null,
-              attachment.width ?? null, // aspectRatioWidth
-              attachment.height ?? null, // aspectRatioHeight
-              attachment.thumbUrl ?? null,
-              attachment.fullsizeUrl ?? null,
-              null, // playlistUrl - images don't have this
-              null, // downloadedAt - not downloading media locally
-            ]
-          );
+        const sourceUrl =
+          attachment.type === "image"
+            ? attachment.fullsizeUrl
+            : attachment.playlistUrl;
+        await db.runAsync(
+          `INSERT INTO media_asset (
+            contentCid, mediaType, mimeType, sourceUrl, sourceDid,
+            sourceMetadataJSON, downloadState
+          ) VALUES (?, ?, ?, ?, ?, ?, 'pending')
+          ON CONFLICT(contentCid) DO UPDATE SET
+            mediaType = excluded.mediaType,
+            mimeType = COALESCE(excluded.mimeType, media_asset.mimeType),
+            sourceUrl = COALESCE(excluded.sourceUrl, media_asset.sourceUrl),
+            sourceDid = excluded.sourceDid,
+            sourceMetadataJSON = excluded.sourceMetadataJSON;`,
+          [
+            attachment.blobCid,
+            attachment.type,
+            attachment.mimeType ?? null,
+            sourceUrl ?? null,
+            sourceDid,
+            JSON.stringify({
+              thumbUrl: attachment.thumbUrl ?? null,
+              width: attachment.width ?? null,
+              height: attachment.height ?? null,
+              alt: attachment.alt ?? null,
+            }),
+          ]
+        );
 
-          return attachment;
+        const existing = await db.getFirstAsync<{
+          downloadState: string;
+          localPath: string | null;
+        }>(
+          `SELECT downloadState, localPath FROM media_asset
+           WHERE contentCid = ?;`,
+          [attachment.blobCid]
+        );
+
+        let localUri = existing?.localPath ?? null;
+        let downloadState: "complete" | "failed" = "complete";
+        let downloadError: string | null = null;
+
+        if (existing?.downloadState !== "complete" || !localUri) {
+          await db.runAsync(
+            `UPDATE media_asset
+             SET downloadState = 'downloading', lastError = NULL,
+                 attemptCount = attemptCount + 1
+             WHERE contentCid = ?;`,
+            [attachment.blobCid]
+          );
+          try {
+            if (!this.deps.downloadMedia) {
+              throw new Error("Media download is unavailable");
+            }
+            localUri = await this.deps.downloadMedia(
+              attachment.blobCid,
+              sourceDid
+            );
+            await db.runAsync(
+              `UPDATE media_asset
+               SET localPath = ?, downloadState = 'complete', lastError = NULL,
+                   downloadedAt = ?
+               WHERE contentCid = ?;`,
+              [localUri, Date.now(), attachment.blobCid]
+            );
+          } catch (error) {
+            downloadState = "failed";
+            downloadError =
+              error instanceof Error ? error.message : String(error);
+            await db.runAsync(
+              `UPDATE media_asset
+               SET downloadState = 'failed', lastError = ?
+               WHERE contentCid = ?;`,
+              [downloadError, attachment.blobCid]
+            );
+          }
         }
 
-        // Handle video attachments
-        if (attachment.type === "video") {
-          // Insert video into post_media table
-          await db.runAsync(
-            `INSERT INTO post_media (
-              postUri, position, mediaType, blobCid, mimeType, alt,
-              width, height, aspectRatioWidth, aspectRatioHeight,
-              thumbUrl, fullsizeUrl, playlistUrl, downloadedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(postUri, position) DO UPDATE SET
-              mediaType = excluded.mediaType,
-              blobCid = excluded.blobCid,
-              mimeType = excluded.mimeType,
-              alt = excluded.alt,
-              width = excluded.width,
-              height = excluded.height,
-              aspectRatioWidth = excluded.aspectRatioWidth,
-              aspectRatioHeight = excluded.aspectRatioHeight,
-              thumbUrl = excluded.thumbUrl,
-              fullsizeUrl = excluded.fullsizeUrl,
-              playlistUrl = excluded.playlistUrl,
-              downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt);`,
-            [
-              postUri,
-              position,
-              attachment.type,
-              attachment.blobCid,
-              attachment.mimeType ?? null,
-              attachment.alt ?? null,
-              attachment.width ?? null,
-              attachment.height ?? null,
-              attachment.width ?? null, // aspectRatioWidth
-              attachment.height ?? null, // aspectRatioHeight
-              attachment.thumbUrl ?? null,
-              null, // fullsizeUrl - videos use playlistUrl instead
-              attachment.playlistUrl ?? null,
-              null, // downloadedAt - not downloading media locally
-            ]
-          );
+        const downloadedAt = downloadState === "complete" ? Date.now() : null;
+        await db.runAsync(
+          `INSERT INTO post_media (
+            postUri, position, mediaType, blobCid, mimeType, alt,
+            width, height, aspectRatioWidth, aspectRatioHeight,
+            thumbUrl, fullsizeUrl, playlistUrl, downloadedAt, assetCid
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(postUri, position) DO UPDATE SET
+            mediaType = excluded.mediaType,
+            blobCid = excluded.blobCid,
+            mimeType = excluded.mimeType,
+            alt = excluded.alt,
+            width = excluded.width,
+            height = excluded.height,
+            aspectRatioWidth = excluded.aspectRatioWidth,
+            aspectRatioHeight = excluded.aspectRatioHeight,
+            thumbUrl = excluded.thumbUrl,
+            fullsizeUrl = excluded.fullsizeUrl,
+            playlistUrl = excluded.playlistUrl,
+            downloadedAt = COALESCE(excluded.downloadedAt, post_media.downloadedAt),
+            assetCid = excluded.assetCid;`,
+          [
+            postUri,
+            position,
+            attachment.type,
+            attachment.blobCid,
+            attachment.mimeType ?? null,
+            attachment.alt ?? null,
+            attachment.width ?? null,
+            attachment.height ?? null,
+            attachment.width ?? null,
+            attachment.height ?? null,
+            attachment.thumbUrl ?? null,
+            attachment.type === "image" ? attachment.fullsizeUrl ?? null : null,
+            attachment.type === "video" ? attachment.playlistUrl ?? null : null,
+            downloadedAt,
+            attachment.blobCid,
+          ]
+        );
 
-          return attachment;
-        }
-
-        return attachment;
+        return {
+          ...attachment,
+          contentCid: attachment.blobCid,
+          localUri,
+          downloadState,
+          downloadError,
+        };
       })
     );
   }
