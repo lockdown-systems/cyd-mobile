@@ -20,6 +20,7 @@ import {
   createPostWithQuotedExternalEmbed,
   createPostWithVideo,
   createReplyPost,
+  makePostRecordRecognizable,
 } from "@/testUtils/blueskyFixtures";
 import { createMockDatabase } from "@/testUtils/mockDatabase";
 import { PostIndexer, type PostIndexerDeps } from "../post-indexer";
@@ -61,6 +62,10 @@ describe("PostIndexer", () => {
       makeApiRequest: jest.fn(<T>(fn: () => T) =>
         fn()
       ) as PostIndexerDeps["makeApiRequest"],
+      downloadMedia: jest.fn(async (blobCid: string) => {
+        downloadedUrls.push(blobCid);
+        return `/local/path/${encodeURIComponent(blobCid)}`;
+      }),
       downloadMediaFromUrl: jest.fn(async (url: string) => {
         downloadedUrls.push(url);
         return `/local/path/${encodeURIComponent(url)}`;
@@ -142,7 +147,7 @@ describe("PostIndexer", () => {
     });
 
     it("should handle posts with images", async () => {
-      const posts = [createPostWithImages(3)];
+      const posts = [makePostRecordRecognizable(createPostWithImages(3))];
 
       (mockAgent.app!.bsky.feed.getAuthorFeed as jest.Mock).mockResolvedValue(
         createAuthorFeedResponse(posts, undefined)
@@ -151,12 +156,13 @@ describe("PostIndexer", () => {
       const indexer = new PostIndexer(deps);
       await indexer.indexPosts();
 
-      // Should complete without errors
-      expect(mockAgent.app!.bsky.feed.getAuthorFeed).toHaveBeenCalled();
+      expect(deps.downloadMedia).toHaveBeenCalledTimes(3);
     });
 
     it("should handle posts with videos", async () => {
-      const posts = [createPostWithVideo()];
+      const video = makePostRecordRecognizable(createPostWithVideo());
+      (video.post.embed as { cid?: string }).cid = "bafy-video";
+      const posts = [video];
 
       (mockAgent.app!.bsky.feed.getAuthorFeed as jest.Mock).mockResolvedValue(
         createAuthorFeedResponse(posts, undefined)
@@ -165,8 +171,10 @@ describe("PostIndexer", () => {
       const indexer = new PostIndexer(deps);
       await indexer.indexPosts();
 
-      // Should complete without errors
-      expect(mockAgent.app!.bsky.feed.getAuthorFeed).toHaveBeenCalled();
+      expect(deps.downloadMedia).toHaveBeenCalledWith(
+        "bafy-video",
+        video.post.author.did,
+      );
     });
 
     it("should handle posts with quoted posts", async () => {
@@ -322,6 +330,24 @@ describe("PostIndexer", () => {
       await indexer.indexLikes();
 
       expect(mockAgent.app!.bsky.feed.getActorLikes).toHaveBeenCalled();
+    });
+
+    it("should preserve full images and video from liked posts", async () => {
+      const image = makePostRecordRecognizable(createPostWithImages(1));
+      const video = makePostRecordRecognizable(createPostWithVideo());
+      (video.post.embed as { cid?: string }).cid = "bafy-liked-video";
+      (mockAgent.app!.bsky.feed.getActorLikes as jest.Mock).mockResolvedValue({
+        feed: [image, video],
+        cursor: undefined,
+      });
+
+      await new PostIndexer(deps).indexLikes();
+
+      expect(deps.downloadMedia).toHaveBeenCalledTimes(2);
+      expect(deps.downloadMedia).toHaveBeenCalledWith(
+        "bafy-liked-video",
+        video.post.author.did,
+      );
     });
   });
 

@@ -91,6 +91,10 @@ export interface RateLimitInfo {
 
 export type MediaAttachment = {
   type: "image" | "video";
+  contentCid?: string | null;
+  localUri?: string | null;
+  downloadState?: "pending" | "complete" | "failed";
+  downloadError?: string | null;
   thumbUrl?: string | null;
   fullsizeUrl?: string | null;
   playlistUrl?: string | null;

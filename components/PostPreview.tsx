@@ -446,7 +446,7 @@ export function PostPreview({
     return post.media
       .filter((item) => item.type === "image")
       .map((item, index) => ({
-        uri: item.fullsizeUrl ?? item.thumbUrl ?? "",
+        uri: item.downloadState === "complete" ? item.localUri ?? "" : "",
         index,
       }))
       .filter((item) => item.uri !== "");
@@ -503,11 +503,10 @@ export function PostPreview({
         />
       )}
 
-      {browseMode && currentVideo && currentVideo.playlistUrl && (
+      {browseMode && currentVideo?.localUri && (
         <VideoPlayerModal
           visible={videoVisible}
-          videoUri={String(currentVideo.playlistUrl)}
-          posterUri={currentVideo.thumbUrl ?? undefined}
+          videoUri={currentVideo.localUri}
           onClose={closeVideo}
         />
       )}
@@ -563,13 +562,51 @@ export function PostPreview({
         <View style={styles.mediaGrid}>
           {post.media.map((item, index) => {
             const key = `${item.type}-${index}`;
-            const thumbUri = item.thumbUrl ?? undefined;
+            const isLocallyAvailable =
+              item.downloadState === "complete" && !!item.localUri;
+            const thumbUri = browseMode
+              ? item.type === "image" && isLocallyAvailable
+                ? item.localUri ?? undefined
+                : undefined
+              : item.thumbUrl ?? undefined;
+
+            if (browseMode && !isLocallyAvailable) {
+              return (
+                <View
+                  key={key}
+                  style={[
+                    styles.unavailableMedia,
+                    { borderColor: palette.icon + "55" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.unavailableMediaTitle,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Media unavailable — save again to retry
+                  </Text>
+                  {item.downloadError ? (
+                    <Text
+                      style={[
+                        styles.unavailableMediaError,
+                        { color: palette.icon },
+                      ]}
+                    >
+                      {item.downloadError}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            }
 
             if (item.type === "video") {
-              const hasPlaylistUrl = !!item.playlistUrl;
+              const hasPlayableVideo = browseMode
+                ? !!item.localUri
+                : !!item.playlistUrl;
 
-              // In browse mode with a playlist URL, make it tappable to play
-              if (browseMode && hasPlaylistUrl) {
+              if (browseMode && hasPlayableVideo) {
                 return (
                   <Pressable
                     key={key}
@@ -631,7 +668,7 @@ export function PostPreview({
             if (browseMode) {
               // Find the gallery index for this image
               const galleryIdx = galleryImages.findIndex(
-                (g) => g.uri === (item.fullsizeUrl ?? item.thumbUrl),
+                (g) => g.uri === item.localUri,
               );
 
               return (
@@ -832,6 +869,22 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 10,
     backgroundColor: "#0001",
+  },
+  unavailableMedia: {
+    width: 240,
+    minHeight: 100,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    justifyContent: "center",
+    gap: 6,
+  },
+  unavailableMediaTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  unavailableMediaError: {
+    fontSize: 12,
   },
   videoPlaceholder: {
     width: 120,

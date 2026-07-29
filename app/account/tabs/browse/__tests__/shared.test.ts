@@ -396,6 +396,39 @@ describe("shared browse helpers", () => {
 
       expect(result.size).toBe(0);
     });
+
+    it("should map account-local assets for offline browse", async () => {
+      (mockDb.getAllAsync as jest.Mock).mockResolvedValue([
+        {
+          postUri: "at://did/post/1",
+          position: 0,
+          mediaType: "video",
+          alt: "Saved video",
+          width: 1920,
+          height: 1080,
+          thumbUrl: "https://cdn.bsky.app/thumb.jpg",
+          fullsizeUrl: null,
+          playlistUrl: "https://video.bsky.app/playlist.m3u8",
+          contentCid: "bafy-video",
+          localPath: "file:///account/media/bafy-video",
+          downloadState: "complete",
+          lastError: null,
+        },
+      ] satisfies MediaRow[]);
+
+      const result = await fetchMediaForPosts(mockDb, ["at://did/post/1"]);
+
+      expect(result.get("at://did/post/1")?.[0]).toMatchObject({
+        contentCid: "bafy-video",
+        localUri: "file:///account/media/bafy-video",
+        downloadState: "complete",
+      });
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+        expect.stringContaining("JOIN media_asset"),
+        ["at://did/post/1"],
+      );
+    });
   });
 
   describe("fetchExternalEmbedsForPosts", () => {

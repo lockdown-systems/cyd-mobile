@@ -630,6 +630,20 @@ describe("BlueskyAccountController", () => {
   });
 
   describe("media operations", () => {
+    beforeEach(() => {
+      jest.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          service: [
+            {
+              type: "AtprotoPersonalDataServer",
+              serviceEndpoint: "https://pds.example.com",
+            },
+          ],
+        }),
+      } as unknown as Response);
+    });
+
     it("should skip download when file already exists", async () => {
       const controller = new BlueskyAccountController(1);
       (controller as unknown as { agent: Agent | null }).agent = {} as Agent;
@@ -688,9 +702,28 @@ describe("BlueskyAccountController", () => {
       const mockedDownload = jest.mocked(File.downloadFileAsync);
       expect(mockedDownload).toHaveBeenCalledTimes(1);
       const [url, dest] = mockedDownload.mock.calls[0] as [string, File];
-      expect(url).toBe("https://cdn.bsky.app/blob/did%3Aplc%3A123/bafy%2Ftest");
+      expect(url).toBe(
+        "https://pds.example.com/xrpc/com.atproto.sync.getBlob?did=did%3Aplc%3A123&cid=bafy%2Ftest",
+      );
       expect(dest).toBeInstanceOf(File);
       expect(path).toBe(targetPath);
+    });
+
+    it("should isolate the same content CID within each local account", async () => {
+      const first = new BlueskyAccountController(1, "account-one");
+      const second = new BlueskyAccountController(2, "account-two");
+      (first as unknown as { agent: Agent | null }).agent = {} as Agent;
+      (second as unknown as { agent: Agent | null }).agent = {} as Agent;
+
+      const firstPath = await first.downloadMedia("shared-cid", "did:plc:author");
+      const secondPath = await second.downloadMedia(
+        "shared-cid",
+        "did:plc:author",
+      );
+
+      expect(firstPath).toContain("bluesky-account-one/media/shared-cid");
+      expect(secondPath).toContain("bluesky-account-two/media/shared-cid");
+      expect(firstPath).not.toBe(secondPath);
     });
   });
 

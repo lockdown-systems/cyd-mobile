@@ -15,6 +15,7 @@ interface IndexerDeps {
   updateProgress: (updates: Partial<BlueskyProgress>) => void;
   waitForPause: () => Promise<void>;
   makeApiRequest: RequestExecutor;
+  downloadMedia: (blobCid: string, did: string) => Promise<string>;
   downloadMediaFromUrl: (url: string, did: string) => Promise<string>;
 }
 
@@ -30,6 +31,7 @@ export class BlueskyIndexer {
       updateProgress: deps.updateProgress,
       waitForPause: deps.waitForPause,
       makeApiRequest: deps.makeApiRequest,
+      downloadMedia: deps.downloadMedia,
       downloadMediaFromUrl: deps.downloadMediaFromUrl,
     };
 

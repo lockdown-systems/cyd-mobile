@@ -87,6 +87,17 @@ export function createFeedViewPost(
   };
 }
 
+export function makePostRecordRecognizable<
+  T extends { post: { record: unknown } },
+>(item: T): T {
+  item.post.record = {
+    ...(item.post.record as Record<string, unknown>),
+    $type: "app.bsky.feed.post",
+    createdAt: "2026-01-04T12:00:00.000Z",
+  };
+  return item;
+}
+
 // Create a post with facets (links and mentions)
 export function createPostWithFacets(): AppBskyFeedDefs.FeedViewPost {
   const text =
