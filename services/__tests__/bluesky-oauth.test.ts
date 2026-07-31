@@ -83,7 +83,7 @@ import {
 } from "../bluesky-oauth";
 
 describe("Bluesky OAuth protected connection integration", () => {
-  it("restores a working session from the local account's UUID-keyed connection", async () => {
+  it("restores a working session from the Bluesky local account's UUID-keyed connection", async () => {
     jest.mocked(getDatabase).mockResolvedValue({
       getFirstAsync: jest.fn(async () => ({ uuid: "uuid-alice" })),
     } as never);
@@ -110,7 +110,7 @@ describe("Bluesky OAuth protected connection integration", () => {
     expect(restored.tokenSet.refresh_token).toBe("refresh-token");
   });
 
-  it("disconnects without deleting the local account or saved data", async () => {
+  it("disconnects without deleting the Bluesky local account or Bluesky saved data", async () => {
     const db = {
       getFirstAsync: jest.fn(async () => ({
         uuid: "uuid-alice",

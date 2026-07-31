@@ -419,7 +419,7 @@ describe("Account Database Operations", () => {
   });
 
   describe("deleteAccount", () => {
-    it("removes the protected connection and the local account", async () => {
+    it("removes the protected connection and the Bluesky local account", async () => {
       mockDb.getFirstAsync.mockResolvedValue({
         bskyAccountID: 50,
         uuid: "uuid-alice",
