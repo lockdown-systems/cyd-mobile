@@ -3,14 +3,19 @@ import type { OAuthSession } from "@atproto/oauth-client";
 
 import {
   createBlueskyAccount,
+  deleteAccount,
   listAccounts,
   saveAuthenticatedBlueskyAccount,
 } from "../accounts";
 import * as databaseModule from "../index";
+import { deleteBlueskyConnection } from "@/services/bluesky-connection-store";
 
 // Mock the database module
 jest.mock("../index", () => ({
   getDatabase: jest.fn(),
+}));
+jest.mock("@/services/bluesky-connection-store", () => ({
+  deleteBlueskyConnection: jest.fn(),
 }));
 
 const getDatabase = databaseModule.getDatabase as jest.Mock;
@@ -142,9 +147,6 @@ describe("Account Database Operations", () => {
           0, // postsCount
           null, // avatarUrl
           null, // did
-          null, // accessJwt
-          null, // refreshJwt
-          null, // sessionJson
         ])
       );
 
@@ -169,9 +171,6 @@ describe("Account Database Operations", () => {
         displayName: "Test User",
         postsCount: 42,
         avatarUrl: "data:image/png;base64,abc",
-        accessJwt: "access-token",
-        refreshJwt: "refresh-token",
-        sessionJson: '{"test":"data"}',
       };
 
       const account = await createBlueskyAccount(params);
@@ -187,9 +186,6 @@ describe("Account Database Operations", () => {
           42,
           "data:image/png;base64,abc",
           "did:plc:test123",
-          "access-token",
-          "refresh-token",
-          '{"test":"data"}',
         ])
       );
 
@@ -292,9 +288,6 @@ describe("Account Database Operations", () => {
           100,
           "https://example.com/avatar.jpg",
           "did:plc:test123",
-          null,
-          null,
-          expect.stringContaining('"did":"did:plc:test123"'),
         ])
       );
 
@@ -340,9 +333,6 @@ describe("Account Database Operations", () => {
           expect.any(Number),
           100,
           "did:plc:test123",
-          null,
-          null,
-          expect.any(String),
           50,
         ])
       );
@@ -389,7 +379,7 @@ describe("Account Database Operations", () => {
       expect(account.avatarUrl).toBeNull();
     });
 
-    it("should serialize session as JSON", async () => {
+    it("keeps OAuth connection material out of the runtime database", async () => {
       mockDb.getFirstAsync
         .mockResolvedValueOnce(null) // Check for existing bsky_account
         .mockResolvedValueOnce(null) // Check for existing account
@@ -416,11 +406,39 @@ describe("Account Database Operations", () => {
         profile: mockProfile,
       });
 
+      const sqlStatements = mockDb.runAsync.mock.calls
+        .map((call: unknown[]) => call[0])
+        .join("\n");
+      const boundValues = mockDb.runAsync.mock.calls.flatMap(
+        (call: unknown[]) => (Array.isArray(call[1]) ? call[1] : [])
+      );
+
+      expect(sqlStatements).not.toMatch(/accessJwt|refreshJwt|sessionJson/);
+      expect(boundValues).not.toContain(JSON.stringify(mockSession));
+    });
+  });
+
+  describe("deleteAccount", () => {
+    it("removes the protected connection and the local account", async () => {
+      mockDb.getFirstAsync.mockResolvedValue({
+        bskyAccountID: 50,
+        uuid: "uuid-alice",
+        did: "did:plc:alice",
+      });
+
+      await deleteAccount(25);
+
+      expect(deleteBlueskyConnection).toHaveBeenCalledWith(
+        "uuid-alice",
+        "did:plc:alice"
+      );
       expect(mockDb.runAsync).toHaveBeenCalledWith(
-        expect.stringContaining("INSERT INTO bsky_account"),
-        expect.arrayContaining([
-          expect.stringContaining('"did":"did:plc:test123"'),
-        ])
+        expect.stringContaining("DELETE FROM account"),
+        [25]
+      );
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining("DELETE FROM bsky_account"),
+        [50]
       );
     });
   });

@@ -7,15 +7,7 @@ import {
 } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
-
-function getDocumentsBasePath(): string {
-  const baseDir = Paths.document ?? Paths.cache;
-  if (!baseDir?.uri) {
-    throw new Error("Unable to resolve a writable document directory");
-  }
-  const uri = baseDir.uri;
-  return uri.endsWith("/") ? uri : `${uri}/`;
-}
+import { getBackupEligibleDataRoot } from "@/services/device-storage";
 
 /**
  * Get the parent directory of the default SQLite database directory.
@@ -29,7 +21,7 @@ function getSQLiteParentDirectory(): string {
 }
 
 export function buildAccountPaths(accountType: string, accountUUID: string) {
-  const base = getDocumentsBasePath();
+  const base = getBackupEligibleDataRoot();
   const accountsDir = `${base}accounts/`;
   const accountDir = `${accountsDir}${accountType}-${accountUUID}/`;
   const sqliteParent = getSQLiteParentDirectory();
