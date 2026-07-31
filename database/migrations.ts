@@ -98,4 +98,13 @@ export const migrations: Migration[] = [
       `ALTER TABLE cyd_account ADD COLUMN onboardingShown INTEGER DEFAULT 0;`,
     ],
   },
+  {
+    version: 6,
+    name: "remove runtime database credentials",
+    statements: [
+      `ALTER TABLE bsky_account DROP COLUMN accessJwt;`,
+      `ALTER TABLE bsky_account DROP COLUMN refreshJwt;`,
+      `ALTER TABLE bsky_account DROP COLUMN sessionJson;`,
+    ],
+  },
 ];

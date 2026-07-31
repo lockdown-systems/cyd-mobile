@@ -2,6 +2,8 @@ import type { AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
 import type { SQLiteDatabase } from "expo-sqlite";
 
+import { deleteBlueskyConnection } from "@/services/bluesky-connection-store";
+
 import { getDatabase } from "./index";
 
 export type AccountListItem = {
@@ -23,9 +25,6 @@ type CreateBlueskyAccountParams = {
   displayName?: string | null;
   postsCount?: number;
   avatarUrl?: string | null;
-  accessJwt?: string | null;
-  refreshJwt?: string | null;
-  sessionJson?: string | null;
 };
 
 export async function listAccounts(): Promise<AccountListItem[]> {
@@ -76,11 +75,8 @@ async function createBlueskyAccountWithDb(
         displayName,
         postsCount,
         avatarUrl,
-        did,
-        accessJwt,
-        refreshJwt,
-        sessionJson
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        did
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         now,
         now,
@@ -90,9 +86,6 @@ async function createBlueskyAccountWithDb(
         postsCount,
         params.avatarUrl ?? null,
         params.did ?? null,
-        params.accessJwt ?? null,
-        params.refreshJwt ?? null,
-        params.sessionJson ?? null,
       ]
     );
 
@@ -135,6 +128,7 @@ async function getNextSortOrder(db: SQLiteDatabase): Promise<number> {
 export async function saveAuthenticatedBlueskyAccount(params: {
   session: OAuthSession;
   profile: AppBskyActorDefs.ProfileViewDetailed;
+  accountUUID?: string;
 }): Promise<AccountListItem> {
   const db = await getDatabase();
   const now = Date.now();
@@ -142,11 +136,8 @@ export async function saveAuthenticatedBlueskyAccount(params: {
   let savedAccount: AccountListItem | null = null;
 
   await db.withTransactionAsync(async () => {
-    const sessionJson = JSON.stringify(session);
     const avatar = profile.avatar ?? null;
     const displayName = profile.displayName ?? null;
-    const persistedAccessJwt: string | null = null;
-    const persistedRefreshJwt: string | null = null;
 
     const existing = await db.getFirstAsync<{ id: number }>(
       `SELECT id FROM bsky_account WHERE did = ? OR handle = ? LIMIT 1;`,
@@ -163,10 +154,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
              updatedAt = ?,
              accessedAt = ?,
              postsCount = ?,
-             did = ?,
-             accessJwt = ?,
-             refreshJwt = ?,
-             sessionJson = ?
+             did = ?
          WHERE id = ?;`,
         [
           profile.handle,
@@ -176,9 +164,6 @@ export async function saveAuthenticatedBlueskyAccount(params: {
           now,
           profile.postsCount ?? 0,
           session.did,
-          persistedAccessJwt,
-          persistedRefreshJwt,
-          sessionJson,
           existing.id,
         ]
       );
@@ -193,11 +178,8 @@ export async function saveAuthenticatedBlueskyAccount(params: {
           displayName,
           postsCount,
           avatarUrl,
-          did,
-          accessJwt,
-          refreshJwt,
-          sessionJson
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          did
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           now,
           now,
@@ -207,9 +189,6 @@ export async function saveAuthenticatedBlueskyAccount(params: {
           profile.postsCount ?? 0,
           avatar,
           session.did,
-          persistedAccessJwt,
-          persistedRefreshJwt,
-          sessionJson,
         ]
       );
       bskyAccountID = insert.lastInsertRowId;
@@ -225,7 +204,7 @@ export async function saveAuthenticatedBlueskyAccount(params: {
       await db.runAsync(
         `INSERT INTO account (uuid, sortOrder, type, bskyAccountID)
          VALUES (?, ?, 'bluesky', ?);`,
-        [createUUID(), sortOrder, bskyAccountID]
+        [params.accountUUID ?? createUUID(), sortOrder, bskyAccountID]
       );
     }
 
@@ -265,16 +244,26 @@ export async function saveAuthenticatedBlueskyAccount(params: {
 
 export async function deleteAccount(accountId: number): Promise<void> {
   const db = await getDatabase();
+  const row = await db.getFirstAsync<{
+    bskyAccountID: number;
+    uuid: string;
+    did: string | null;
+  }>(
+    `SELECT a.bskyAccountID, a.uuid, b.did
+       FROM account a
+       INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+      WHERE a.id = ?
+      LIMIT 1;`,
+    [accountId]
+  );
+
+  if (!row?.bskyAccountID) {
+    throw new Error("Account not found");
+  }
+
+  await deleteBlueskyConnection(row.uuid, row.did ?? undefined);
+
   await db.withTransactionAsync(async () => {
-    const row = await db.getFirstAsync<{ bskyAccountID: number }>(
-      `SELECT bskyAccountID FROM account WHERE id = ? LIMIT 1;`,
-      [accountId]
-    );
-
-    if (!row?.bskyAccountID) {
-      throw new Error("Account not found");
-    }
-
     await db.runAsync(`DELETE FROM account WHERE id = ?;`, [accountId]);
     await db.runAsync(`DELETE FROM bsky_account WHERE id = ?;`, [
       row.bskyAccountID,

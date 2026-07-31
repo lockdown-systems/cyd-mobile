@@ -45,6 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       versionCode: packageJson.androidVersionCode,
+      allowBackup: true,
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -72,6 +73,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       "expo-router",
       "expo-iap",
+      ["expo-secure-store", { configureAndroidBackup: true }],
       [
         "expo-build-properties",
         {

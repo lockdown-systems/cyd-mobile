@@ -108,4 +108,17 @@ describe("Database Migrations", () => {
       expect(insertStatement).toBeTruthy();
     });
   });
+
+  describe("migration 6: remove runtime database credentials", () => {
+    const migration = migrations[5];
+
+    it("removes every legacy OAuth credential column", () => {
+      expect(migration.name).toBe("remove runtime database credentials");
+      expect(migration.statements).toEqual([
+        "ALTER TABLE bsky_account DROP COLUMN accessJwt;",
+        "ALTER TABLE bsky_account DROP COLUMN refreshJwt;",
+        "ALTER TABLE bsky_account DROP COLUMN sessionJson;",
+      ]);
+    });
+  });
 });

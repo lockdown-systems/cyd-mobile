@@ -173,9 +173,8 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     const row = await mainDb.getFirstAsync<{
       did: string;
       handle: string;
-      sessionJson: string | null;
     }>(
-      `SELECT b.did, b.handle, b.sessionJson
+      `SELECT b.did, b.handle
        FROM account a
        INNER JOIN bsky_account b ON b.id = a.bskyAccountID
        WHERE a.id = ?;`,
@@ -353,15 +352,6 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Refresh the session after re-authentication
    */
   async refreshSession(newSession: OAuthSession): Promise<void> {
-    const mainDb = await getDatabase();
-
-    await mainDb.runAsync(
-      `UPDATE bsky_account
-       SET sessionJson = ?, updatedAt = ?
-       WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
-      [JSON.stringify(newSession), Date.now(), this.accountId],
-    );
-
     const sessionFetch = newSession.fetchHandler.bind(newSession);
     this.agent = new Agent({
       did: newSession.did,

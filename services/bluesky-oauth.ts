@@ -13,12 +13,20 @@ import {
   type StateStore,
 } from "@atproto/oauth-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 
 import { getDatabase } from "@/database";
 import { saveAuthenticatedBlueskyAccount } from "@/database/accounts";
+import {
+  deleteBlueskyConnection,
+  deleteBlueskyOAuthState,
+  getBlueskyConnection,
+  getBlueskyOAuthState,
+  setBlueskyOAuthState,
+  setBlueskyConnection,
+} from "@/services/bluesky-connection-store";
 
-const STATE_PREFIX = "@cyd/bluesky/state/";
 const SESSION_PREFIX = "@cyd/bluesky/session/";
 const CLIENT_METADATA_PATH = "bluesky/client-metadata-mobile.json";
 const PROD_HOST = "api.cyd.social";
@@ -31,6 +39,7 @@ let clientPromise: Promise<OAuthClient> | null = null;
 const stateStore = createStateStore();
 const sessionStore = createSessionStore();
 const runtimeImplementation = createRuntimeImplementation();
+const pendingConnections = new Map<string, string>();
 type OAuthRedirectUri = NonNullable<AuthorizeOptions["redirect_uri"]>;
 
 export function normalizeHandle(handle: string): string {
@@ -89,10 +98,6 @@ export async function restoreBlueskyOAuthSession(
   }
 }
 
-function stateKey(key: string): string {
-  return `${STATE_PREFIX}${key}`;
-}
-
 function sessionKey(sub: string): string {
   return `${SESSION_PREFIX}${sub}`;
 }
@@ -139,10 +144,31 @@ export async function authenticateBlueskyAccount(handleInput: string) {
   const profileResponse = await agent.getProfile({ actor: session.did });
   console.log("[BlueskyOAuth] profile fetched", sanitizedHandle);
 
-  return saveAuthenticatedBlueskyAccount({
-    session,
-    profile: profileResponse.data,
-  });
+  const existingAccount = await findBlueskyLocalAccount(
+    session.did,
+    profileResponse.data.handle,
+  );
+  const accountUUID = existingAccount?.uuid ?? Crypto.randomUUID();
+  const pendingConnection = pendingConnections.get(session.did);
+
+  if (pendingConnection) {
+    await setBlueskyConnection(accountUUID, pendingConnection);
+  } else {
+    const protectedConnection = await getBlueskyConnection({ accountUUID });
+    if (!protectedConnection) {
+      throw new Error("Unable to protect the Bluesky connection");
+    }
+  }
+
+  try {
+    return await saveAuthenticatedBlueskyAccount({
+      session,
+      profile: profileResponse.data,
+      accountUUID,
+    });
+  } finally {
+    pendingConnections.delete(session.did);
+  }
 }
 
 export async function revokeBlueskyAuthorization(
@@ -151,10 +177,10 @@ export async function revokeBlueskyAuthorization(
   console.log("[BlueskyOAuth] revoke -> start", accountId);
   const db = await getDatabase();
   const accountRow = await db.getFirstAsync<{
-    bskyAccountID: number;
-    sessionJson: string | null;
+    uuid: string;
+    did: string | null;
   }>(
-    `SELECT a.bskyAccountID, b.sessionJson
+    `SELECT a.uuid, b.did
        FROM account a
        INNER JOIN bsky_account b ON b.id = a.bskyAccountID
       WHERE a.id = ?
@@ -162,35 +188,15 @@ export async function revokeBlueskyAuthorization(
     [accountId],
   );
 
-  if (!accountRow?.bskyAccountID) {
+  if (!accountRow) {
     throw new Error("Unable to locate this Bluesky account");
   }
 
-  if (accountRow.sessionJson) {
-    try {
-      const storedSession = JSON.parse(
-        accountRow.sessionJson,
-      ) as Partial<PersistedSession> & { sub?: string };
-      const subject = storedSession.sub;
-      if (typeof subject === "string" && subject.length > 0) {
-        await sessionStore.del(subject);
-        console.log("[BlueskyOAuth] revoke -> cleared session store", subject);
-      }
-    } catch (err) {
-      console.warn("Failed to clear cached Bluesky session", err);
-    }
-  }
-
-  await db.runAsync(
-    `UPDATE bsky_account
-        SET sessionJson = NULL,
-            accessJwt = NULL,
-            refreshJwt = NULL,
-            updatedAt = ?
-      WHERE id = ?;`,
-    [Date.now(), accountRow.bskyAccountID],
+  await deleteBlueskyConnection(
+    accountRow.uuid,
+    accountRow.did ?? undefined,
   );
-  console.log("[BlueskyOAuth] revoke -> db session cleared", accountId);
+  console.log("[BlueskyOAuth] revoke -> connection cleared", accountId);
 }
 
 type SerializedState = Omit<InternalStateData, "dpopKey"> & {
@@ -205,10 +211,10 @@ function createStateStore(): StateStore {
   return {
     async set(key, value) {
       const serialized = serializeState(value);
-      await AsyncStorage.setItem(stateKey(key), JSON.stringify(serialized));
+      await setBlueskyOAuthState(key, JSON.stringify(serialized));
     },
     async get(key) {
-      const raw = await AsyncStorage.getItem(stateKey(key));
+      const raw = await getBlueskyOAuthState(key);
       if (!raw) {
         return undefined;
       }
@@ -216,7 +222,7 @@ function createStateStore(): StateStore {
       return deserializeState(parsed);
     },
     async del(key) {
-      await AsyncStorage.removeItem(stateKey(key));
+      await deleteBlueskyOAuthState(key);
     },
   };
 }
@@ -225,10 +231,22 @@ function createSessionStore(): SessionStore {
   return {
     async set(sub, value) {
       const serialized = serializeSession(value);
-      await AsyncStorage.setItem(sessionKey(sub), JSON.stringify(serialized));
+      const serializedConnection = JSON.stringify(serialized);
+      const account = await findBlueskyLocalAccount(sub);
+      if (account) {
+        await setBlueskyConnection(account.uuid, serializedConnection);
+      } else {
+        pendingConnections.set(sub, serializedConnection);
+      }
     },
     async get(sub) {
-      const raw = await AsyncStorage.getItem(sessionKey(sub));
+      const account = await findBlueskyLocalAccount(sub);
+      const raw = account
+        ? await getBlueskyConnection({
+            accountUUID: account.uuid,
+            legacyDid: sub,
+          })
+        : pendingConnections.get(sub);
       if (!raw) {
         return undefined;
       }
@@ -236,9 +254,30 @@ function createSessionStore(): SessionStore {
       return deserializeSession(parsed);
     },
     async del(sub) {
-      await AsyncStorage.removeItem(sessionKey(sub));
+      pendingConnections.delete(sub);
+      const account = await findBlueskyLocalAccount(sub);
+      if (account) {
+        await deleteBlueskyConnection(account.uuid, sub);
+      } else {
+        await AsyncStorage.removeItem(sessionKey(sub));
+      }
     },
   };
+}
+
+async function findBlueskyLocalAccount(
+  did: string,
+  handle?: string,
+): Promise<{ uuid: string } | null> {
+  const db = await getDatabase();
+  return db.getFirstAsync<{ uuid: string }>(
+    `SELECT a.uuid
+       FROM account a
+       INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+      WHERE b.did = ? OR (? IS NOT NULL AND b.handle = ?)
+      LIMIT 1;`,
+    [did, handle ?? null, handle ?? null],
+  );
 }
 
 function serializeState(value: InternalStateData): SerializedState {
