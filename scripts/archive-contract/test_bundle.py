@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
+import subprocess
 import tempfile
 import urllib.request
 import zipfile
@@ -159,6 +161,31 @@ def normalize_assets(database: sqlite3.Connection) -> list[dict[str, Any]]:
     )
 
 
+def raw_mobile_tables(database: sqlite3.Connection) -> dict[str, Any]:
+    queries = {
+        "archive": "SELECT * FROM archive",
+        "identity": "SELECT * FROM identity",
+        "profiles": "SELECT * FROM profiles ORDER BY id",
+        "records": "SELECT * FROM records ORDER BY uri",
+        "selections": "SELECT * FROM selections ORDER BY category",
+        "record_subjects": "SELECT * FROM record_subjects ORDER BY relationship_uri",
+        "record_context": "SELECT * FROM record_context ORDER BY record_uri, kind",
+        "conversations": "SELECT * FROM conversations ORDER BY id",
+        "conversation_members": (
+            "SELECT * FROM conversation_members ORDER BY conversation_id, profile_id"
+        ),
+        "messages": "SELECT * FROM messages ORDER BY id",
+        "relationships": "SELECT * FROM relationships ORDER BY uri",
+        "record_assets": (
+            "SELECT * FROM record_assets "
+            "ORDER BY owner_type, owner_id, role, position"
+        ),
+        "portable_settings": "SELECT * FROM portable_settings ORDER BY key",
+        "assets": "SELECT * FROM assets ORDER BY id",
+    }
+    return {table: rows(database, query) for table, query in queries.items()}
+
+
 def verify_fixture(bundle: Path, fixture_name: str, expectations: dict[str, Any]) -> None:
     archive_path = bundle / "fixtures" / fixture_name
     fixture_expectations = expectations["fixtures"][fixture_name]
@@ -194,6 +221,14 @@ def verify_fixture(bundle: Path, fixture_name: str, expectations: dict[str, Any]
                 "SELECT completeness FROM archive"
             ).fetchone()[0]
             assert completeness == fixture_expectations["completeness"]
+            mobile_input = bundle / "mobile-input" / f"{fixture_name}.json"
+            mobile_input.parent.mkdir(parents=True, exist_ok=True)
+            mobile_input.write_text(
+                json.dumps(
+                    {"metadata": metadata, "tables": raw_mobile_tables(database)}
+                ),
+                encoding="utf-8",
+            )
         finally:
             database.close()
 
@@ -224,6 +259,17 @@ def main() -> None:
         }
         verify_fixture(bundle, "complete.cyd", expectations)
         verify_fixture(bundle, "incomplete.cyd", expectations)
+        subprocess.run(
+            [
+                "npm",
+                "test",
+                "--",
+                "--runInBand",
+                "services/__tests__/archive-contract-bundle.test.ts",
+            ],
+            check=True,
+            env={**os.environ, "CYD_BLUESKY_CONTRACT_ROOT": str(bundle)},
+        )
     print(f"Canonical Bluesky archive semantics match {PIN['commit']}.")
 
 
