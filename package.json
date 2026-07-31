@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint && tsc --noEmit",
     "test": "jest",
+    "test:archive-contract": "python3 scripts/archive-contract/test_bundle.py",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
@@ -41,7 +42,6 @@
     "expo-crypto": "~57.0.0",
     "expo-dev-client": "~57.0.5",
     "expo-device": "~57.0.0",
-    "expo-document-picker": "~57.0.0",
     "expo-font": "~57.0.0",
     "expo-haptics": "~57.0.0",
     "expo-iap": "^4.3.6",
@@ -51,7 +51,6 @@
     "expo-localization": "~57.0.0",
     "expo-notifications": "~57.0.3",
     "expo-router": "~57.0.3",
-    "expo-sharing": "~57.0.2",
     "expo-splash-screen": "~57.0.2",
     "expo-sqlite": "~57.0.0",
     "expo-status-bar": "~57.0.0",
@@ -71,7 +70,6 @@
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.2",
     "react-native-worklets": "0.10.0",
-    "react-native-zip-archive": "^7.0.2",
     "text-encoding": "^0.7.0"
   },
   "devDependencies": {
@@ -94,15 +92,6 @@
     "tsconfig": "^7.0.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.62.1"
-  },
-  "expo": {
-    "doctor": {
-      "reactNativeDirectoryCheck": {
-        "exclude": [
-          "react-native-zip-archive"
-        ]
-      }
-    }
   },
   "private": true,
   "allowScripts": {

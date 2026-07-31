@@ -113,7 +113,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "@react-native-community/datetimepicker",
       "expo-image",
       "expo-localization",
-      "expo-sharing",
       "expo-sqlite",
       "expo-web-browser",
       "./plugins/remove-android-permissions",
