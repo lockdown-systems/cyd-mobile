@@ -18,7 +18,6 @@ import { useCydAccount } from "@/contexts/CydAccountProvider";
 // Mock the hooks
 const mockSignOut = jest.fn();
 const mockGetDashboardURL = jest.fn(() => "https://dash.cyd.social");
-const mockRefresh = jest.fn();
 
 jest.mock("@/contexts/CydAccountProvider", () => ({
   useCydAccount: jest.fn(() => ({
@@ -32,25 +31,8 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
   })),
 }));
 
-jest.mock("@/hooks/use-accounts", () => ({
-  useAccounts: () => ({
-    accounts: [],
-    loading: false,
-    error: null,
-    refresh: mockRefresh,
-  }),
-}));
-
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-
-jest.mock("@/services/archive-import", () => ({
-  cleanupTempDir: jest.fn(),
-  importArchive: jest.fn(),
-  pickArchiveFile: jest.fn(),
-  validateArchive: jest.fn(),
-  validateArchiveFilename: jest.fn(),
 }));
 
 jest.mock("@/hooks/use-color-scheme", () => ({

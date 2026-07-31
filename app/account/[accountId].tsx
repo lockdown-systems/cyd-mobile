@@ -211,19 +211,6 @@ export default function AccountScreen() {
     router.replace("/");
   }, [account, handleSignOut, router]);
 
-  const handleExportArchive = useCallback(async () => {
-    if (!account) {
-      throw new Error(
-        "Account information is not available yet. Please try again in a moment.",
-      );
-    }
-
-    await runWithAccountController(account, async (controller) => {
-      await controller.initAgent();
-      await controller.exportArchive();
-    });
-  }, [account]);
-
   // Reset auth status when the account disappears (adjusting state during
   // render, per React docs, instead of a synchronous setState in an effect).
   const [previousAccountForAuth, setPreviousAccountForAuth] =
@@ -574,7 +561,6 @@ export default function AccountScreen() {
         onReauthenticate={handleReauthenticate}
         onSignOut={handleSignOut}
         onRemoveAccount={handleRemoveAccount}
-        onExportArchive={handleExportArchive}
       />
     </>
   );

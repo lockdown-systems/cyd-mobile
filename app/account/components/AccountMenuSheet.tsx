@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Modal,
@@ -23,7 +22,6 @@ export type AccountMenuSheetProps = {
   onSignOut?: () => Promise<void>;
   onReauthenticate?: () => Promise<void>;
   onRemoveAccount?: () => Promise<void>;
-  onExportArchive?: () => Promise<void>;
   authStatus: "authenticated" | "signed_out" | "unknown";
 };
 
@@ -56,11 +54,9 @@ export function AccountMenuSheet({
   onSignOut,
   onReauthenticate,
   onRemoveAccount,
-  onExportArchive,
   authStatus,
 }: AccountMenuSheetProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
   const [signInModalVisible, setSignInModalVisible] = useState(false);
   const {
     state: cydState,
@@ -73,12 +69,6 @@ export function AccountMenuSheet({
         type: "info",
         key: "bluesky-handle",
         label: `Bluesky account: ${handle}`,
-      },
-      {
-        type: "action",
-        key: "export-archive",
-        label: "Export Bluesky archive",
-        log: `Export archive tapped for ${handle}`,
       },
       ...(authStatus !== "authenticated"
         ? [
@@ -150,34 +140,6 @@ export function AccountMenuSheet({
       console.log(`[Account Settings] ${item.log}`);
 
       if (pendingAction) {
-        return;
-      }
-
-      if (item.key === "export-archive") {
-        if (!onExportArchive) {
-          Alert.alert(
-            "Export unavailable",
-            "This action is not supported here.",
-          );
-          onClose();
-          return;
-        }
-
-        setPendingAction(item.key);
-        setIsExporting(true);
-        try {
-          await onExportArchive();
-          onClose();
-        } catch (err) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : "Unable to export archive right now.";
-          Alert.alert("Export failed", message);
-        } finally {
-          setIsExporting(false);
-          setPendingAction(null);
-        }
         return;
       }
 
@@ -302,7 +264,6 @@ export function AccountMenuSheet({
     },
     [
       onClose,
-      onExportArchive,
       onReauthenticate,
       onRemoveAccount,
       onSignOut,
@@ -403,18 +364,6 @@ export function AccountMenuSheet({
             })}
           </View>
         </View>
-        {isExporting && (
-          <View style={styles.exportingOverlay}>
-            <View
-              style={[styles.exportingModal, { backgroundColor: palette.card }]}
-            >
-              <ActivityIndicator size="large" color={palette.tint} />
-              <Text style={[styles.exportingText, { color: palette.text }]}>
-                Preparing archive...
-              </Text>
-            </View>
-          </View>
-        )}
       </Modal>
       <CydSignInModal
         visible={signInModalVisible}
@@ -471,23 +420,6 @@ const styles = StyleSheet.create({
   separator: {
     borderTopWidth: StyleSheet.hairlineWidth,
     marginVertical: 4,
-  },
-  exportingOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  exportingModal: {
-    borderRadius: 16,
-    padding: 32,
-    alignItems: "center",
-    gap: 16,
-    minWidth: 200,
-  },
-  exportingText: {
-    fontSize: 16,
-    fontWeight: "600",
   },
 });
 

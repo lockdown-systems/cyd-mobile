@@ -32,6 +32,14 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run canonical Bluesky archive contract tests
+        run: npm run test:archive-contract
+
+      - name: Check for a newer canonical Bluesky archive bundle
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/archive-contract/check_latest.py
+
   build_ios:
     name: Build iOS
     runs-on: macos-26

@@ -321,18 +321,6 @@ jest.mock("react-native-svg", () => ({
   Stop: "Stop",
 }));
 
-// Mock expo-sharing
-jest.mock("expo-sharing", () => ({
-  isAvailableAsync: jest.fn(() => Promise.resolve(true)),
-  shareAsync: jest.fn(() => Promise.resolve()),
-}));
-
-// Mock react-native-zip-archive
-jest.mock("react-native-zip-archive", () => ({
-  zip: jest.fn((source: string, target: string) => Promise.resolve(target)),
-  unzip: jest.fn((source: string, target: string) => Promise.resolve(target)),
-}));
-
 // Silence console warnings in tests
 global.console = {
   ...console,
