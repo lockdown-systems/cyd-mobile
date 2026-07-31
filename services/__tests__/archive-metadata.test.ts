@@ -22,6 +22,7 @@ describe("Cyd Bluesky archive metadata", () => {
     expect(
       classifyBlueskyArchiveMetadata({
         ...canonicalMetadata,
+        type: "bluesky",
         futureOptionalField: "ignored",
       }),
     ).toEqual({ supported: true, metadata: canonicalMetadata });
