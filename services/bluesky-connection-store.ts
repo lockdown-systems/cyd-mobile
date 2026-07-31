@@ -16,7 +16,7 @@ type GetBlueskyConnectionOptions = {
 function connectionKey(accountUUID: string): string {
   const normalizedUUID = accountUUID.trim();
   if (!normalizedUUID) {
-    throw new Error("Missing Bluesky local-account UUID");
+    throw new Error("Missing Bluesky local account UUID");
   }
   return `${CONNECTION_PREFIX}${normalizedUUID}`;
 }
@@ -68,12 +68,10 @@ export async function getBlueskyOAuthState(
 }
 
 export async function deleteBlueskyOAuthState(state: string): Promise<void> {
-  const key = oauthStateKey(state);
-  await SecureStore.setItemAsync(key, DISCONNECTED, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED,
-  });
-  await AsyncStorage.removeItem(`${LEGACY_STATE_PREFIX}${state}`);
-  await SecureStore.deleteItemAsync(key);
+  await deleteProtectedValue(
+    oauthStateKey(state),
+    `${LEGACY_STATE_PREFIX}${state}`,
+  );
 }
 
 export async function setBlueskyConnection(
@@ -91,12 +89,21 @@ export async function deleteBlueskyConnection(
   accountUUID: string,
   legacyDid?: string,
 ): Promise<void> {
-  const key = connectionKey(accountUUID);
+  await deleteProtectedValue(
+    connectionKey(accountUUID),
+    legacyDid ? legacySessionKey(legacyDid) : undefined,
+  );
+}
+
+async function deleteProtectedValue(
+  key: string,
+  legacyKey?: string,
+): Promise<void> {
   await SecureStore.setItemAsync(key, DISCONNECTED, {
     keychainAccessible: SecureStore.WHEN_UNLOCKED,
   });
-  if (legacyDid) {
-    await AsyncStorage.removeItem(legacySessionKey(legacyDid));
+  if (legacyKey) {
+    await AsyncStorage.removeItem(legacyKey);
   }
   await SecureStore.deleteItemAsync(key);
 }

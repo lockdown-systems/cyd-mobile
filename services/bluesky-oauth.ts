@@ -189,7 +189,7 @@ export async function revokeBlueskyAuthorization(
   );
 
   if (!accountRow) {
-    throw new Error("Unable to locate this Bluesky account");
+    throw new Error("Unable to locate this Bluesky local account");
   }
 
   await deleteBlueskyConnection(
