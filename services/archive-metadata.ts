@@ -55,15 +55,14 @@ export function classifyBlueskyArchiveMetadata(
 
   const metadata = value as Record<string, unknown>;
 
-  if (isPrototypeMetadata(metadata)) {
-    return {
-      supported: false,
-      reason: "legacy",
-      error: "Unsupported legacy Bluesky archive format.",
-    };
-  }
-
   if (metadata.format !== "cyd-archive") {
+    if (isPrototypeMetadata(metadata)) {
+      return {
+        supported: false,
+        reason: "legacy",
+        error: "Unsupported legacy Bluesky archive format.",
+      };
+    }
     return invalid("the format discriminator is missing or invalid.");
   }
 
