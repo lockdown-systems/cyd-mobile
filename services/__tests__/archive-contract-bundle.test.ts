@@ -27,6 +27,7 @@ function readExpectations(root: string) {
       string,
       { assets: Record<string, unknown>[]; completeness: string }
     >;
+    desktopBlueskyVersionBehavior: Record<string, string>;
   };
 }
 
@@ -59,12 +60,20 @@ contractDescribe("pinned canonical Cyd Bluesky archive bundle", () => {
   );
 
   it("matches the canonical version rejection outcomes", () => {
+    const expectations = readExpectations(root);
     const input = JSON.parse(
       fs.readFileSync(
         path.join(root, "mobile-input", "complete.cyd.json"),
         "utf8",
       ),
     ) as ContractInput;
+
+    expect(expectations.desktopBlueskyVersionBehavior).toMatchObject({
+      unversionedV1: "reject_unsupported_legacy_format",
+      blueskyV2Import: "accept",
+      otherPlatform: "reject_unsupported_archive_platform",
+      newerVersion: "reject_unsupported_newer_version",
+    });
 
     expect(
       classifyBlueskyArchiveMetadata({ ...input.metadata, version: 3 }),
