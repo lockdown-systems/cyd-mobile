@@ -21,6 +21,8 @@ FILES = (
     "fixtures/complete.cyd",
     "fixtures/incomplete.cyd",
     "fixtures/semantic-expectations.json",
+    # Mobile's writer embeds this file; the test compares the two.
+    "schema.sql",
 )
 
 

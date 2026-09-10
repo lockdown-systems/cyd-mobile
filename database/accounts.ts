@@ -2,6 +2,11 @@ import type { AppBskyActorDefs } from "@atproto/api";
 import type { OAuthSession } from "@atproto/oauth-client";
 import type { SQLiteDatabase } from "expo-sqlite";
 
+import {
+  portableSettingsFromAccountRow,
+  type BlueskyAccountSettingsRow,
+  type PortableSettings,
+} from "@/services/archive-export";
 import { deleteBlueskyConnection } from "@/services/bluesky-connection-store";
 
 import { getDatabase } from "./index";
@@ -417,4 +422,29 @@ export async function getAccountHandle(
     [accountId]
   );
   return row?.handle ?? null;
+}
+
+/**
+ * Read the save and delete defaults a Cyd Bluesky archive may carry.
+ *
+ * Deliberately narrow: this row also holds schedules and identity, and a Cyd
+ * Bluesky archive carries neither. Only the booleans
+ * {@link portableSettingsFromAccountRow} recognizes leave this function.
+ */
+export async function getPortableBlueskySettings(
+  accountId: number
+): Promise<PortableSettings> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<BlueskyAccountSettingsRow>(
+    `SELECT b.settingSavePosts, b.settingSaveLikes, b.settingSaveBookmarks,
+            b.settingSaveChats, b.settingDeletePosts, b.settingDeleteReposts,
+            b.settingDeleteLikes, b.settingDeleteBookmarks, b.settingDeleteChats,
+            b.settingDeleteUnfollowEveryone
+     FROM account a
+     INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+     WHERE a.id = ?
+     LIMIT 1;`,
+    [accountId]
+  );
+  return portableSettingsFromAccountRow(row);
 }
