@@ -18,6 +18,7 @@
     "database/**/*.ts",
     "hooks/**/*.ts",
     "hooks/**/*.tsx",
+    "scripts/**/*.ts",
     "services/**/*.ts",
     "testUtils/**/*.ts",
     "testUtils/**/*.tsx",

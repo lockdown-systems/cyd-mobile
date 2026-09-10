@@ -29,8 +29,14 @@ KNOWN_GAPS = (
     ("captured historical profiles", "profile is UNIQUE(did), updated in place"),
     ("records.first_observed_at vs observed_at", "one savedAt column"),
     ("records.indexed_at", "not stored"),
-    ("assets kind preview / thumbnail", "media_asset is image|video only"),
+    ("assets kind thumbnail", "a video's own thumbnail is a URL, never preserved"),
     ("record_assets owner profile / message", "written only from post persistence"),
+    ("created_at of a like or repost", "no creation time stored, so it is the observation time"),
+    ("record_subjects for bookmarks", "no bookmark record URI, so the selection names the post"),
+    ("deletion state of a removed bookmark", "no bookmark record to carry it"),
+    ("deletion state of a like whose URI Cyd never saw", "no like record to carry it"),
+    ("context for records Cyd never saved", "author DID only; the URI stays in payload_json"),
+    ("portable_settings.save_reposts", "reposts are saved with posts, with no separate switch"),
 )
 
 
@@ -66,7 +72,9 @@ def main() -> int:
     print("Selected-record coverage")
     counts = {
         "posts": "SELECT COUNT(*) FROM post WHERE isRepost = 0",
-        "reposts": "SELECT COUNT(*) FROM post WHERE isRepost = 1",
+        # Matches what the writer exports: a repost record of its own, or a
+        # post the account reposted.
+        "reposts": "SELECT COUNT(*) FROM post WHERE isRepost = 1 OR viewerReposted = 1",
         "likes": "SELECT COUNT(*) FROM post WHERE viewerLiked = 1",
         "bookmarks": "SELECT COUNT(*) FROM bookmark",
         "chats": "SELECT COUNT(*) FROM conversation",
@@ -117,21 +125,28 @@ def main() -> int:
     for missing in {"image", "video"} - present:
         problems.append(f"no preserved {missing} — the fixture will not exercise {missing} payloads")
 
-    media_bytes = scalar(
-        database,
-        "SELECT COALESCE(SUM(byteLength), 0) FROM media_asset WHERE downloadState = 'complete'",
-    )
-    projected = media_bytes + arguments.database.stat().st_size
-    print(f"\nProjected fixture size (uncompressed): {human(projected)}")
-    if projected > SIZE_BUDGET_BYTES:
+    # Media is stored uncompressed in the archive and dominates its size, while
+    # data.db deflates to a few KiB. `media_asset.byteLength` is often NULL, so
+    # the files themselves are the reliable measure.
+    media_dir = arguments.media_dir or arguments.database.parent / "media"
+    if media_dir.is_dir():
+        media_bytes = sum(f.stat().st_size for f in media_dir.rglob("*") if f.is_file())
+        source = str(media_dir)
+    else:
+        media_bytes = scalar(
+            database,
+            "SELECT COALESCE(SUM(byteLength), 0) FROM media_asset "
+            "WHERE downloadState = 'complete'",
+        )
+        source = "media_asset.byteLength (no media directory alongside the database)"
+
+    print(f"\nProjected fixture size: {human(media_bytes)} of media, plus a compressed data.db")
+    print(f"  measured from {source}")
+    if media_bytes > SIZE_BUDGET_BYTES:
         problems.append(
-            f"projected fixture is {human(projected)}, over the {human(SIZE_BUDGET_BYTES)} budget — "
+            f"projected fixture is {human(media_bytes)}, over the {human(SIZE_BUDGET_BYTES)} budget — "
             "curate the account further before exporting"
         )
-
-    if arguments.media_dir:
-        on_disk = sum(f.stat().st_size for f in arguments.media_dir.rglob("*") if f.is_file())
-        print(f"Media directory on disk:              {human(on_disk)}")
 
     print("\nInterchange groups Mobile cannot populate (expected to be empty)")
     for group, reason in KNOWN_GAPS:

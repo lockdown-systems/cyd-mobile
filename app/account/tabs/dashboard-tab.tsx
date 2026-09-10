@@ -9,6 +9,7 @@ import {
   type ImageSourcePropType,
 } from "react-native";
 
+import { DevArchiveExportCard } from "@/app/account/components/DevArchiveExportCard";
 import iconBrowse from "@/assets/images/icon-browse.png";
 import iconDelete from "@/assets/images/icon-delete.png";
 import iconSave from "@/assets/images/icon-save.png";
@@ -61,6 +62,7 @@ const TABLET_CARD_MIN_HEIGHT = 240;
 
 export function DashboardTab({
   accountId,
+  accountUUID,
   handle,
   palette,
   onSelectTab,
@@ -182,6 +184,11 @@ export function DashboardTab({
             );
           })}
         </View>
+        <DevArchiveExportCard
+          accountId={accountId}
+          accountUUID={accountUUID}
+          palette={palette}
+        />
       </View>
     </View>
   );

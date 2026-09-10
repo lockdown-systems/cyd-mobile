@@ -14,6 +14,13 @@ import {
     blueskyAccountMigrations,
 } from "@/database/account-db";
 import type { AccountDeleteSettings } from "@/database/delete-settings";
+import {
+  createBlueskyArchiveExportEnvironment,
+  runBlueskyArchiveExport,
+  type BlueskyArchiveExportProgress,
+  type BlueskyArchiveExportResult,
+  type PortableSettings,
+} from "@/services/archive-export";
 import { restoreBlueskyOAuthSession } from "@/services/bluesky-oauth";
 import {
     BaseAccountController,
@@ -1716,6 +1723,86 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
 
     const downloaded = await File.downloadFileAsync(url, targetFile);
     return downloaded.uri;
+  }
+
+  // ==================== Cyd Bluesky Archive Export ====================
+
+  /**
+   * Write this account's Bluesky saved data out as a Cyd Bluesky archive.
+   *
+   * Needs no Bluesky connection: export reads only what Cyd already has, so it
+   * works while disconnected, offline, and without premium (ADR 0015).
+   *
+   * Building this is not the same as offering it: until #100 proves version 2
+   * conformance in both directions, the only thing that calls this is a
+   * development-only affordance (ADR 0004).
+   */
+  async exportBlueskyArchive(options: {
+    exportId: string;
+    portableSettings: PortableSettings;
+    onProgress?: (progress: BlueskyArchiveExportProgress) => void;
+  }): Promise<BlueskyArchiveExportResult> {
+    const identity = await this.resolveExportIdentity();
+    const accountDatabase = this.requireDb();
+
+    // Only undo the pause this export caused. Somebody who paused their own
+    // save job before exporting should still be paused afterwards.
+    let pausedForExport = false;
+
+    const environment = createBlueskyArchiveExportEnvironment({
+      accountDatabase,
+      pauseAccountWork: () => {
+        pausedForExport = !this.isPaused();
+        if (pausedForExport) {
+          this.pause();
+        }
+      },
+      resumeAccountWork: () => {
+        if (pausedForExport) {
+          this.resume();
+          pausedForExport = false;
+        }
+      },
+    });
+
+    return runBlueskyArchiveExport(environment, {
+      exportId: options.exportId,
+      accountUuid: this.getAccountUUID(),
+      accountDid: identity.did,
+      accountHandle: identity.handle,
+      portableSettings: options.portableSettings,
+      onProgress: options.onProgress,
+    });
+  }
+
+  /**
+   * The identity an archive names, read without needing an agent.
+   */
+  private async resolveExportIdentity(): Promise<{
+    did: string;
+    handle: string | null;
+  }> {
+    if (this.did) {
+      return { did: this.did, handle: this.handle };
+    }
+
+    const mainDb = await getDatabase();
+    const row = await mainDb.getFirstAsync<{
+      did: string | null;
+      handle: string | null;
+    }>(
+      `SELECT b.did, b.handle
+       FROM account a
+       INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+       WHERE a.id = ?;`,
+      [this.accountId],
+    );
+    if (!row?.did) {
+      throw new Error(
+        "This account has no Bluesky DID yet, so Cyd cannot name it in an archive.",
+      );
+    }
+    return { did: row.did, handle: row.handle };
   }
 
   async deleteAccountStorage(): Promise<void> {

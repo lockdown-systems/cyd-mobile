@@ -6,6 +6,7 @@ import {
   createTestBlueskyArchiveIntakeEnvironment,
 } from "@/testUtils/archiveFixtures";
 
+import { BLUESKY_ARCHIVE_V2_SCHEMA_SQL } from "../archive-export";
 import { classifyBlueskyArchiveMetadata } from "../archive-metadata";
 import {
   runBlueskyArchiveIntake,
@@ -104,6 +105,16 @@ contractDescribe("pinned canonical Cyd Bluesky archive bundle", () => {
       }
     },
   );
+
+  it("writes the pinned interchange schema, character for character", () => {
+    // Mobile's writer carries its own copy of schema.sql, because a phone
+    // cannot fetch the contract mid-export. A copy nobody compares is a fork,
+    // so this is the comparison: if cyd changes the schema, the pin bump has
+    // to bring the new text with it.
+    expect(BLUESKY_ARCHIVE_V2_SCHEMA_SQL).toBe(
+      fs.readFileSync(path.join(root, "schema.sql"), "utf8"),
+    );
+  });
 
   it("matches the canonical version rejection outcomes", () => {
     const expectations = readExpectations(root);

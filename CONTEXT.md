@@ -36,6 +36,10 @@ _Avoid_: archive import, replace, synchronize
 The first half of a Bluesky archive import: reading a Cyd Bluesky archive off the device into verified, isolated staging, with no effect on any Bluesky local account. Intake ends *prepared*; the merge that follows is the rest of the import.
 _Avoid_: intake, extraction, unpacking, archive validation
 
+**Cyd Bluesky archive export**:
+Writing one Bluesky local account's Bluesky saved data out as a Cyd Bluesky archive, from a point-in-time snapshot taken while account-mutating work is briefly paused. It is the mirror of Bluesky archive intake and reads only what Cyd already holds, so it needs no Bluesky connection.
+_Avoid_: export, backup, archive export
+
 **Bluesky account settings**:
 Local preferences governing how Cyd saves and manages a Bluesky identity. A Cyd Bluesky archive can supply defaults for a new Bluesky local account, but does not silently override an existing Bluesky local account's preferences or schedules.
 _Avoid_: account settings, account data, archive state
