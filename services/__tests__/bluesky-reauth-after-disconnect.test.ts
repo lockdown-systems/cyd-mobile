@@ -83,6 +83,9 @@ const account: AccountListItem = {
   did: ACCOUNT_DID,
 };
 
+/** Set once Bluesky itself has invalidated the session, outside of Cyd. */
+let bskyHasRevokedSession = false;
+
 /**
  * Stands in for the real controller, modelling the one property that caused
  * the bug: the agent is bound to whichever Bluesky connection was stored when
@@ -108,6 +111,12 @@ class MockBlueskyAccountController {
       missing.name = "MissingBlueskySessionError";
       throw missing;
     }
+    if (bskyHasRevokedSession) {
+      // atproto cannot refresh a revoked session, and drops the store entry
+      // on its way out. The message is whatever the server sent back.
+      await deleteBlueskyConnection(ACCOUNT_UUID, ACCOUNT_DID);
+      throw new Error("The session was revoked");
+    }
     this.agentConnection = connection;
   }
 
@@ -124,7 +133,7 @@ class MockBlueskyAccountController {
       accountUUID: ACCOUNT_UUID,
       legacyDid: ACCOUNT_DID,
     });
-    if (stored !== this.agentConnection) {
+    if (bskyHasRevokedSession || stored !== this.agentConnection) {
       // What @atproto/oauth-client does when a session it holds turns out to
       // be unusable: it deletes the store entry for that DID. The entry is
       // keyed by account, so it takes any newer connection down with it.
@@ -143,6 +152,11 @@ class MockBlueskyAccountController {
   }
 }
 
+/** Bluesky invalidates the session; nothing in Cyd is told. */
+function revokeSessionOnBluesky(): void {
+  bskyHasRevokedSession = true;
+}
+
 /** The store side of completing an OAuth authorization. */
 async function completeAuthorization(connection: string): Promise<void> {
   await setBlueskyConnection(ACCOUNT_UUID, connection);
@@ -159,6 +173,7 @@ describe("reauthenticating on a warm controller", () => {
     await disposeAllBlueskyControllersForTests();
     mockLegacyValues.clear();
     mockProtectedValues.clear();
+    bskyHasRevokedSession = false;
     jest.clearAllMocks();
     jest.spyOn(console, "log").mockImplementation(() => undefined);
   });
@@ -217,5 +232,21 @@ describe("reauthenticating on a warm controller", () => {
     expect(await getBlueskyConnection({ accountUUID: ACCOUNT_UUID })).toBe(
       "connection-2",
     );
+  });
+
+  it("reports signed out once Bluesky has revoked the session", async () => {
+    await completeAuthorization("connection-1");
+    await verifyAfterAuthorization();
+
+    // Nothing in Cyd knows until the cached agent is used, and the failed
+    // refresh takes the stored connection with it.
+    revokeSessionOnBluesky();
+    const status = await withBlueskyController(
+      account.id,
+      account.uuid,
+      (controller) => verifyBlueskyAccountAuthStatus(controller, account),
+    );
+
+    expect(status).toBe(ACCOUNT_AUTH_STATUS.signedOut);
   });
 });

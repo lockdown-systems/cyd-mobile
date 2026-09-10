@@ -1,3 +1,7 @@
+jest.mock("@/services/bluesky-connection-store", () => ({
+  getBlueskyConnection: jest.fn(async () => "stored-connection"),
+}));
+
 import type { AppBskyActorDefs } from "@atproto/api";
 
 import type { BlueskyAccountController } from "@/controllers/BlueskyAccountController";
@@ -7,6 +11,7 @@ import {
   type AccountAuthStatusValue,
 } from "@/controllers/config";
 import type { AccountListItem } from "@/database/accounts";
+import { getBlueskyConnection } from "@/services/bluesky-connection-store";
 
 import { verifyBlueskyAccountAuthStatus } from "../bluesky-account-auth-status";
 
@@ -66,6 +71,7 @@ function verify(
 
 describe("verifyBlueskyAccountAuthStatus", () => {
   beforeEach(() => {
+    jest.mocked(getBlueskyConnection).mockResolvedValue("stored-connection");
     jest.spyOn(console, "log").mockImplementation(() => undefined);
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
   });
@@ -176,5 +182,66 @@ describe("verifyBlueskyAccountAuthStatus", () => {
       ACCOUNT_CONFIG_KEYS.authStatus,
       ACCOUNT_AUTH_STATUS.signedOut,
     );
+  });
+
+  // Regression: Bluesky can revoke a session with no disconnect in Cyd. The
+  // failed refresh takes the stored connection with it, but the error that
+  // surfaces says only "Session expired", which matches nothing — so the
+  // account went on reading as authenticated until something forced a check.
+  it("signs out when the failed check left no stored connection", async () => {
+    jest.mocked(getBlueskyConnection).mockResolvedValue(null);
+    const controller = createController({
+      getProfile: jest.fn(async () => {
+        throw new Error("Session expired and no callback provided");
+      }),
+    });
+
+    const status = await verify(controller);
+
+    expect(status).toBe(ACCOUNT_AUTH_STATUS.signedOut);
+    expect(controller.setConfig).toHaveBeenCalledWith(
+      ACCOUNT_CONFIG_KEYS.authStatus,
+      ACCOUNT_AUTH_STATUS.signedOut,
+    );
+  });
+
+  it("signs out when the connection cannot be refreshed on init", async () => {
+    jest.mocked(getBlueskyConnection).mockResolvedValue(null);
+    const controller = createController({
+      isAgentReady: jest.fn(() => false),
+      initAgent: jest.fn(async () => {
+        // atproto's TokenRefreshError: the message can be whatever the
+        // authorization server sent back.
+        throw new Error("The session was revoked");
+      }),
+    });
+
+    expect(await verify(controller)).toBe(ACCOUNT_AUTH_STATUS.signedOut);
+  });
+
+  it("keeps the stored status when the connection outlives a failed check", async () => {
+    const controller = createController({
+      getProfile: jest.fn(async () => {
+        throw new Error("Network request failed");
+      }),
+    });
+
+    const status = await verify(controller);
+
+    expect(getBlueskyConnection).toHaveBeenCalled();
+    expect(status).toBe(ACCOUNT_AUTH_STATUS.authenticated);
+  });
+
+  it("keeps the stored status when the connection cannot be read", async () => {
+    jest
+      .mocked(getBlueskyConnection)
+      .mockRejectedValue(new Error("SecureStore unavailable"));
+    const controller = createController({
+      getProfile: jest.fn(async () => {
+        throw new Error("Network request failed");
+      }),
+    });
+
+    expect(await verify(controller)).toBe(ACCOUNT_AUTH_STATUS.authenticated);
   });
 });
