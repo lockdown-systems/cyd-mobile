@@ -10,6 +10,31 @@ function directoryUri(
   return directory.uri.endsWith("/") ? directory.uri : `${directory.uri}/`;
 }
 
+function getDocumentRoot(): string {
+  return directoryUri(Paths.document, "document storage");
+}
+
 export function getBackupEligibleDataRoot(): string {
-  return directoryUri(Paths.document, "backup-eligible document storage");
+  return getDocumentRoot();
+}
+
+/**
+ * Directory holding in-progress Bluesky archive import staging.
+ *
+ * Mirrors `ARCHIVE_STAGING_PATH` in plugins/android-backup-rules.js, which
+ * keeps this path out of every Android backup path.
+ */
+export const ARCHIVE_STAGING_DIRECTORY = "archive-intake";
+
+/**
+ * Where an import unpacks an archive while it works.
+ *
+ * This is durable storage rather than the cache, because an import that the
+ * system interrupts has to be resumable on the next launch (ADR 0006) and the
+ * cache can be evicted underneath it. It is excluded from device backup
+ * instead: staging is half-unpacked working state, not committed account data
+ * (ADR 0014).
+ */
+export function getArchiveStagingRoot(): string {
+  return `${getDocumentRoot()}${ARCHIVE_STAGING_DIRECTORY}/`;
 }
