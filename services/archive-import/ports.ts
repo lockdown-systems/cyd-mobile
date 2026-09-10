@@ -9,7 +9,7 @@
  */
 
 /** Random-access reads over the archive the person picked. */
-export type ArchiveByteReader = {
+export type BlueskyArchiveByteReader = {
   readonly byteLength: number;
   read(offset: number, length: number): Promise<Uint8Array>;
   close(): void;
@@ -42,7 +42,7 @@ export type StagedFileWriter = {
  * Paths are staging-relative and are rejected if they would escape the root,
  * so no archive entry can reach a live Bluesky local account.
  */
-export type ArchiveStagingArea = {
+export type BlueskyArchiveStagingArea = {
   readonly root: string;
   createFile(relativePath: string): StagedFileWriter;
   fileExists(relativePath: string): boolean;
@@ -53,9 +53,9 @@ export type ArchiveStagingArea = {
   destroy(): void;
 };
 
-export type ArchiveIntakeEnvironment = {
+export type BlueskyArchiveIntakeEnvironment = {
   /** Open (creating if needed) the staging area for one import. */
-  openStaging(intakeId: string): ArchiveStagingArea;
+  openStaging(intakeId: string): BlueskyArchiveStagingArea;
   /** Staging areas left behind by earlier runs, resumable or not. */
   listStagingIds(): string[];
   /** Free space on the volume holding staging, in bytes. */

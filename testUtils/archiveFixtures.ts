@@ -12,11 +12,11 @@ import crypto from "crypto";
 import zlib from "zlib";
 
 import { crc32 } from "@/services/archive-import/crc32";
-import { ArchiveIntakeError } from "@/services/archive-import/errors";
+import { checkZipEntryPath } from "@/services/archive-import/entry-paths";
 import type {
-  ArchiveByteReader,
-  ArchiveIntakeEnvironment,
-  ArchiveStagingArea,
+  BlueskyArchiveByteReader,
+  BlueskyArchiveIntakeEnvironment,
+  BlueskyArchiveStagingArea,
   CreateHasher,
   Hasher,
   StagedFileWriter,
@@ -251,7 +251,7 @@ export type MemoryByteReaderOptions = {
 export function createMemoryByteReader(
   bytes: Uint8Array,
   options: MemoryByteReaderOptions = {},
-): ArchiveByteReader & { readCount: number; closed: boolean } {
+): BlueskyArchiveByteReader & { readCount: number; closed: boolean } {
   const reader = {
     byteLength: bytes.length,
     readCount: 0,
@@ -270,7 +270,7 @@ export function createMemoryByteReader(
   return reader;
 }
 
-export class MemoryStagingArea implements ArchiveStagingArea {
+export class MemoryStagingArea implements BlueskyArchiveStagingArea {
   readonly root: string;
   readonly files = new Map<string, Uint8Array>();
   /** Staging-relative paths whose writes should fail, standing in for a crash. */
@@ -281,15 +281,15 @@ export class MemoryStagingArea implements ArchiveStagingArea {
     this.root = `memory://staging/${intakeId}/`;
   }
 
+  /**
+   * Fails loudly rather than as a rejection: a harness that reached outside its
+   * own staging area is a bug in the test, not an archive Cyd should refuse.
+   */
   private assertRelative(relativePath: string): void {
-    if (
-      relativePath.length === 0 ||
-      relativePath.startsWith("/") ||
-      relativePath.split("/").some((segment) => segment === ".." || segment === "")
-    ) {
-      throw new ArchiveIntakeError(
-        "unsafe-entry-path",
-        `Refusing to touch ${relativePath} outside the staging area.`,
+    const check = checkZipEntryPath(relativePath);
+    if (!check.ok || check.isDirectory) {
+      throw new Error(
+        `Test staging area asked to touch ${relativePath}, which is not a file inside it.`,
       );
     }
   }
@@ -343,8 +343,8 @@ export class MemoryStagingArea implements ArchiveStagingArea {
   }
 }
 
-export type TestIntakeEnvironment = Omit<
-  ArchiveIntakeEnvironment,
+export type TestBlueskyArchiveIntakeEnvironment = Omit<
+  BlueskyArchiveIntakeEnvironment,
   "openStaging"
 > & {
   openStaging(intakeId: string): MemoryStagingArea;
@@ -352,15 +352,17 @@ export type TestIntakeEnvironment = Omit<
   availableStorage: number;
 };
 
-export function createTestIntakeEnvironment(
+export function createTestBlueskyArchiveIntakeEnvironment(
   options: { availableStorageBytes?: number } = {},
-): TestIntakeEnvironment {
+): TestBlueskyArchiveIntakeEnvironment {
   const stagingAreas = new Map<string, MemoryStagingArea>();
+  // Required lazily so that a test file mocking expo-file-system does not have
+  // to care about the module graph behind the decompressor.
   const { createInflateDecompressor } =
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     require("@/services/archive-import/inflate") as typeof import("@/services/archive-import/inflate");
 
-  const environment: TestIntakeEnvironment = {
+  const environment: TestBlueskyArchiveIntakeEnvironment = {
     stagingAreas,
     availableStorage: options.availableStorageBytes ?? 8 * 1024 * 1024 * 1024,
     openStaging(intakeId: string): MemoryStagingArea {

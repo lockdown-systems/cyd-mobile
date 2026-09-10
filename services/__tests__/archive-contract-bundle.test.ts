@@ -3,7 +3,7 @@ import path from "path";
 
 import {
   createMemoryByteReader,
-  createTestIntakeEnvironment,
+  createTestBlueskyArchiveIntakeEnvironment,
 } from "@/testUtils/archiveFixtures";
 
 import { classifyBlueskyArchiveMetadata } from "../archive-metadata";
@@ -75,7 +75,7 @@ contractDescribe("pinned canonical Cyd Bluesky archive bundle", () => {
       const archive = new Uint8Array(
         fs.readFileSync(path.join(root, "fixtures", fixtureName)),
       );
-      const environment = createTestIntakeEnvironment();
+      const environment = createTestBlueskyArchiveIntakeEnvironment();
 
       const outcome = await runBlueskyArchiveIntake(environment, {
         intakeId: `contract-${fixtureName}`,

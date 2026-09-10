@@ -7,31 +7,31 @@
  * is a separate step, so nothing here can change a live account.
  */
 
-export { ArchiveIntakeError, isArchiveIntakeError } from "./errors";
-export type { ArchiveIntakeErrorCode } from "./errors";
+export { BlueskyArchiveIntakeError } from "./errors";
+export type { BlueskyArchiveIntakeErrorCode } from "./errors";
 export {
-  createArchiveIntakeEnvironment,
-  openArchiveByteReader,
+  createBlueskyArchiveIntakeEnvironment,
+  openBlueskyArchiveByteReader,
 } from "./environment";
 export {
   cancelBlueskyArchiveIntake,
   listResumableBlueskyArchiveIntakes,
   runBlueskyArchiveIntake,
   stagedPayloadPath,
-  DEFAULT_ARCHIVE_INTAKE_LIMITS,
 } from "./intake";
 export type {
-  ArchiveIntakePhase,
-  ArchiveIntakeProgress,
+  BlueskyArchiveIntakePhase,
+  BlueskyArchiveIntakeProgress,
   BlueskyArchiveIntakeOutcome,
   PreparedBlueskyArchive,
-  ResumableArchiveIntake,
-  RunArchiveIntakeOptions,
+  ResumableBlueskyArchiveIntake,
+  RunBlueskyArchiveIntakeOptions,
 } from "./intake";
-export type { ArchiveIntakeLimits } from "./limits";
-export type { ArchiveManifestPayload } from "./manifest";
+export { DEFAULT_BLUESKY_ARCHIVE_INTAKE_LIMITS } from "./limits";
+export type { BlueskyArchiveIntakeLimits } from "./limits";
+export type { BlueskyArchiveManifestPayload } from "./manifest";
 export type {
-  ArchiveByteReader,
-  ArchiveIntakeEnvironment,
-  ArchiveStagingArea,
+  BlueskyArchiveByteReader,
+  BlueskyArchiveIntakeEnvironment,
+  BlueskyArchiveStagingArea,
 } from "./ports";

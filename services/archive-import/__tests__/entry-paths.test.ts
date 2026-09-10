@@ -1,11 +1,11 @@
 import {
   MAX_ENTRY_PATH_LENGTH,
-  checkArchiveEntryPath,
-  decodeArchiveEntryName,
+  checkZipEntryPath,
+  decodeZipEntryName,
 } from "../entry-paths";
 
 function reasonFor(name: string): string {
-  const check = checkArchiveEntryPath(name);
+  const check = checkZipEntryPath(name);
   if (check.ok) {
     throw new Error(`Expected ${JSON.stringify(name)} to be rejected`);
   }
@@ -20,7 +20,7 @@ describe("archive entry paths", () => {
       "data.db",
       "media/sha256/6c/6c55d7bbccd73bb135e8e7c7161b4be3cef97142313f2fba304e73b3329ecc3d",
     ]) {
-      expect(checkArchiveEntryPath(name)).toEqual({
+      expect(checkZipEntryPath(name)).toEqual({
         ok: true,
         path: name,
         isDirectory: false,
@@ -29,7 +29,7 @@ describe("archive entry paths", () => {
   });
 
   it("reports directory entries separately from the files they contain", () => {
-    expect(checkArchiveEntryPath("media/sha256/")).toEqual({
+    expect(checkZipEntryPath("media/sha256/")).toEqual({
       ok: true,
       path: "media/sha256",
       isDirectory: true,
@@ -76,9 +76,9 @@ describe("archive entry paths", () => {
   });
 
   it("decodes entry names as strict UTF-8", () => {
-    expect(decodeArchiveEntryName(new TextEncoder().encode("média.json"))).toBe(
+    expect(decodeZipEntryName(new TextEncoder().encode("média.json"))).toBe(
       "média.json",
     );
-    expect(decodeArchiveEntryName(new Uint8Array([0xff, 0xfe, 0x41]))).toBeNull();
+    expect(decodeZipEntryName(new Uint8Array([0xff, 0xfe, 0x41]))).toBeNull();
   });
 });
