@@ -73,7 +73,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       "expo-router",
       "expo-iap",
-      ["expo-secure-store", { configureAndroidBackup: true }],
+      // Backup rules come from ./plugins/android-backup-rules instead: the
+      // rules bundled with expo-secure-store would drop the app's databases
+      // and archives from every backup.
+      ["expo-secure-store", { configureAndroidBackup: false }],
       [
         "expo-build-properties",
         {
@@ -118,6 +121,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "expo-sqlite",
       "expo-web-browser",
       "./plugins/remove-android-permissions",
+      "./plugins/android-backup-rules",
     ],
     experiments: {
       typedRoutes: true,
