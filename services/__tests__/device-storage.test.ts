@@ -4,6 +4,7 @@ import {
   getBackupEligibleDataRoot,
 } from "../device-storage";
 
+// The config plugin is CommonJS, so it has no ES module entry point to import.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const backupRules = require("@/plugins/android-backup-rules") as {
   ARCHIVE_STAGING_PATH: string;

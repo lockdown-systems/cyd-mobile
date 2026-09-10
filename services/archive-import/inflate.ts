@@ -1,6 +1,6 @@
 import { Inflate } from "fflate";
 
-import { ArchiveIntakeError } from "./errors";
+import { BlueskyArchiveIntakeError } from "./errors";
 import type { CreateDecompressor, Decompressor } from "./ports";
 
 /**
@@ -39,7 +39,7 @@ export const createInflateDecompressor: CreateDecompressor = (
         if (!isFlateError(error)) {
           throw error;
         }
-        throw new ArchiveIntakeError(
+        throw new BlueskyArchiveIntakeError(
           "corrupt-archive",
           `The archive contains compressed data that could not be read: ${error.message}`,
         );

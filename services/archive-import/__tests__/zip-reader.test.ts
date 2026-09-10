@@ -7,7 +7,7 @@ import {
 } from "@/testUtils/archiveFixtures";
 
 import { crc32 } from "../crc32";
-import { ArchiveIntakeError } from "../errors";
+import { BlueskyArchiveIntakeError } from "../errors";
 import { createInflateDecompressor } from "../inflate";
 import { readZipCentralDirectory, streamZipEntry } from "../zip-reader";
 
@@ -23,13 +23,13 @@ function readDirectory(entries: ZipEntryInput[], options?: { entryCount?: number
 async function expectRejection(
   promise: Promise<unknown>,
   code: string,
-): Promise<ArchiveIntakeError> {
+): Promise<BlueskyArchiveIntakeError> {
   try {
     await promise;
   } catch (error) {
-    expect(error).toBeInstanceOf(ArchiveIntakeError);
-    expect((error as ArchiveIntakeError).code).toBe(code);
-    return error as ArchiveIntakeError;
+    expect(error).toBeInstanceOf(BlueskyArchiveIntakeError);
+    expect((error as BlueskyArchiveIntakeError).code).toBe(code);
+    return error as BlueskyArchiveIntakeError;
   }
   throw new Error(`Expected the archive to be rejected with ${code}`);
 }
@@ -69,13 +69,12 @@ describe("reading the central directory", () => {
     expect(commented.entries).toHaveLength(1);
   });
 
-  it("reports directory entries without offering them as files", async () => {
+  it("does not offer directory entries as files to unpack", async () => {
     const directory = await readDirectory([
       { name: "media/", data: "" },
       { name: "media/blob", data: "hello" },
     ]);
 
-    expect(directory.directoryEntryCount).toBe(1);
     expect(directory.entries.map((entry) => entry.path)).toEqual(["media/blob"]);
   });
 

@@ -5,7 +5,7 @@
  * root, so the messages are written for the person holding the phone rather
  * than for a log file.
  */
-export type ArchiveIntakeErrorCode =
+export type BlueskyArchiveIntakeErrorCode =
   | "not-an-archive"
   | "unsupported-zip-feature"
   | "unsafe-entry-path"
@@ -25,19 +25,37 @@ export type ArchiveIntakeErrorCode =
   | "corrupt-archive";
 
 /**
- * An archive was rejected. Unlike an I/O failure, this is final: retrying the
- * same file cannot succeed, so the caller discards the staging area.
+ * An archive was rejected. Most of these are final -- retrying the same file
+ * cannot succeed, so the caller discards the staging area. See
+ * {@link isRetryableBlueskyArchiveIntakeFailure} for the exception.
  */
-export class ArchiveIntakeError extends Error {
-  readonly code: ArchiveIntakeErrorCode;
+export class BlueskyArchiveIntakeError extends Error {
+  readonly code: BlueskyArchiveIntakeErrorCode;
 
-  constructor(code: ArchiveIntakeErrorCode, message: string) {
+  constructor(code: BlueskyArchiveIntakeErrorCode, message: string) {
     super(message);
-    this.name = "ArchiveIntakeError";
+    this.name = "BlueskyArchiveIntakeError";
     this.code = code;
   }
 }
 
-export function isArchiveIntakeError(error: unknown): error is ArchiveIntakeError {
-  return error instanceof ArchiveIntakeError;
+/**
+ * Codes that describe the device rather than the archive.
+ *
+ * Retrying the same file after freeing space can succeed, so a failure like
+ * this must not take an import's staged progress down with it.
+ */
+export function isRetryableBlueskyArchiveIntakeFailure(code: BlueskyArchiveIntakeErrorCode): boolean {
+  return code === "insufficient-storage";
+}
+
+/**
+ * Raised when the person cancels part-way through, including mid-entry. It is
+ * not an error about the archive, so it never reports a rejection.
+ */
+export class BlueskyArchiveIntakeCancelled extends Error {
+  constructor() {
+    super("The archive import was cancelled");
+    this.name = "BlueskyArchiveIntakeCancelled";
+  }
 }

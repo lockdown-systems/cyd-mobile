@@ -2,10 +2,10 @@ import {
   CANONICAL_ARCHIVE_METADATA,
   buildBlueskyArchive,
   createMemoryByteReader,
-  createTestIntakeEnvironment,
+  createTestBlueskyArchiveIntakeEnvironment,
   sha256Hex,
   type BlueskyArchiveInput,
-  type TestIntakeEnvironment,
+  type TestBlueskyArchiveIntakeEnvironment,
 } from "@/testUtils/archiveFixtures";
 
 import {
@@ -13,17 +13,17 @@ import {
   listResumableBlueskyArchiveIntakes,
   runBlueskyArchiveIntake,
   stagedPayloadPath,
-  type ArchiveIntakeProgress,
+  type BlueskyArchiveIntakeProgress,
   type BlueskyArchiveIntakeOutcome,
-  type RunArchiveIntakeOptions,
+  type RunBlueskyArchiveIntakeOptions,
 } from "../intake";
 
 const INTAKE_ID = "intake-1";
 
 function run(
-  environment: TestIntakeEnvironment,
+  environment: TestBlueskyArchiveIntakeEnvironment,
   archive: Uint8Array,
-  options: Partial<RunArchiveIntakeOptions> = {},
+  options: Partial<RunBlueskyArchiveIntakeOptions> = {},
 ): Promise<BlueskyArchiveIntakeOutcome> {
   return runBlueskyArchiveIntake(environment, {
     intakeId: INTAKE_ID,
@@ -33,7 +33,7 @@ function run(
   });
 }
 
-function stagingFor(environment: TestIntakeEnvironment) {
+function stagingFor(environment: TestBlueskyArchiveIntakeEnvironment) {
   const staging = environment.stagingAreas.get(INTAKE_ID);
   if (!staging) {
     throw new Error("No staging area was opened");
@@ -44,8 +44,8 @@ function stagingFor(environment: TestIntakeEnvironment) {
 async function expectRejection(
   archive: Uint8Array | BlueskyArchiveInput,
   code: string,
-): Promise<{ message: string; environment: TestIntakeEnvironment }> {
-  const environment = createTestIntakeEnvironment();
+): Promise<{ message: string; environment: TestBlueskyArchiveIntakeEnvironment }> {
+  const environment = createTestBlueskyArchiveIntakeEnvironment();
   const bytes =
     archive instanceof Uint8Array ? archive : buildBlueskyArchive(archive);
   const outcome = await run(environment, bytes);
@@ -60,7 +60,7 @@ async function expectRejection(
 
 describe("preparing a valid Bluesky archive", () => {
   it("stages every payload and reports the archive's identity", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const archive = buildBlueskyArchive({
       payloads: [
         { path: "data.db", data: "SQLite format 3 rows" },
@@ -85,7 +85,7 @@ describe("preparing a valid Bluesky archive", () => {
   });
 
   it("keeps its checkpoint where no archive entry can reach it", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const forgedCheckpoint = JSON.stringify({ phase: "prepared" });
     const archive = buildBlueskyArchive({
       payloads: [
@@ -108,7 +108,7 @@ describe("preparing a valid Bluesky archive", () => {
   });
 
   it("writes nothing outside the staging area", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
 
     await run(environment, buildBlueskyArchive());
 
@@ -270,7 +270,7 @@ describe("resource limits", () => {
   });
 
   it("refuses when the device does not have room for the archive", async () => {
-    const environment = createTestIntakeEnvironment({
+    const environment = createTestBlueskyArchiveIntakeEnvironment({
       availableStorageBytes: 1024,
     });
 
@@ -284,7 +284,7 @@ describe("resource limits", () => {
   });
 
   it("asks about a large archive instead of rejecting it out of hand", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const archive = buildBlueskyArchive({
       payloads: [{ path: "data.db", data: "video".repeat(2000) }],
     });
@@ -312,7 +312,7 @@ describe("resource limits", () => {
   });
 
   it("does not ask twice once the person has confirmed", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const archive = buildBlueskyArchive({
       payloads: [{ path: "data.db", data: "video".repeat(2000) }],
     });
@@ -334,6 +334,71 @@ describe("resource limits", () => {
   });
 });
 
+describe("running out of room", () => {
+  const archive = buildBlueskyArchive({
+    payloads: [
+      { path: "data.db", data: "rows".repeat(1000) },
+      { path: "media/one.jpg", data: "one".repeat(1000) },
+    ],
+  });
+  const limits = { storageHeadroomBytes: 100, expansionRatioFloorBytes: 1e9 };
+
+  async function stagePartially(environment: TestBlueskyArchiveIntakeEnvironment) {
+    const staging = environment.openStaging(INTAKE_ID);
+    staging.failWrites.add(stagedPayloadPath("media/one.jpg"));
+    await expect(run(environment, archive, { limits })).rejects.toThrow();
+    staging.failWrites.clear();
+    return staging;
+  }
+
+  it("asks only for the room the work that is left needs", async () => {
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
+    const staging = await stagePartially(environment);
+    // Enough for the last payload, nowhere near enough for the whole archive.
+    environment.availableStorage = 3200;
+
+    const resumed = await run(environment, archive, { limits });
+
+    expect(resumed.status).toBe("prepared");
+    expect(staging.readText(stagedPayloadPath("media/one.jpg"))).toBe(
+      "one".repeat(1000),
+    );
+  });
+
+  it("keeps verified payloads when the device is out of room", async () => {
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
+    const staging = await stagePartially(environment);
+    environment.availableStorage = 10;
+
+    const outcome = await run(environment, archive, { limits });
+
+    expect(outcome).toMatchObject({
+      status: "rejected",
+      code: "insufficient-storage",
+    });
+    expect(staging.destroyed).toBe(false);
+    expect(staging.readText(stagedPayloadPath("data.db"))).toBe(
+      "rows".repeat(1000),
+    );
+
+    environment.availableStorage = 8 * 1024 * 1024 * 1024;
+    expect((await run(environment, archive, { limits })).status).toBe(
+      "prepared",
+    );
+  });
+
+  it("discards an archive it never started staging", async () => {
+    const environment = createTestBlueskyArchiveIntakeEnvironment({
+      availableStorageBytes: 10,
+    });
+
+    const outcome = await run(environment, archive, { limits });
+
+    expect(outcome).toMatchObject({ code: "insufficient-storage" });
+    expect(stagingFor(environment).destroyed).toBe(true);
+  });
+});
+
 describe("surviving termination", () => {
   const archive = buildBlueskyArchive({
     payloads: [
@@ -344,7 +409,7 @@ describe("surviving termination", () => {
   });
 
   it("resumes without re-staging payloads it already verified", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const staging = environment.openStaging(INTAKE_ID);
     staging.failWrites.add(stagedPayloadPath("media/two.jpg"));
 
@@ -358,7 +423,7 @@ describe("surviving termination", () => {
     expect(interrupted[0].preparedBytes).toBeGreaterThan(0);
 
     staging.failWrites.clear();
-    const progress: ArchiveIntakeProgress[] = [];
+    const progress: BlueskyArchiveIntakeProgress[] = [];
     const resumed = await run(environment, archive, {
       onProgress: (update) => progress.push(update),
     });
@@ -371,7 +436,7 @@ describe("surviving termination", () => {
   });
 
   it("restages a payload that was only half written", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const staging = environment.openStaging(INTAKE_ID);
     const halfWritten = stagedPayloadPath("media/two.jpg");
     const createFile = staging.createFile.bind(staging);
@@ -403,8 +468,26 @@ describe("surviving termination", () => {
     expect(staging.readText(halfWritten)).toBe("two".repeat(100));
   });
 
+  it("restages a payload that no longer matches the size it was verified at", async () => {
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
+    const staging = environment.openStaging(INTAKE_ID);
+    expect((await run(environment, archive)).status).toBe("prepared");
+
+    // Storage lost the tail of a payload after its checkpoint entry was written.
+    staging.files.set(
+      stagedPayloadPath("media/one.jpg"),
+      new TextEncoder().encode("on"),
+    );
+    const rerun = await run(environment, archive);
+
+    expect(rerun.status).toBe("prepared");
+    expect(staging.readText(stagedPayloadPath("media/one.jpg"))).toBe(
+      "one".repeat(100),
+    );
+  });
+
   it("starts over when the file behind a resumed import changed", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const staging = environment.openStaging(INTAKE_ID);
     staging.failWrites.add(stagedPayloadPath("media/two.jpg"));
     await expect(run(environment, archive)).rejects.toThrow();
@@ -423,8 +506,51 @@ describe("surviving termination", () => {
 });
 
 describe("cancellation", () => {
+  it("stops part-way through a single large payload", async () => {
+    // Stored rather than deflated, so its compressed length is its real length
+    // and it has to stream as more than one read.
+    const database = "rows".repeat(100_000);
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
+    const archive = buildBlueskyArchive({
+      payloads: [{ path: "data.db", data: database }],
+      mutateEntries: (entries) =>
+        entries.map((entry) =>
+          entry.name === "data.db" ? { ...entry, method: 0 as const } : entry,
+        ),
+    });
+    const staging = environment.openStaging(INTAKE_ID);
+    let databaseBytesWritten = 0;
+    const createFile = staging.createFile.bind(staging);
+    jest.spyOn(staging, "createFile").mockImplementation((path: string) => {
+      const writer = createFile(path);
+      return {
+        write: (chunk: Uint8Array) => {
+          if (path === stagedPayloadPath("data.db")) {
+            databaseBytesWritten += chunk.length;
+          }
+          writer.write(chunk);
+        },
+        close: () => writer.close(),
+      };
+    });
+    // data.db is large enough to stream as two reads: metadata.json takes the
+    // first check, then data.db is cancelled between its own two chunks.
+    let checks = 0;
+    const outcome = await run(environment, archive, {
+      shouldCancel: () => {
+        checks += 1;
+        return checks > 2;
+      },
+    });
+
+    expect(outcome).toEqual({ status: "cancelled", intakeId: INTAKE_ID });
+    expect(databaseBytesWritten).toBeGreaterThan(0);
+    expect(databaseBytesWritten).toBeLessThan(database.length);
+    expect(staging.destroyed).toBe(true);
+  });
+
   it("removes staging when the import is cancelled mid-way", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     const archive = buildBlueskyArchive({
       payloads: [
         { path: "data.db", data: "rows" },
@@ -446,7 +572,7 @@ describe("cancellation", () => {
   });
 
   it("removes staging when an abandoned import is cancelled later", async () => {
-    const environment = createTestIntakeEnvironment();
+    const environment = createTestBlueskyArchiveIntakeEnvironment();
     await run(environment, buildBlueskyArchive());
 
     cancelBlueskyArchiveIntake(environment, INTAKE_ID);

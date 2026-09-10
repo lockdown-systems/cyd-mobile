@@ -3,13 +3,13 @@ import { createHash } from "react-native-quick-crypto";
 
 import { getArchiveStagingRoot } from "@/services/device-storage";
 
-import { checkArchiveEntryPath } from "./entry-paths";
-import { ArchiveIntakeError } from "./errors";
+import { requireStagedFilePath } from "./entry-paths";
+import { BlueskyArchiveIntakeError } from "./errors";
 import { createInflateDecompressor } from "./inflate";
 import type {
-  ArchiveByteReader,
-  ArchiveIntakeEnvironment,
-  ArchiveStagingArea,
+  BlueskyArchiveByteReader,
+  BlueskyArchiveIntakeEnvironment,
+  BlueskyArchiveStagingArea,
   Hasher,
   StagedFileWriter,
 } from "./ports";
@@ -29,28 +29,19 @@ function ensureDirectory(uri: string): Directory {
 }
 
 /**
- * Resolve a staging-relative path, refusing anything that could leave the
- * staging root. This repeats the ZIP reader's check on purpose: it is the last
- * gate before a real write, and it protects paths that never came from a ZIP.
+ * Resolve a staging-relative path. The check repeats the ZIP reader's on
+ * purpose: it is the last gate before a real write, and it also covers paths
+ * that never came from a ZIP.
  */
 function resolveStagedUri(root: string, relativePath: string): string {
-  const check = checkArchiveEntryPath(relativePath);
-  if (!check.ok || check.isDirectory) {
-    throw new ArchiveIntakeError(
-      "unsafe-entry-path",
-      check.ok
-        ? `Refusing to write the directory ${relativePath} as a file.`
-        : check.reason,
-    );
-  }
-  return `${root}${check.path}`;
+  return `${root}${requireStagedFilePath(relativePath)}`;
 }
 
 function parentDirectoryUri(uri: string): string {
   return uri.slice(0, uri.lastIndexOf("/") + 1);
 }
 
-class DeviceStagingArea implements ArchiveStagingArea {
+class DeviceStagingArea implements BlueskyArchiveStagingArea {
   readonly root: string;
 
   constructor(intakeId: string) {
@@ -110,10 +101,10 @@ const createDeviceHasher = (): Hasher => {
 };
 
 /** Open the archive the person picked for random-access reads. */
-export function openArchiveByteReader(uri: string): ArchiveByteReader {
+export function openBlueskyArchiveByteReader(uri: string): BlueskyArchiveByteReader {
   const file = new File(uri);
   if (!file.exists) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "That file is no longer available on this device.",
     );
@@ -131,7 +122,7 @@ export function openArchiveByteReader(uri: string): ArchiveByteReader {
   };
 }
 
-export function createArchiveIntakeEnvironment(): ArchiveIntakeEnvironment {
+export function createBlueskyArchiveIntakeEnvironment(): BlueskyArchiveIntakeEnvironment {
   return {
     openStaging: (intakeId) => new DeviceStagingArea(intakeId),
     listStagingIds: () => {

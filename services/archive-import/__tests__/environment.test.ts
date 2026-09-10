@@ -8,10 +8,10 @@
 import crypto from "crypto";
 import * as FileSystem from "expo-file-system";
 
-import { ArchiveIntakeError } from "../errors";
+import { BlueskyArchiveIntakeError } from "../errors";
 import {
-  createArchiveIntakeEnvironment,
-  openArchiveByteReader,
+  createBlueskyArchiveIntakeEnvironment,
+  openBlueskyArchiveByteReader,
 } from "../environment";
 
 type MockFileSystem = {
@@ -186,14 +186,14 @@ beforeEach(() => {
 
 describe("device-backed staging", () => {
   it("stages an import in its own directory under the staging root", () => {
-    const staging = createArchiveIntakeEnvironment().openStaging("intake-1");
+    const staging = createBlueskyArchiveIntakeEnvironment().openStaging("intake-1");
 
     expect(staging.root).toBe(`${STAGING_ROOT}intake-1/`);
     expect(state.directories.has(staging.root)).toBe(true);
   });
 
   it("writes, reads back, and reports staged files", () => {
-    const staging = createArchiveIntakeEnvironment().openStaging("intake-1");
+    const staging = createBlueskyArchiveIntakeEnvironment().openStaging("intake-1");
 
     const writer = staging.createFile("payload/media/one.jpg");
     writer.write(new TextEncoder().encode("first "));
@@ -208,10 +208,10 @@ describe("device-backed staging", () => {
   });
 
   it("refuses to write outside its own directory", () => {
-    const staging = createArchiveIntakeEnvironment().openStaging("intake-1");
+    const staging = createBlueskyArchiveIntakeEnvironment().openStaging("intake-1");
 
     for (const path of ["../../evil.db", "/etc/passwd", "payload/../../evil"]) {
-      expect(() => staging.createFile(path)).toThrow(ArchiveIntakeError);
+      expect(() => staging.createFile(path)).toThrow(BlueskyArchiveIntakeError);
     }
     for (const uri of state.files.keys()) {
       expect(uri.startsWith(staging.root)).toBe(true);
@@ -219,7 +219,7 @@ describe("device-backed staging", () => {
   });
 
   it("removes everything it staged when destroyed", () => {
-    const environment = createArchiveIntakeEnvironment();
+    const environment = createBlueskyArchiveIntakeEnvironment();
     const staging = environment.openStaging("intake-1");
     staging.createFile("payload/data.db").close();
     staging.writeText("intake.json", "{}");
@@ -231,7 +231,7 @@ describe("device-backed staging", () => {
   });
 
   it("lists the imports left behind by an earlier launch", () => {
-    const environment = createArchiveIntakeEnvironment();
+    const environment = createBlueskyArchiveIntakeEnvironment();
     environment.openStaging("intake-1");
     environment.openStaging("intake-2");
 
@@ -239,7 +239,7 @@ describe("device-backed staging", () => {
   });
 
   it("reports no leftover imports before anything has been staged", () => {
-    expect(createArchiveIntakeEnvironment().listStagingIds()).toEqual([]);
+    expect(createBlueskyArchiveIntakeEnvironment().listStagingIds()).toEqual([]);
   });
 });
 
@@ -247,11 +247,11 @@ describe("device-backed capabilities", () => {
   it("reports the free space the device has", () => {
     state.availableDiskSpace = 1234;
 
-    expect(createArchiveIntakeEnvironment().availableStorageBytes()).toBe(1234);
+    expect(createBlueskyArchiveIntakeEnvironment().availableStorageBytes()).toBe(1234);
   });
 
   it("hashes streamed chunks the way SHA-256 does", () => {
-    const hasher = createArchiveIntakeEnvironment().createHasher();
+    const hasher = createBlueskyArchiveIntakeEnvironment().createHasher();
     hasher.update(new TextEncoder().encode("one "));
     hasher.update(new TextEncoder().encode("two"));
 
@@ -267,7 +267,7 @@ describe("reading a picked archive", () => {
     file.create();
     file.write("0123456789");
 
-    const reader = openArchiveByteReader("file:///picked/archive.cyd");
+    const reader = openBlueskyArchiveByteReader("file:///picked/archive.cyd");
 
     expect(reader.byteLength).toBe(10);
     expect(new TextDecoder().decode(await reader.read(4, 3))).toBe("456");
@@ -276,8 +276,8 @@ describe("reading a picked archive", () => {
   });
 
   it("reports a file that is no longer there", () => {
-    expect(() => openArchiveByteReader("file:///picked/gone.cyd")).toThrow(
-      ArchiveIntakeError,
+    expect(() => openBlueskyArchiveByteReader("file:///picked/gone.cyd")).toThrow(
+      BlueskyArchiveIntakeError,
     );
   });
 });

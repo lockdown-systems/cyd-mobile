@@ -1,8 +1,8 @@
 import { Crc32 } from "./crc32";
-import { ArchiveIntakeError } from "./errors";
-import { checkArchiveEntryPath, decodeArchiveEntryName } from "./entry-paths";
+import { checkZipEntryPath, decodeZipEntryName } from "./entry-paths";
+import { BlueskyArchiveIntakeCancelled, BlueskyArchiveIntakeError } from "./errors";
 import type {
-  ArchiveByteReader,
+  BlueskyArchiveByteReader,
   CreateDecompressor,
   CreateHasher,
 } from "./ports";
@@ -48,10 +48,13 @@ const UNIX_REGULAR_FILE = 0x8000;
 const UNIX_DIRECTORY = 0x4000;
 const MSDOS_DIRECTORY_ATTRIBUTE = 0x10;
 
+/** The only two compression methods a Cyd Bluesky archive may use. */
+export type ZipCompressionMethod = typeof STORED | typeof DEFLATED;
+
 export type ZipEntry = {
   /** Validated, staging-relative path. */
   path: string;
-  method: number;
+  method: ZipCompressionMethod;
   compressedBytes: number;
   uncompressedBytes: number;
   crc32: number;
@@ -61,7 +64,6 @@ export type ZipEntry = {
 export type ZipCentralDirectory = {
   /** File entries, in central directory order. Directory entries are dropped. */
   entries: ZipEntry[];
-  directoryEntryCount: number;
   totalCompressedBytes: number;
   totalUncompressedBytes: number;
 };
@@ -73,7 +75,7 @@ function view(bytes: Uint8Array): DataView {
 function readUint64(data: DataView, offset: number, field: string): number {
   const value = data.getBigUint64(offset, true);
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       `The archive declares an unreadable ${field}.`,
     );
@@ -88,10 +90,10 @@ type EndOfCentralDirectory = {
 };
 
 async function readEndOfCentralDirectory(
-  reader: ArchiveByteReader,
+  reader: BlueskyArchiveByteReader,
 ): Promise<EndOfCentralDirectory> {
   if (reader.byteLength < END_OF_CENTRAL_DIRECTORY_BYTES) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "This file is too small to be a Cyd Bluesky archive.",
     );
@@ -136,13 +138,13 @@ async function readEndOfCentralDirectory(
 
     if (!needsZip64) {
       if (diskNumber !== 0 || centralDirectoryDisk !== 0) {
-        throw new ArchiveIntakeError(
+        throw new BlueskyArchiveIntakeError(
           "unsupported-zip-feature",
           "Split or multi-disk archives are not supported.",
         );
       }
       if (entriesOnDisk !== entryCount) {
-        throw new ArchiveIntakeError(
+        throw new BlueskyArchiveIntakeError(
           "not-an-archive",
           "The archive's directory disagrees with itself about how many entries it has.",
         );
@@ -153,21 +155,21 @@ async function readEndOfCentralDirectory(
     return readZip64EndOfCentralDirectory(reader, trailer, trailerStart, index);
   }
 
-  throw new ArchiveIntakeError(
+  throw new BlueskyArchiveIntakeError(
     "not-an-archive",
     "This file is not a Cyd Bluesky archive.",
   );
 }
 
 async function readZip64EndOfCentralDirectory(
-  reader: ArchiveByteReader,
+  reader: BlueskyArchiveByteReader,
   trailer: Uint8Array,
   trailerStart: number,
   endOfCentralDirectoryIndex: number,
 ): Promise<EndOfCentralDirectory> {
   const locatorIndex = endOfCentralDirectoryIndex - ZIP64_LOCATOR_BYTES;
   if (locatorIndex < 0) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "The archive is missing its ZIP64 directory locator.",
     );
@@ -175,13 +177,13 @@ async function readZip64EndOfCentralDirectory(
 
   const trailerView = view(trailer);
   if (trailerView.getUint32(locatorIndex, true) !== ZIP64_LOCATOR_SIGNATURE) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "The archive is missing its ZIP64 directory locator.",
     );
   }
   if (trailerView.getUint32(locatorIndex + 16, true) !== 1) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "unsupported-zip-feature",
       "Split or multi-disk archives are not supported.",
     );
@@ -193,7 +195,7 @@ async function readZip64EndOfCentralDirectory(
     "ZIP64 directory offset",
   );
   if (recordOffset + 56 > trailerStart + endOfCentralDirectoryIndex) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "The archive's ZIP64 directory is outside the file.",
     );
@@ -201,13 +203,13 @@ async function readZip64EndOfCentralDirectory(
 
   const record = view(await reader.read(recordOffset, 56));
   if (record.getUint32(0, true) !== ZIP64_END_OF_CENTRAL_DIRECTORY_SIGNATURE) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "The archive's ZIP64 directory is missing.",
     );
   }
   if (record.getUint32(16, true) !== 0 || record.getUint32(20, true) !== 0) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "unsupported-zip-feature",
       "Split or multi-disk archives are not supported.",
     );
@@ -216,7 +218,7 @@ async function readZip64EndOfCentralDirectory(
   const entriesOnDisk = readUint64(record, 24, "entry count");
   const entryCount = readUint64(record, 32, "entry count");
   if (entriesOnDisk !== entryCount) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "The archive's directory disagrees with itself about how many entries it has.",
     );
@@ -252,7 +254,7 @@ function readZip64Extra(
       let field = dataStart;
       const takeField = (name: string): number => {
         if (field + 8 > dataStart + dataBytes) {
-          throw new ArchiveIntakeError(
+          throw new BlueskyArchiveIntakeError(
             "not-an-archive",
             "The archive has a truncated ZIP64 entry header.",
           );
@@ -281,7 +283,6 @@ function assertSupportedEntry(
   path: string,
   isDirectory: boolean,
   flags: number,
-  method: number,
   madeByHost: number,
   externalAttributes: number,
 ): void {
@@ -290,7 +291,7 @@ function assertSupportedEntry(
     (flags & FLAG_STRONG_ENCRYPTION) !== 0 ||
     (flags & FLAG_MASKED_LOCAL_HEADERS) !== 0
   ) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "unsupported-zip-feature",
       "Encrypted archives are not supported.",
     );
@@ -300,7 +301,7 @@ function assertSupportedEntry(
     const fileType = (externalAttributes >>> 16) & UNIX_FILE_TYPE_MASK;
     const expected = isDirectory ? UNIX_DIRECTORY : UNIX_REGULAR_FILE;
     if (fileType !== 0 && fileType !== expected) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "unsupported-entry-type",
         `The archive contains an entry that is not a regular file: ${path}`,
       );
@@ -308,18 +309,25 @@ function assertSupportedEntry(
   }
 
   if (!isDirectory && (externalAttributes & MSDOS_DIRECTORY_ATTRIBUTE) !== 0) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "unsupported-entry-type",
       `The archive contains an entry that is not a regular file: ${path}`,
     );
   }
 
-  if (!isDirectory && method !== STORED && method !== DEFLATED) {
-    throw new ArchiveIntakeError(
+}
+
+function narrowCompressionMethod(
+  method: number,
+  path: string,
+): ZipCompressionMethod {
+  if (method !== STORED && method !== DEFLATED) {
+    throw new BlueskyArchiveIntakeError(
       "unsupported-zip-feature",
       `The archive uses an unsupported compression method for ${path}.`,
     );
   }
+  return method;
 }
 
 /**
@@ -329,26 +337,26 @@ function assertSupportedEntry(
  * a single byte of entry content is touched.
  */
 export async function readZipCentralDirectory(
-  reader: ArchiveByteReader,
+  reader: BlueskyArchiveByteReader,
   options: { maxEntries: number },
 ): Promise<ZipCentralDirectory> {
   const { entryCount, centralDirectoryOffset, centralDirectoryBytes } =
     await readEndOfCentralDirectory(reader);
 
   if (entryCount > options.maxEntries) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "too-many-entries",
       `The archive declares ${entryCount} entries, more than the ${options.maxEntries} Cyd will read.`,
     );
   }
   if (centralDirectoryBytes > MAX_CENTRAL_DIRECTORY_BYTES) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "too-many-entries",
       "The archive's directory is too large to read.",
     );
   }
   if (centralDirectoryOffset + centralDirectoryBytes > reader.byteLength) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "The archive's directory is outside the file.",
     );
@@ -359,20 +367,19 @@ export async function readZipCentralDirectory(
 
   const entries: ZipEntry[] = [];
   const seenPaths = new Set<string>();
-  let directoryEntryCount = 0;
   let totalCompressedBytes = 0;
   let totalUncompressedBytes = 0;
   let cursor = 0;
 
   for (let index = 0; index < entryCount; index += 1) {
     if (cursor + CENTRAL_FILE_HEADER_BYTES > central.length) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "not-an-archive",
         "The archive's directory is truncated.",
       );
     }
     if (centralView.getUint32(cursor, true) !== CENTRAL_FILE_HEADER_SIGNATURE) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "not-an-archive",
         "The archive's directory is corrupt.",
       );
@@ -395,7 +402,7 @@ export async function readZipCentralDirectory(
     const extraStart = nameStart + nameBytes;
     const nextCursor = extraStart + extraBytes + commentBytes;
     if (nextCursor > central.length) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "not-an-archive",
         "The archive's directory is truncated.",
       );
@@ -411,25 +418,25 @@ export async function readZipCentralDirectory(
     localHeaderOffset = zip64.localOffset ?? localHeaderOffset;
 
     if (diskStart !== 0 && diskStart !== 0xffff) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "unsupported-zip-feature",
         "Split or multi-disk archives are not supported.",
       );
     }
 
-    const rawName = decodeArchiveEntryName(
+    const rawName = decodeZipEntryName(
       central.subarray(nameStart, nameStart + nameBytes),
     );
     if (rawName === null) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "unsafe-entry-path",
         "The archive contains an entry path that is not valid UTF-8.",
       );
     }
 
-    const pathCheck = checkArchiveEntryPath(rawName);
+    const pathCheck = checkZipEntryPath(rawName);
     if (!pathCheck.ok) {
-      throw new ArchiveIntakeError("unsafe-entry-path", pathCheck.reason);
+      throw new BlueskyArchiveIntakeError("unsafe-entry-path", pathCheck.reason);
     }
     const { path, isDirectory } = pathCheck;
 
@@ -437,36 +444,29 @@ export async function readZipCentralDirectory(
     // overwrite another that differs only in case.
     const collisionKey = path.toLowerCase();
     if (seenPaths.has(collisionKey)) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "duplicate-entry",
         `The archive contains more than one entry for ${path}.`,
       );
     }
     seenPaths.add(collisionKey);
 
-    assertSupportedEntry(
-      path,
-      isDirectory,
-      flags,
-      method,
-      madeByHost,
-      externalAttributes,
-    );
+    assertSupportedEntry(path, isDirectory, flags, madeByHost, externalAttributes);
 
     if (isDirectory) {
-      directoryEntryCount += 1;
       cursor = nextCursor;
       continue;
     }
 
-    if (method === STORED && compressedBytes !== uncompressedBytes) {
-      throw new ArchiveIntakeError(
+    const compressionMethod = narrowCompressionMethod(method, path);
+    if (compressionMethod === STORED && compressedBytes !== uncompressedBytes) {
+      throw new BlueskyArchiveIntakeError(
         "size-mismatch",
         `The archive declares inconsistent sizes for ${path}.`,
       );
     }
     if (localHeaderOffset + LOCAL_FILE_HEADER_BYTES > reader.byteLength) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "not-an-archive",
         `The archive places ${path} outside the file.`,
       );
@@ -474,7 +474,7 @@ export async function readZipCentralDirectory(
 
     entries.push({
       path,
-      method,
+      method: compressionMethod,
       compressedBytes,
       uncompressedBytes,
       crc32: declaredCrc32,
@@ -486,18 +486,13 @@ export async function readZipCentralDirectory(
   }
 
   if (cursor !== central.length) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "not-an-archive",
       "The archive's directory has unexpected trailing data.",
     );
   }
 
-  return {
-    entries,
-    directoryEntryCount,
-    totalCompressedBytes,
-    totalUncompressedBytes,
-  };
+  return { entries, totalCompressedBytes, totalUncompressedBytes };
 }
 
 export type StreamedZipEntry = {
@@ -511,27 +506,31 @@ export type StreamedZipEntry = {
  * `onBytes` sees each decompressed chunk exactly once. The entry is aborted
  * the instant it produces more than it declared, so the caller never has to
  * decide what to do with a half-written bomb.
+ *
+ * Cancellation is checked per chunk rather than per entry: a single full-video
+ * entry can run to gigabytes, and waiting for it to finish is not cancelling.
  */
 export async function streamZipEntry(
-  reader: ArchiveByteReader,
+  reader: BlueskyArchiveByteReader,
   entry: ZipEntry,
   options: {
     createDecompressor: CreateDecompressor;
     createHasher: CreateHasher;
     onBytes: (bytes: Uint8Array) => void;
+    shouldCancel?: () => boolean;
   },
 ): Promise<StreamedZipEntry> {
   const header = view(
     await reader.read(entry.localHeaderOffset, LOCAL_FILE_HEADER_BYTES),
   );
   if (header.getUint32(0, true) !== LOCAL_FILE_HEADER_SIGNATURE) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "corrupt-archive",
       `The archive's directory does not match its contents for ${entry.path}.`,
     );
   }
   if (header.getUint16(8, true) !== entry.method) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "corrupt-archive",
       `The archive's directory does not match its contents for ${entry.path}.`,
     );
@@ -539,11 +538,11 @@ export async function streamZipEntry(
 
   const nameBytes = header.getUint16(26, true);
   const extraBytes = header.getUint16(28, true);
-  const localName = decodeArchiveEntryName(
+  const localName = decodeZipEntryName(
     await reader.read(entry.localHeaderOffset + LOCAL_FILE_HEADER_BYTES, nameBytes),
   );
   if (localName !== entry.path) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "corrupt-archive",
       `The archive's directory does not match its contents for ${entry.path}.`,
     );
@@ -552,7 +551,7 @@ export async function streamZipEntry(
   const dataStart =
     entry.localHeaderOffset + LOCAL_FILE_HEADER_BYTES + nameBytes + extraBytes;
   if (dataStart + entry.compressedBytes > reader.byteLength) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "corrupt-archive",
       `The archive is truncated before the end of ${entry.path}.`,
     );
@@ -565,7 +564,7 @@ export async function streamZipEntry(
   const accept = (bytes: Uint8Array): void => {
     written += bytes.length;
     if (written > entry.uncompressedBytes) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "size-mismatch",
         `${entry.path} expands past the size the archive declares for it.`,
       );
@@ -582,10 +581,13 @@ export async function streamZipEntry(
 
   let consumed = 0;
   while (consumed < entry.compressedBytes) {
+    if (options.shouldCancel?.() === true) {
+      throw new BlueskyArchiveIntakeCancelled();
+    }
     const length = Math.min(READ_CHUNK_BYTES, entry.compressedBytes - consumed);
     const chunk = await reader.read(dataStart + consumed, length);
     if (chunk.length !== length) {
-      throw new ArchiveIntakeError(
+      throw new BlueskyArchiveIntakeError(
         "corrupt-archive",
         `The archive is truncated before the end of ${entry.path}.`,
       );
@@ -598,13 +600,13 @@ export async function streamZipEntry(
   }
 
   if (written !== entry.uncompressedBytes) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "size-mismatch",
       `${entry.path} is not the size the archive declares for it.`,
     );
   }
   if (checksum.value() !== entry.crc32) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "corrupt-archive",
       `${entry.path} is corrupt.`,
     );

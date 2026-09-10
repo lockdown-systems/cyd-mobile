@@ -3,25 +3,29 @@ import {
   type BlueskyArchiveMetadata,
 } from "@/services/archive-metadata";
 
-import { ArchiveIntakeError, type ArchiveIntakeErrorCode } from "./errors";
 import {
-  DEFAULT_ARCHIVE_INTAKE_LIMITS,
+  BlueskyArchiveIntakeCancelled,
+  BlueskyArchiveIntakeError,
+  isRetryableBlueskyArchiveIntakeFailure,
+  type BlueskyArchiveIntakeErrorCode,
+} from "./errors";
+import {
   formatBytes,
-  resolveArchiveIntakeLimits,
-  type ArchiveIntakeLimits,
+  resolveBlueskyArchiveIntakeLimits,
+  type BlueskyArchiveIntakeLimits,
 } from "./limits";
 import {
   MANIFEST_ENTRY_PATH,
   METADATA_ENTRY_PATH,
-  parseArchiveManifest,
-  planArchivePayloads,
-  type ArchiveManifestPayload,
-  type ArchivePayloadPlan,
+  parseBlueskyArchiveManifest,
+  planBlueskyArchivePayloads,
+  type BlueskyArchiveManifestPayload,
+  type BlueskyArchivePayloadPlan,
 } from "./manifest";
 import type {
-  ArchiveByteReader,
-  ArchiveIntakeEnvironment,
-  ArchiveStagingArea,
+  BlueskyArchiveByteReader,
+  BlueskyArchiveIntakeEnvironment,
+  BlueskyArchiveStagingArea,
 } from "./ports";
 import { readZipCentralDirectory, streamZipEntry, type ZipEntry } from "./zip-reader";
 
@@ -40,8 +44,7 @@ const CHECKPOINT_PATH = "intake.json";
 const PAYLOAD_PREFIX = "payload/";
 const CHECKPOINT_VERSION = 1;
 
-export type ArchiveIntakePhase =
-  | "preparing"
+export type BlueskyArchiveIntakePhase =
   | "awaiting-confirmation"
   | "extracting"
   | "prepared";
@@ -50,11 +53,11 @@ type ArchiveIntakeCheckpoint = {
   version: number;
   sourceUri: string;
   sourceBytes: number;
-  phase: ArchiveIntakePhase;
+  phase: BlueskyArchiveIntakePhase;
   confirmedLargeArchive: boolean;
   totalBytes: number | null;
   metadata: BlueskyArchiveMetadata | null;
-  payloads: ArchiveManifestPayload[];
+  payloads: BlueskyArchiveManifestPayload[];
   extracted: string[];
   updatedAt: string;
 };
@@ -64,10 +67,8 @@ export type PreparedBlueskyArchive = {
   intakeId: string;
   stagingRoot: string;
   metadata: BlueskyArchiveMetadata;
-  payloads: ArchiveManifestPayload[];
+  payloads: BlueskyArchiveManifestPayload[];
   totalBytes: number;
-  /** Staging-relative location of a prepared payload. */
-  payloadPath: (archivePath: string) => string;
 };
 
 export type BlueskyArchiveIntakeOutcome =
@@ -83,35 +84,35 @@ export type BlueskyArchiveIntakeOutcome =
   | {
       status: "rejected";
       intakeId: string;
-      code: ArchiveIntakeErrorCode;
+      code: BlueskyArchiveIntakeErrorCode;
       message: string;
     }
   | { status: "cancelled"; intakeId: string };
 
-export type ArchiveIntakeProgress = {
-  phase: ArchiveIntakePhase;
+export type BlueskyArchiveIntakeProgress = {
+  phase: BlueskyArchiveIntakePhase;
   preparedBytes: number;
   totalBytes: number;
 };
 
-export type RunArchiveIntakeOptions = {
+export type RunBlueskyArchiveIntakeOptions = {
   /** Stable id for this import, reused to resume it after a restart. */
   intakeId: string;
   /** Identifies the picked file, so a resumed intake cannot pick up a different one. */
   sourceUri: string;
-  openReader: () => Promise<ArchiveByteReader>;
+  openReader: () => Promise<BlueskyArchiveByteReader>;
   /** Set once the person has agreed to import an unusually large archive. */
   confirmLargeArchive?: boolean;
-  limits?: Partial<ArchiveIntakeLimits>;
+  limits?: Partial<BlueskyArchiveIntakeLimits>;
   shouldCancel?: () => boolean;
-  onProgress?: (progress: ArchiveIntakeProgress) => void;
+  onProgress?: (progress: BlueskyArchiveIntakeProgress) => void;
 };
 
 export function stagedPayloadPath(archivePath: string): string {
   return `${PAYLOAD_PREFIX}${archivePath}`;
 }
 
-function readCheckpoint(staging: ArchiveStagingArea): ArchiveIntakeCheckpoint | null {
+function readCheckpoint(staging: BlueskyArchiveStagingArea): ArchiveIntakeCheckpoint | null {
   const text = staging.readText(CHECKPOINT_PATH);
   if (text === null) {
     return null;
@@ -125,8 +126,8 @@ function readCheckpoint(staging: ArchiveStagingArea): ArchiveIntakeCheckpoint | 
 }
 
 function writeCheckpoint(
-  staging: ArchiveStagingArea,
-  environment: ArchiveIntakeEnvironment,
+  staging: BlueskyArchiveStagingArea,
+  environment: BlueskyArchiveIntakeEnvironment,
   checkpoint: Omit<ArchiveIntakeCheckpoint, "version" | "updatedAt">,
 ): ArchiveIntakeCheckpoint {
   const stored: ArchiveIntakeCheckpoint = {
@@ -139,14 +140,14 @@ function writeCheckpoint(
 }
 
 /** Read a small entry (metadata or manifest) fully into memory. */
-async function readDescriptorEntry(
-  reader: ArchiveByteReader,
-  environment: ArchiveIntakeEnvironment,
+async function readBlueskyArchiveDescriptor(
+  reader: BlueskyArchiveByteReader,
+  environment: BlueskyArchiveIntakeEnvironment,
   entry: ZipEntry,
-  limits: ArchiveIntakeLimits,
+  limits: BlueskyArchiveIntakeLimits,
 ): Promise<{ text: string; bytes: number; sha256: string }> {
   if (entry.uncompressedBytes > limits.maxDescriptorBytes) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "manifest-invalid",
       `The archive's ${entry.path} is too large to read.`,
     );
@@ -170,34 +171,34 @@ async function readDescriptorEntry(
   };
 }
 
-function requireEntry(entries: ZipEntry[], path: string, code: ArchiveIntakeErrorCode): ZipEntry {
+function requireEntry(entries: ZipEntry[], path: string, code: BlueskyArchiveIntakeErrorCode): ZipEntry {
   const entry = entries.find((candidate) => candidate.path === path);
   if (!entry) {
-    throw new ArchiveIntakeError(code, `The archive is missing ${path}.`);
+    throw new BlueskyArchiveIntakeError(code, `The archive is missing ${path}.`);
   }
   return entry;
 }
 
 type InspectionResult = {
   metadata: BlueskyArchiveMetadata;
-  plan: ArchivePayloadPlan[];
+  plan: BlueskyArchivePayloadPlan[];
   totalBytes: number;
 };
 
 /**
  * Everything that must be true before a single payload byte is written.
  */
-async function inspectArchive(
-  reader: ArchiveByteReader,
-  environment: ArchiveIntakeEnvironment,
-  limits: ArchiveIntakeLimits,
+async function inspectBlueskyArchive(
+  reader: BlueskyArchiveByteReader,
+  environment: BlueskyArchiveIntakeEnvironment,
+  limits: BlueskyArchiveIntakeLimits,
 ): Promise<InspectionResult> {
   const directory = await readZipCentralDirectory(reader, {
     maxEntries: limits.maxEntries,
   });
 
   if (directory.totalUncompressedBytes > limits.maxTotalBytes) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "archive-too-large",
       `This archive unpacks to ${formatBytes(directory.totalUncompressedBytes)}, which is more than Cyd can import.`,
     );
@@ -208,7 +209,7 @@ async function inspectArchive(
     directory.totalUncompressedBytes / directory.totalCompressedBytes >
       limits.maxExpansionRatio
   ) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "expansion-exceeded",
       "This archive expands far more than a real Bluesky archive does, so Cyd will not unpack it.",
     );
@@ -219,21 +220,21 @@ async function inspectArchive(
     MANIFEST_ENTRY_PATH,
     "manifest-missing",
   );
-  const manifestDescriptor = await readDescriptorEntry(
+  const manifestDescriptor = await readBlueskyArchiveDescriptor(
     reader,
     environment,
     manifestEntry,
     limits,
   );
-  const manifest = parseArchiveManifest(manifestDescriptor.text);
-  const plan = planArchivePayloads(manifest, directory.entries);
+  const manifest = parseBlueskyArchiveManifest(manifestDescriptor.text);
+  const plan = planBlueskyArchivePayloads(manifest, directory.entries);
 
   const metadataEntry = requireEntry(
     directory.entries,
     METADATA_ENTRY_PATH,
     "metadata-missing",
   );
-  const metadataDescriptor = await readDescriptorEntry(
+  const metadataDescriptor = await readBlueskyArchiveDescriptor(
     reader,
     environment,
     metadataEntry,
@@ -243,7 +244,7 @@ async function inspectArchive(
     (payload) => payload.path === METADATA_ENTRY_PATH,
   );
   if (metadataDescriptor.sha256 !== metadataPayload?.sha256) {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "digest-mismatch",
       "The archive's metadata does not match the digest its manifest declares.",
     );
@@ -253,32 +254,23 @@ async function inspectArchive(
   try {
     parsedMetadata = JSON.parse(metadataDescriptor.text);
   } catch {
-    throw new ArchiveIntakeError(
+    throw new BlueskyArchiveIntakeError(
       "unsupported-archive",
       "Invalid or corrupt Bluesky archive: metadata.json is not valid JSON.",
     );
   }
   const classified = classifyBlueskyArchiveMetadata(parsedMetadata);
   if (!classified.supported) {
-    throw new ArchiveIntakeError("unsupported-archive", classified.error);
+    throw new BlueskyArchiveIntakeError("unsupported-archive", classified.error);
   }
 
   const totalBytes = plan.reduce((sum, planned) => sum + planned.payload.bytes, 0);
-  const requiredBytes = totalBytes + limits.storageHeadroomBytes;
-  const availableBytes = environment.availableStorageBytes();
-  if (availableBytes < requiredBytes) {
-    throw new ArchiveIntakeError(
-      "insufficient-storage",
-      `This archive needs ${formatBytes(totalBytes)} of free space, and only ${formatBytes(availableBytes)} is available.`,
-    );
-  }
-
   return { metadata: classified.metadata, plan, totalBytes };
 }
 
 function samePlan(
-  checkpointed: ArchiveManifestPayload[],
-  plan: ArchivePayloadPlan[],
+  checkpointed: BlueskyArchiveManifestPayload[],
+  plan: BlueskyArchivePayloadPlan[],
 ): boolean {
   if (checkpointed.length !== plan.length) {
     return false;
@@ -299,13 +291,16 @@ function samePlan(
  * confirmation the person already gave is not asked for twice.
  */
 export async function runBlueskyArchiveIntake(
-  environment: ArchiveIntakeEnvironment,
-  options: RunArchiveIntakeOptions,
+  environment: BlueskyArchiveIntakeEnvironment,
+  options: RunBlueskyArchiveIntakeOptions,
 ): Promise<BlueskyArchiveIntakeOutcome> {
-  const limits = resolveArchiveIntakeLimits(options.limits);
+  const limits = resolveBlueskyArchiveIntakeLimits(options.limits);
   const { intakeId } = options;
   let staging = environment.openStaging(intakeId);
   const reader = await options.openReader();
+  // Tracks whether there is verified work in staging worth keeping if this run
+  // fails for a reason that is not the archive's fault.
+  let stagedBytes = 0;
 
   try {
     let checkpoint = readCheckpoint(staging);
@@ -324,7 +319,7 @@ export async function runBlueskyArchiveIntake(
       options.confirmLargeArchive === true ||
       checkpoint?.confirmedLargeArchive === true;
 
-    const inspection = await inspectArchive(reader, environment, limits);
+    const inspection = await inspectBlueskyArchive(reader, environment, limits);
     const { metadata, plan, totalBytes } = inspection;
 
     if (checkpoint && !samePlan(checkpoint.payloads, plan)) {
@@ -332,6 +327,34 @@ export async function runBlueskyArchiveIntake(
       staging.destroy();
       staging = environment.openStaging(intakeId);
       checkpoint = null;
+    }
+
+    // A checkpointed payload counts as done only if what is on disk is still
+    // the size it was verified at. Anything else is staged again.
+    const extracted = new Set(
+      plan
+        .filter(
+          (planned) =>
+            checkpoint?.extracted.includes(planned.payload.path) === true &&
+            staging.fileSize(stagedPayloadPath(planned.payload.path)) ===
+              planned.payload.bytes,
+        )
+        .map((planned) => planned.payload.path),
+    );
+    let preparedBytes = plan
+      .filter((planned) => extracted.has(planned.payload.path))
+      .reduce((sum, planned) => sum + planned.payload.bytes, 0);
+    stagedBytes = preparedBytes;
+
+    // Free space is measured against the work that is left. A resumed import
+    // must not be told there is no room for payloads it has already written.
+    const remainingBytes = totalBytes - preparedBytes;
+    const availableBytes = environment.availableStorageBytes();
+    if (availableBytes < remainingBytes + limits.storageHeadroomBytes) {
+      throw new BlueskyArchiveIntakeError(
+        "insufficient-storage",
+        `This archive needs ${formatBytes(remainingBytes)} of free space, and only ${formatBytes(availableBytes)} is available.`,
+      );
     }
 
     if (totalBytes > limits.confirmationThresholdBytes && !confirmedLargeArchive) {
@@ -343,7 +366,7 @@ export async function runBlueskyArchiveIntake(
         totalBytes,
         metadata,
         payloads: plan.map((planned) => planned.payload),
-        extracted: checkpoint?.extracted ?? [],
+        extracted: [...extracted],
       });
       return {
         status: "needs-confirmation",
@@ -354,15 +377,6 @@ export async function runBlueskyArchiveIntake(
         message: `This Bluesky archive is ${formatBytes(totalBytes)}. Importing it will use that much space on this device.`,
       };
     }
-
-    const extracted = new Set(
-      (checkpoint?.extracted ?? []).filter((path) =>
-        staging.fileExists(stagedPayloadPath(path)),
-      ),
-    );
-    let preparedBytes = plan
-      .filter((planned) => extracted.has(planned.payload.path))
-      .reduce((sum, planned) => sum + planned.payload.bytes, 0);
 
     checkpoint = writeCheckpoint(staging, environment, {
       sourceUri: options.sourceUri,
@@ -380,11 +394,6 @@ export async function runBlueskyArchiveIntake(
       if (extracted.has(planned.payload.path)) {
         continue;
       }
-      if (options.shouldCancel?.() === true) {
-        staging.destroy();
-        return { status: "cancelled", intakeId };
-      }
-
       const destination = staging.createFile(stagedPayloadPath(planned.payload.path));
       let streamed;
       try {
@@ -392,19 +401,20 @@ export async function runBlueskyArchiveIntake(
           createDecompressor: environment.createDecompressor,
           createHasher: environment.createHasher,
           onBytes: (bytes) => destination.write(bytes),
+          shouldCancel: options.shouldCancel,
         });
       } finally {
         destination.close();
       }
 
       if (streamed.bytes !== planned.payload.bytes) {
-        throw new ArchiveIntakeError(
+        throw new BlueskyArchiveIntakeError(
           "size-mismatch",
           `${planned.payload.path} is not the size the archive's manifest declares.`,
         );
       }
       if (streamed.sha256 !== planned.payload.sha256) {
-        throw new ArchiveIntakeError(
+        throw new BlueskyArchiveIntakeError(
           "digest-mismatch",
           `${planned.payload.path} does not match the digest the archive's manifest declares.`,
         );
@@ -412,6 +422,7 @@ export async function runBlueskyArchiveIntake(
 
       extracted.add(planned.payload.path);
       preparedBytes += planned.payload.bytes;
+      stagedBytes = preparedBytes;
       checkpoint = writeCheckpoint(staging, environment, {
         ...checkpoint,
         extracted: [...extracted],
@@ -429,12 +440,19 @@ export async function runBlueskyArchiveIntake(
       metadata,
       payloads: plan.map((planned) => planned.payload),
       totalBytes,
-      payloadPath: stagedPayloadPath,
     };
   } catch (error) {
-    if (error instanceof ArchiveIntakeError) {
-      // Rejection is final, so nothing staged for this archive is worth keeping.
+    if (error instanceof BlueskyArchiveIntakeCancelled) {
       staging.destroy();
+      return { status: "cancelled", intakeId };
+    }
+    if (error instanceof BlueskyArchiveIntakeError) {
+      // A rejection blames the archive and is final, so nothing staged for it
+      // is worth keeping. A failure that blames the device is not: verified
+      // payloads stay put so freeing space and retrying resumes the import.
+      if (!isRetryableBlueskyArchiveIntakeFailure(error.code) || stagedBytes === 0) {
+        staging.destroy();
+      }
       return {
         status: "rejected",
         intakeId,
@@ -451,16 +469,18 @@ export async function runBlueskyArchiveIntake(
 
 /** Abandon an import and remove everything it staged. */
 export function cancelBlueskyArchiveIntake(
-  environment: ArchiveIntakeEnvironment,
+  environment: BlueskyArchiveIntakeEnvironment,
   intakeId: string,
 ): void {
   environment.openStaging(intakeId).destroy();
 }
 
-export type ResumableArchiveIntake = {
+export type ResumableBlueskyArchiveIntake = {
   intakeId: string;
   sourceUri: string;
-  phase: ArchiveIntakePhase;
+  /** The Bluesky identity the staged archive belongs to, once known. */
+  accountDid: string | null;
+  phase: BlueskyArchiveIntakePhase;
   totalBytes: number | null;
   preparedBytes: number;
   updatedAt: string;
@@ -473,9 +493,9 @@ export type ResumableArchiveIntake = {
  * only be debris from a run that died before it recorded anything.
  */
 export function listResumableBlueskyArchiveIntakes(
-  environment: ArchiveIntakeEnvironment,
-): ResumableArchiveIntake[] {
-  const resumable: ResumableArchiveIntake[] = [];
+  environment: BlueskyArchiveIntakeEnvironment,
+): ResumableBlueskyArchiveIntake[] {
+  const resumable: ResumableBlueskyArchiveIntake[] = [];
   for (const intakeId of environment.listStagingIds()) {
     const staging = environment.openStaging(intakeId);
     const checkpoint = readCheckpoint(staging);
@@ -489,6 +509,7 @@ export function listResumableBlueskyArchiveIntakes(
     resumable.push({
       intakeId,
       sourceUri: checkpoint.sourceUri,
+      accountDid: checkpoint.metadata?.accountDid ?? null,
       phase: checkpoint.phase,
       totalBytes: checkpoint.totalBytes,
       preparedBytes,
@@ -497,5 +518,3 @@ export function listResumableBlueskyArchiveIntakes(
   }
   return resumable;
 }
-
-export { DEFAULT_ARCHIVE_INTAKE_LIMITS };

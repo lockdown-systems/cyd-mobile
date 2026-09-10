@@ -8,7 +8,7 @@
  * confirm rather than by refusing it.
  */
 
-export type ArchiveIntakeLimits = {
+export type BlueskyArchiveIntakeLimits = {
   /** Entry count ceiling, well above any real archive. */
   maxEntries: number;
   /** Arithmetic ceiling, not a product limit. */
@@ -27,7 +27,7 @@ export type ArchiveIntakeLimits = {
 
 const GIBIBYTE = 1024 * 1024 * 1024;
 
-export const DEFAULT_ARCHIVE_INTAKE_LIMITS: ArchiveIntakeLimits = {
+export const DEFAULT_BLUESKY_ARCHIVE_INTAKE_LIMITS: BlueskyArchiveIntakeLimits = {
   maxEntries: 200_000,
   maxTotalBytes: 512 * GIBIBYTE,
   confirmationThresholdBytes: 2 * GIBIBYTE,
@@ -37,10 +37,10 @@ export const DEFAULT_ARCHIVE_INTAKE_LIMITS: ArchiveIntakeLimits = {
   maxDescriptorBytes: 4 * 1024 * 1024,
 };
 
-export function resolveArchiveIntakeLimits(
-  overrides?: Partial<ArchiveIntakeLimits>,
-): ArchiveIntakeLimits {
-  return { ...DEFAULT_ARCHIVE_INTAKE_LIMITS, ...overrides };
+export function resolveBlueskyArchiveIntakeLimits(
+  overrides?: Partial<BlueskyArchiveIntakeLimits>,
+): BlueskyArchiveIntakeLimits {
+  return { ...DEFAULT_BLUESKY_ARCHIVE_INTAKE_LIMITS, ...overrides };
 }
 
 export function formatBytes(bytes: number): string {
