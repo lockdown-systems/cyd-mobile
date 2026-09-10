@@ -17,7 +17,7 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 jest.mock(
   "expo-secure-store",
   () => ({
-    WHEN_UNLOCKED: "WHEN_UNLOCKED",
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: "WHEN_UNLOCKED_THIS_DEVICE_ONLY",
     getItemAsync: jest.fn(async (key: string) => mockProtectedValues.get(key) ?? null),
     setItemAsync: jest.fn(async (key: string, value: string) => {
       mockProtectedValues.set(key, value);

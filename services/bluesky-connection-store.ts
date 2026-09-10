@@ -40,7 +40,7 @@ export async function setBlueskyOAuthState(
   serializedState: string,
 ): Promise<void> {
   await SecureStore.setItemAsync(oauthStateKey(state), serializedState, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED,
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
 }
 
@@ -81,7 +81,7 @@ export async function setBlueskyConnection(
   await SecureStore.setItemAsync(
     connectionKey(accountUUID),
     serializedConnection,
-    { keychainAccessible: SecureStore.WHEN_UNLOCKED },
+    { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY },
   );
 }
 
@@ -100,7 +100,7 @@ async function deleteProtectedValue(
   legacyKey?: string,
 ): Promise<void> {
   await SecureStore.setItemAsync(key, DISCONNECTED, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED,
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
   if (legacyKey) {
     await AsyncStorage.removeItem(legacyKey);
