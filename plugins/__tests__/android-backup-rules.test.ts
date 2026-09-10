@@ -103,6 +103,19 @@ describe("android-backup-rules plugin", () => {
       );
     });
 
+    it("keeps in-progress archive import staging out of every backup path", () => {
+      // Staging is half-unpacked working state; the committed account data it
+      // becomes is backed up on its own.
+      const [cloudBackup, deviceTransfer] =
+        DATA_EXTRACTION_RULES_XML.split("<device-transfer>");
+
+      for (const rules of [BACKUP_RULES_XML, cloudBackup, deviceTransfer]) {
+        expect(rules).toContain(
+          '<exclude domain="file" path="archive-intake"/>',
+        );
+      }
+    });
+
     it("mirrors the cloud rules on Android 11 and lower", () => {
       // full-backup-content has no device-transfer path.
       expect(BACKUP_RULES_XML).toContain(
