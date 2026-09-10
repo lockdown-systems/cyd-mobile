@@ -1,7 +1,16 @@
 import fs from "fs";
 import path from "path";
 
+import {
+  createMemoryByteReader,
+  createTestIntakeEnvironment,
+} from "@/testUtils/archiveFixtures";
+
 import { classifyBlueskyArchiveMetadata } from "../archive-metadata";
+import {
+  runBlueskyArchiveIntake,
+  stagedPayloadPath,
+} from "../archive-import";
 import {
   type BlueskyArchiveTables,
   normalizeBlueskyArchiveSemantics,
@@ -56,6 +65,43 @@ contractDescribe("pinned canonical Cyd Bluesky archive bundle", () => {
       expect(normalized.completeness).toBe(
         expectations.fixtures[fixtureName].completeness,
       );
+    },
+  );
+
+  it.each(["complete.cyd", "incomplete.cyd"])(
+    "prepares %s through streaming intake, whatever the file is called",
+    async (fixtureName) => {
+      const expectations = readExpectations(root);
+      const archive = new Uint8Array(
+        fs.readFileSync(path.join(root, "fixtures", fixtureName)),
+      );
+      const environment = createTestIntakeEnvironment();
+
+      const outcome = await runBlueskyArchiveIntake(environment, {
+        intakeId: `contract-${fixtureName}`,
+        // Deliberately not an archive name: validity comes from the contents.
+        sourceUri: "file:///picked/holiday-photos.zip",
+        openReader: async () => createMemoryByteReader(archive),
+      });
+
+      if (outcome.status !== "prepared") {
+        throw new Error(
+          `Expected the canonical fixture to be prepared, got ${outcome.status}`,
+        );
+      }
+      expect(outcome.metadata.completeness).toBe(
+        expectations.fixtures[fixtureName].completeness,
+      );
+
+      const staging = environment.stagingAreas.get(`contract-${fixtureName}`);
+      expect(staging?.fileExists(stagedPayloadPath("data.db"))).toBe(true);
+      for (const asset of expectations.fixtures[fixtureName].assets) {
+        if (typeof asset.archivePath === "string") {
+          expect(staging?.fileExists(stagedPayloadPath(asset.archivePath))).toBe(
+            true,
+          );
+        }
+      }
     },
   );
 
