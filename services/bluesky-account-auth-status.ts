@@ -54,6 +54,15 @@ function isMissingSessionError(err: unknown): boolean {
   );
 }
 
+/**
+ * Check whether Cyd can still act on a Bluesky local account, and persist the
+ * result.
+ *
+ * Pass `force` after anything that changes the account's Bluesky connection.
+ * It both skips the stored-status shortcut and rebuilds the controller's agent
+ * from the stored connection, so the check reflects the connection that exists
+ * now rather than the one the controller was last built from.
+ */
 export async function verifyBlueskyAccountAuthStatus(
   controller: BlueskyAccountController,
   account: AccountListItem,
@@ -87,8 +96,12 @@ export async function verifyBlueskyAccountAuthStatus(
   }
 
   try {
-    if (!controller.isAgentReady()) {
-      console.log("[AuthStatus] initAgent required", account.id);
+    // A forced check follows something that changed the stored connection, so
+    // the agent is rebuilt even when one is already loaded: reusing an agent
+    // built from a superseded Bluesky connection makes the current one look
+    // expired, and the failed refresh deletes it.
+    if (force || !controller.isAgentReady()) {
+      console.log("[AuthStatus] initAgent required", account.id, { force });
       await controller.initAgent();
     }
     const profile = await controller.getProfile();

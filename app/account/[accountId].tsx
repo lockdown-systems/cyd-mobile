@@ -50,10 +50,8 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { onAuthStatusChange } from "@/services/auth-events";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
-import {
-  authenticateBlueskyAccount,
-  revokeBlueskyAuthorization,
-} from "@/services/bluesky-oauth";
+import { disconnectBlueskyAccount } from "@/services/bluesky-disconnect";
+import { authenticateBlueskyAccount } from "@/services/bluesky-oauth";
 import type { AccountTabKey, AccountTabProps } from "@/types/account-tabs";
 import { BrowseTab } from "./tabs/browse-tab";
 import { DashboardTab } from "./tabs/dashboard-tab";
@@ -123,15 +121,9 @@ export default function AccountScreen() {
 
     try {
       console.log("[AccountScreen] handleSignOut -> start", account.id);
-      await revokeBlueskyAuthorization(account.id);
-      console.log(
-        "[AccountScreen] revokeBlueskyAuthorization complete",
-        account.id,
-      );
-      setAuthStatus(ACCOUNT_AUTH_STATUS.signedOut);
-      const nextStatus = await runWithAccountController(account, (controller) =>
-        verifyBlueskyAccountAuthStatus(controller, account),
-      );
+      // disconnectBlueskyAccount reports signed out even if the status check
+      // that follows the revoke fails, so there is nothing to set optimistically.
+      const nextStatus = await disconnectBlueskyAccount(account);
       console.log(
         "[AccountScreen] handleSignOut -> verified",
         account.id,

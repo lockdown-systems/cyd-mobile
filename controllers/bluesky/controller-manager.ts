@@ -100,6 +100,23 @@ export async function withBlueskyController<T>(
   return fn(controller);
 }
 
+/**
+ * Drop the cached controller's agent so its next use rebuilds it from the
+ * stored Bluesky connection. Call this whenever the connection behind a
+ * cached controller changes — disconnecting or reauthenticating — since the
+ * controller itself survives both.
+ */
+export function resetBlueskyControllerAgent(accountId: number): void {
+  const entry = controllerManager.get(accountId);
+  if (!entry || entry.disposePromise) {
+    console.log("[BlueskyControllerManager] reset agent -> no-op", accountId);
+    return;
+  }
+
+  console.log("[BlueskyControllerManager] reset agent", accountId);
+  entry.controller.resetAgent();
+}
+
 export async function disposeBlueskyController(
   accountId: number,
 ): Promise<void> {

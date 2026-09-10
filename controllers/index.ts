@@ -23,5 +23,6 @@ export {
   disposeAllBlueskyControllersForTests,
   disposeBlueskyController,
   getBlueskyController,
+  resetBlueskyControllerAgent,
   withBlueskyController,
 } from "./bluesky/controller-manager";

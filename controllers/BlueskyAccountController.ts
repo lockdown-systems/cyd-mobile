@@ -349,6 +349,24 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   }
 
   /**
+   * Drop the in-memory agent and the identity it was built from.
+   *
+   * The agent holds one Bluesky connection for the life of the controller, so
+   * anything that invalidates or replaces that connection — disconnecting,
+   * reauthenticating — has to reset it. Otherwise the next request goes out
+   * over the old session, and the refresh that atproto attempts on the
+   * resulting 401 deletes the stored connection, including a newer one that
+   * shares the same key. Unlike cleanup(), the controller stays usable: the
+   * next initAgent() rebuilds from whatever connection is stored now.
+   */
+  resetAgent(): void {
+    console.log("[BlueskyController] resetAgent", this.accountId);
+    this.agent = null;
+    this.did = null;
+    this.handle = null;
+  }
+
+  /**
    * Refresh the session after re-authentication
    */
   async refreshSession(newSession: OAuthSession): Promise<void> {
@@ -1743,9 +1761,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Clean up resources
    */
   async cleanup(): Promise<void> {
-    this.agent = null;
-    this.did = null;
-    this.handle = null;
+    this.resetAgent();
     await super.cleanup();
   }
 }

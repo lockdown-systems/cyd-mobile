@@ -3,6 +3,7 @@ import {
   disposeAllBlueskyControllersForTests,
   disposeBlueskyController,
   getBlueskyController,
+  resetBlueskyControllerAgent,
   withBlueskyController,
 } from "../controller-manager";
 
@@ -10,6 +11,7 @@ type MockController = {
   initDB: jest.Mock<Promise<void>, []>;
   cleanup: jest.Mock<Promise<void>, []>;
   deleteAccountStorage: jest.Mock<Promise<void>, []>;
+  resetAgent: jest.Mock<void, []>;
 };
 
 const mockControllers: MockController[] = [];
@@ -23,6 +25,7 @@ jest.mock("@/controllers/BlueskyAccountController", () => {
           initDB: jest.fn(async () => undefined),
           cleanup: jest.fn(async () => undefined),
           deleteAccountStorage: jest.fn(async () => undefined),
+          resetAgent: jest.fn(() => undefined),
         };
         mockControllers.push(controller);
         return controller;
@@ -117,6 +120,7 @@ describe("bluesky controller manager", () => {
         initDB: jest.fn(() => initDbImpl()),
         cleanup: jest.fn(async () => undefined),
         deleteAccountStorage: jest.fn(async () => undefined),
+        resetAgent: jest.fn(() => undefined),
       };
       mockControllers.push(controller);
       return controller;
@@ -155,5 +159,23 @@ describe("bluesky controller manager", () => {
     expect(second).not.toBe(first);
     expect(mockControllers[0].cleanup).toHaveBeenCalledTimes(1);
     expect(mockControllers[1].initDB).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: disconnecting leaves the cached controller in place, so its
+  // agent has to be dropped explicitly or it keeps using the revoked session.
+  it("resets the cached agent without disposing the controller", async () => {
+    const controller = await getBlueskyController(60, "uuid-60");
+
+    resetBlueskyControllerAgent(60);
+
+    expect(mockControllers[0].resetAgent).toHaveBeenCalledTimes(1);
+    expect(mockControllers[0].cleanup).not.toHaveBeenCalled();
+    expect(await getBlueskyController(60, "uuid-60")).toBe(controller);
+    expect(mockControllers).toHaveLength(1);
+  });
+
+  it("ignores an agent reset for an account with no cached controller", () => {
+    expect(() => resetBlueskyControllerAgent(61)).not.toThrow();
+    expect(mockControllers).toHaveLength(0);
   });
 });
