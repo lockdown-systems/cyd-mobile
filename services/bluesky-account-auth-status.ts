@@ -8,6 +8,7 @@ import {
 } from "@/controllers/config";
 import type { AccountListItem } from "@/database/accounts";
 import { emitAuthStatusChange } from "@/services/auth-events";
+import { getBlueskyConnection } from "@/services/bluesky-connection-store";
 
 export function normalizeHandle(
   handle: string | null | undefined,
@@ -63,6 +64,30 @@ function isMissingSessionError(err: unknown): boolean {
  * from the stored connection, so the check reflects the connection that exists
  * now rather than the one the controller was last built from.
  */
+/**
+ * Whether this device still holds a Bluesky connection for the account.
+ *
+ * When atproto concludes that a session is unusable it deletes the stored
+ * connection, so an empty store after a failed check is the dependable signal
+ * that the account is signed out. The error itself is not: the one that
+ * surfaces from a revoked session says only that it expired, and atproto's
+ * refresh failures carry whatever description the authorization server sent
+ * back. A store that cannot be read counts as intact, so a failure to read it
+ * never signs the account out on its own.
+ */
+async function hasStoredConnection(account: AccountListItem): Promise<boolean> {
+  try {
+    const connection = await getBlueskyConnection({
+      accountUUID: account.uuid,
+      legacyDid: account.did ?? undefined,
+    });
+    return connection !== null;
+  } catch (err) {
+    console.warn("Failed to read the stored Bluesky connection", err);
+    return true;
+  }
+}
+
 export async function verifyBlueskyAccountAuthStatus(
   controller: BlueskyAccountController,
   account: AccountListItem,
@@ -114,9 +139,11 @@ export async function verifyBlueskyAccountAuthStatus(
     console.log("[AuthStatus] profile match result", account.id, status);
   } catch (err) {
     console.warn("Unable to verify Bluesky auth status", err);
-    if (isMissingSessionError(err)) {
+    if (isMissingSessionError(err) || !(await hasStoredConnection(account))) {
       status = ACCOUNT_AUTH_STATUS.signedOut;
     } else {
+      // The connection is still there, so the check failed for some other
+      // reason — being offline, most likely. Leave the status alone.
       status = storedStatus ?? ACCOUNT_AUTH_STATUS.signedOut;
     }
   }
