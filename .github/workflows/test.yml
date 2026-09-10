@@ -33,6 +33,9 @@ jobs:
       - name: Run canonical Bluesky archive contract tests
         run: npm run test:archive-contract
 
+      - name: Verify the archive conformance checker still rejects bad archives
+        run: npm run test:archive-conformance
+
       - name: Check for a newer canonical Bluesky archive bundle
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -9,34 +9,19 @@ import os
 import sqlite3
 import subprocess
 import tempfile
-import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Any
 
+import bundle
 
-SCRIPT_ROOT = Path(__file__).resolve().parent
-PIN = json.loads((SCRIPT_ROOT / "pin.json").read_text(encoding="utf-8"))
+
+PIN = bundle.PIN
 FILES = (
     "fixtures/complete.cyd",
     "fixtures/incomplete.cyd",
     "fixtures/semantic-expectations.json",
 )
-
-
-def download_bundle(destination: Path) -> None:
-    base_url = (
-        f"https://raw.githubusercontent.com/{PIN['repository']}/"
-        f"{PIN['commit']}/{PIN['path']}"
-    )
-    for relative_path in FILES:
-        output = destination / relative_path
-        output.parent.mkdir(parents=True, exist_ok=True)
-        request = urllib.request.Request(
-            f"{base_url}/{relative_path}", headers={"User-Agent": "cyd-mobile-ci"}
-        )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            output.write_bytes(response.read())
 
 
 def rows(database: sqlite3.Connection, query: str) -> list[dict[str, Any]]:
@@ -68,8 +53,8 @@ def raw_mobile_tables(database: sqlite3.Connection) -> dict[str, Any]:
     return {table: rows(database, query) for table, query in queries.items()}
 
 
-def prepare_fixture(bundle: Path, fixture_name: str) -> None:
-    archive_path = bundle / "fixtures" / fixture_name
+def prepare_fixture(bundle_root: Path, fixture_name: str) -> None:
+    archive_path = bundle_root / "fixtures" / fixture_name
     with tempfile.TemporaryDirectory(prefix="cyd-bluesky-v2-") as extracted:
         with zipfile.ZipFile(archive_path) as archive:
             archive.extractall(extracted)
@@ -92,7 +77,7 @@ def prepare_fixture(bundle: Path, fixture_name: str) -> None:
         database = sqlite3.connect(Path(extracted) / "data.db")
         database.row_factory = sqlite3.Row
         try:
-            mobile_input = bundle / "mobile-input" / f"{fixture_name}.json"
+            mobile_input = bundle_root / "mobile-input" / f"{fixture_name}.json"
             mobile_input.parent.mkdir(parents=True, exist_ok=True)
             mobile_input.write_text(
                 json.dumps(
@@ -106,10 +91,10 @@ def prepare_fixture(bundle: Path, fixture_name: str) -> None:
 
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="cyd-contract-") as directory:
-        bundle = Path(directory)
-        download_bundle(bundle)
-        prepare_fixture(bundle, "complete.cyd")
-        prepare_fixture(bundle, "incomplete.cyd")
+        bundle_root = Path(directory)
+        bundle.download(FILES, bundle_root)
+        prepare_fixture(bundle_root, "complete.cyd")
+        prepare_fixture(bundle_root, "incomplete.cyd")
         subprocess.run(
             [
                 "npm",
@@ -119,7 +104,7 @@ def main() -> None:
                 "services/__tests__/archive-contract-bundle.test.ts",
             ],
             check=True,
-            env={**os.environ, "CYD_BLUESKY_CONTRACT_ROOT": str(bundle)},
+            env={**os.environ, "CYD_BLUESKY_CONTRACT_ROOT": str(bundle_root)},
         )
     print(f"Canonical Bluesky archive semantics match {PIN['commit']}.")
 

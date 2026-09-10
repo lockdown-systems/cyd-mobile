@@ -42,3 +42,7 @@ PLAN.md
 build-*.ipa
 build-*.aab
 google-play-service-account.json
+
+# Python
+__pycache__/
+*.pyc
