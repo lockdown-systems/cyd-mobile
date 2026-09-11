@@ -1,6 +1,7 @@
 import {
   earliest,
   latest,
+  preferCounted,
   preferPopulated,
   unionFlag,
 } from "./union";
@@ -314,7 +315,7 @@ function unionPost(
 ): ExistingPostRow {
   const newer = incoming.savedAt > local.savedAt;
   const metric = (left: number, right: number): number =>
-    newer ? right : left;
+    preferCounted(left, right, newer);
 
   return {
     uri: local.uri,

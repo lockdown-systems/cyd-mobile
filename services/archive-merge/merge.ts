@@ -1,12 +1,11 @@
 import {
   placeArchivedMedia,
+  predictArchivedMedia,
   readBlueskyInterchange,
-  restoredMediaFileName,
   translateInterchangeToMobileRows,
   type BlueskyInterchangeSnapshot,
   type InterchangeAsset,
   type LocalAccountIdentity,
-  type RestoredAssetPlacement,
   type RestoredMobileAccount,
   type UnrestorableContent,
 } from "@/services/archive-restore";
@@ -122,10 +121,8 @@ export async function previewBlueskyArchiveMerge(
   requireMatchingIdentity(snapshot.archive.account_did, request.account);
 
   const incoming = translateInterchangeToMobileRows(snapshot, {
-    placements: predictPlacements(
-      environment,
-      request.account.uuid,
-      snapshot.assets,
+    placements: predictArchivedMedia(snapshot.assets, (fileName) =>
+      environment.accountMediaUri(request.account.uuid, fileName),
     ),
   });
   const plan = await planAgainstAccount(
@@ -252,36 +249,6 @@ function requireMatchingIdentity(
       "This archive belongs to a different Bluesky identity than the account it was about to be merged into.",
     );
   }
-}
-
-/** Where each packaged asset will live once the merge copies it in. */
-function predictPlacements(
-  environment: BlueskyArchiveMergeEnvironment,
-  accountUuid: string,
-  assets: InterchangeAsset[],
-): Map<string, RestoredAssetPlacement> {
-  const placements = new Map<string, RestoredAssetPlacement>();
-  for (const asset of assets) {
-    if (asset.availability !== "available" || !asset.archive_path || !asset.sha256) {
-      placements.set(asset.id, {
-        assetId: asset.id,
-        availability: "missing",
-        reason:
-          asset.unavailable_reason ??
-          "This file was not included in the archive.",
-      });
-      continue;
-    }
-    placements.set(asset.id, {
-      assetId: asset.id,
-      availability: "restored",
-      localPath: environment.accountMediaUri(
-        accountUuid,
-        restoredMediaFileName(asset.sha256),
-      ),
-    });
-  }
-  return placements;
 }
 
 /**

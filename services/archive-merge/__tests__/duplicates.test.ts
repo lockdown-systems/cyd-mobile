@@ -190,6 +190,19 @@ describe("reconciling a Bluesky identity held by two local accounts", () => {
       counts: { posts: 1, profiles: 1 },
       settings: { settingSavePosts: 0, settingDeleteLikes: 1 },
     });
+    // Keeping the restored account brings the other one's lone post with it,
+    // and says which post that is before anybody commits to it.
+    const survivor = preview.accounts.find(
+      (account) => account.uuid === harness.survivor.uuid,
+    );
+    expect(survivor?.gains.records).toEqual([
+      {
+        category: "posts",
+        id: ORPHAN_URI,
+        text: "only on the other copy",
+        createdAt: "2026-02-02T00:00:00.000Z",
+      },
+    ]);
     expect(
       preview.accounts.find(
         (account) => account.uuid === harness.survivor.uuid,

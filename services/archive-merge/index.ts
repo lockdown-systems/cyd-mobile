@@ -23,6 +23,7 @@ export {
 } from "./duplicates";
 export type {
   DuplicateBlueskyIdentity,
+  DuplicateAccountCounts,
   DuplicateAccountPreview,
   DuplicateReconciliationChoice,
   DuplicateReconciliationPreview,

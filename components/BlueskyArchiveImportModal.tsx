@@ -40,9 +40,6 @@ export type BlueskyArchiveImportModalProps = {
   onDismiss: () => void;
 };
 
-/** How many of the records coming back are named before the list is cut off. */
-const LISTED_RESTORATIONS = 5;
-
 export function BlueskyArchiveImportModal({
   state,
   onConfirmLargeArchive,
@@ -174,6 +171,13 @@ export function BlueskyArchiveImportModal({
                         {account.counts.posts} posts · {account.counts.chats}{" "}
                         chats · {account.counts.follows} follows
                       </Text>
+                      {account.gains.total > 0 ? (
+                        <Text style={[styles.body, { color: palette.icon }]}>
+                          Keeping this one brings back {account.gains.total}{" "}
+                          records it does not have, including{" "}
+                          {describeRecord(account.gains.records[0])}.
+                        </Text>
+                      ) : null}
                     </Pressable>
                     <Pressable
                       onPress={() =>
@@ -241,9 +245,8 @@ export function BlueskyArchiveImportModal({
                       These are not in Cyd right now. If you deleted any of them
                       from Cyd on purpose, importing brings them back.
                     </Text>
-                    {state.preview.summary.restorations.records
-                      .slice(0, LISTED_RESTORATIONS)
-                      .map((record) => (
+                    {state.preview.summary.restorations.records.map(
+                      (record) => (
                         <Text
                           key={`${record.category}:${record.id}`}
                           numberOfLines={2}
@@ -253,13 +256,14 @@ export function BlueskyArchiveImportModal({
                             ? `${record.category}: ${record.text.trim()}`
                             : `${record.category}: ${record.id}`}
                         </Text>
-                      ))}
+                      ),
+                    )}
                     {state.preview.summary.restorations.total >
-                    LISTED_RESTORATIONS ? (
+                    state.preview.summary.restorations.records.length ? (
                       <Text style={[styles.body, { color: palette.icon }]}>
                         …and{" "}
                         {state.preview.summary.restorations.total -
-                          LISTED_RESTORATIONS}{" "}
+                          state.preview.summary.restorations.records.length}{" "}
                         more.
                       </Text>
                     ) : null}
@@ -300,6 +304,16 @@ export function BlueskyArchiveImportModal({
       </View>
     </Modal>
   );
+}
+
+/** One restored record, short enough to sit inside a sentence. */
+function describeRecord(record: {
+  category: string;
+  id: string;
+  text: string | null;
+}): string {
+  const text = record.text?.trim();
+  return text ? `“${text.slice(0, 60)}”` : `one ${record.category} record`;
 }
 
 function totalRecords(account: {

@@ -188,6 +188,38 @@ jest.mock("expo-crypto", () => {
   };
 });
 
+// Mock expo-device and expo-notifications: nothing under test is a phone, and
+// no test may put a notifications prompt anywhere near itself. Tests about
+// push notifications mock these again with the behaviour they need.
+jest.mock("expo-device", () => ({
+  __esModule: true,
+  isDevice: false,
+}));
+
+jest.mock("expo-notifications", () => ({
+  __esModule: true,
+  PermissionStatus: {
+    GRANTED: "granted",
+    DENIED: "denied",
+    UNDETERMINED: "undetermined",
+  },
+  AndroidImportance: { HIGH: "high" },
+  getPermissionsAsync: jest.fn(() => Promise.resolve({ status: "denied" })),
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: "denied" })),
+  setNotificationChannelAsync: jest.fn(),
+  getExpoPushTokenAsync: jest.fn(),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({
+    remove: jest.fn(),
+  })),
+  setNotificationHandler: jest.fn(),
+}));
+
+// Mock expo-localization: only the calendar's time zone is ever read.
+jest.mock("expo-localization", () => ({
+  getCalendars: jest.fn(() => [{ timeZone: "UTC" }]),
+}));
+
 // Mock expo-document-picker: tests never open a real file picker, and an
 // import that is cancelled is the default because it touches nothing.
 jest.mock("expo-document-picker", () => ({

@@ -1,5 +1,4 @@
 import type {
-  DiscardableAccount,
   LocalAccountIdentity,
   PreparedArchiveLocation,
   PreparedArchiveStore,
@@ -120,15 +119,17 @@ export type BlueskyArchiveMergeEnvironment = {
    * Mobile has carried a unique index on `bsky_account.did` since its first
    * migration, so duplicates can only reach an installation from outside it —
    * a database restored from an OS backup, or one that predates the index.
-   * Reconciliation ends by putting the rule back, which is also the check that
-   * the duplicates really are gone: the statement fails while any remain.
+   * Putting the rule back is a no-op on a database that still has it, which is
+   * why reconciliation does not treat it as proof: it checks the accounts
+   * itself afterwards.
    */
   enforceOneAccountPerDid(): Promise<void>;
 
-  /** Remove a reconciled-away Bluesky local account and its storage. */
-  removeLocalAccount(account: DiscardableAccount): Promise<void>;
-
-  now(): Date;
+  /**
+   * Remove a reconciled-away Bluesky local account, its storage and its
+   * Bluesky connection, identified the way reconciliation knows it.
+   */
+  removeLocalAccount(accountUuid: string): Promise<void>;
 };
 
 export type { PreparedArchiveLocation, StoredMediaFile };
