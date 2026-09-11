@@ -43,7 +43,11 @@ export type {
   BlueskyInterchangeSnapshot,
   InterchangeAsset,
 } from "./interchange-reader";
-export { placeArchivedMedia, restoredMediaFileName } from "./media";
+export {
+  placeArchivedMedia,
+  predictArchivedMedia,
+  restoredMediaFileName,
+} from "./media";
 export { translateInterchangeToMobileRows } from "./mobile-rows";
 export type {
   MobileBookmarkWrite,

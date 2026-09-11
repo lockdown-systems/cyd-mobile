@@ -4,9 +4,9 @@ import { readExistingAccountRows } from "./account-rows";
 import { BlueskyArchiveMergeError } from "./errors";
 import {
   planBlueskyArchiveMerge,
-  type BlueskyArchiveMergeSummary,
+  type RestorationPreview,
 } from "./merge-plan";
-import { countPlannedWrites, writeMergedAccountRows } from "./merge-writer";
+import { writeMergedAccountRows } from "./merge-writer";
 import type {
   BlueskyArchiveMergeEnvironment,
   ReconcilableAccountSettings,
@@ -48,6 +48,18 @@ export type DuplicateAccountPreview = {
   handle: string | null;
   counts: DuplicateAccountCounts;
   settings: ReconcilableAccountSettings;
+  /**
+   * What this account would take on from the others if it were the one kept.
+   *
+   * Named rather than counted, for the same reason an archive merge names them
+   * (ADR 0018): a record missing from this account may be missing because
+   * somebody deleted it from Cyd here on purpose, and keeping this account
+   * brings it back.
+   */
+  gains: {
+    total: number;
+    records: RestorationPreview[];
+  };
 };
 
 export type DuplicateReconciliationPreview = {
@@ -69,9 +81,6 @@ export type DuplicateReconciliationResult = {
   did: string;
   survivingUuid: string;
   removedUuids: string[];
-  /** Rows the survivor gained, by table, across all the accounts it absorbed. */
-  summary: BlueskyArchiveMergeSummary[];
-  written: number;
 };
 
 /** Every DID this installation holds more than one Bluesky local account for. */
@@ -105,14 +114,35 @@ export async function previewDuplicateReconciliation(
   identity: DuplicateBlueskyIdentity,
 ): Promise<DuplicateReconciliationPreview> {
   const holders = holdersOf(identity.did, identity.accounts);
-  const accounts: DuplicateAccountPreview[] = [];
-
+  const rows = new Map<string, ExistingAccountRows>();
   for (const account of holders) {
+    rows.set(account.uuid, await readAccount(environment, account.uuid));
+  }
+
+  const accounts: DuplicateAccountPreview[] = [];
+  for (const account of holders) {
+    const own = rows.get(account.uuid);
+    if (!own) {
+      continue;
+    }
+    // Planning the union in memory is how the preview and the reconciliation
+    // stay the same answer: one set of rules, asked a question rather than
+    // told to write.
+    const gains = holders
+      .filter((other) => other.uuid !== account.uuid)
+      .map((other) => rows.get(other.uuid))
+      .filter((other): other is ExistingAccountRows => other !== undefined)
+      .map((other) => planBlueskyArchiveMerge(own, other).summary.restorations);
+
     accounts.push({
       uuid: account.uuid,
       handle: account.handle,
-      counts: countRows(await readAccount(environment, account.uuid)),
+      counts: countRows(own),
       settings: await environment.readAccountSettings(account.uuid),
+      gains: {
+        total: gains.reduce((sum, restoration) => sum + restoration.total, 0),
+        records: gains.flatMap((restoration) => restoration.records),
+      },
     });
   }
 
@@ -143,9 +173,6 @@ export async function reconcileDuplicateBlueskyAccounts(
     choice.settingsFromUuid,
   );
 
-  const summary: BlueskyArchiveMergeSummary[] = [];
-  let written = 0;
-
   for (const account of doomed) {
     const incoming = await adoptMedia(
       environment,
@@ -165,8 +192,6 @@ export async function reconcileDuplicateBlueskyAccounts(
       await survivor.transaction(async () => {
         await writeMergedAccountRows(survivor, plan);
       });
-      summary.push(plan.summary);
-      written += countPlannedWrites(plan);
     } finally {
       await survivor.close();
     }
@@ -177,24 +202,39 @@ export async function reconcileDuplicateBlueskyAccounts(
   await environment.applyAccountSettings(choice.survivingUuid, settings);
 
   for (const account of doomed) {
-    await environment.removeLocalAccount({
-      accountId: null,
-      accountUuid: account.uuid,
-    });
+    await environment.removeLocalAccount(account.uuid);
   }
 
   // With one Bluesky local account left for the identity, the rule that there
   // can only be one goes back on, so a later archive import has somewhere
-  // unambiguous to land (ADR 0011).
+  // unambiguous to land (ADR 0011). Putting the index back does nothing on a
+  // database that never lost it, so the accounts are counted rather than
+  // trusted: an identity still held twice here means a removal did not take,
+  // and saying so beats leaving an import with nowhere to go.
   await environment.enforceOneAccountPerDid();
+  await requireSingleHolder(environment, choice.did);
 
   return {
     did: choice.did,
     survivingUuid: choice.survivingUuid,
     removedUuids: doomed.map((account) => account.uuid),
-    summary,
-    written,
   };
+}
+
+/** Check the rule the reconciliation exists to restore actually holds now. */
+async function requireSingleHolder(
+  environment: BlueskyArchiveMergeEnvironment,
+  did: string,
+): Promise<void> {
+  const duplicates = findDuplicateBlueskyIdentities(
+    await environment.listLocalAccountIdentities(),
+  );
+  if (duplicates.some((duplicate) => duplicate.did === did)) {
+    throw new BlueskyArchiveMergeError(
+      "duplicate-identity",
+      "Cyd merged the accounts but could not remove the duplicates, so this device still has more than one Bluesky account for that identity.",
+    );
+  }
 }
 
 function holdersOf(

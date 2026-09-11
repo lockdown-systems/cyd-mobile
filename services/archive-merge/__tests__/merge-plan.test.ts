@@ -168,6 +168,28 @@ describe("planning a Cyd Bluesky archive merge", () => {
     expect(plan.summary.posts).toEqual({ added: 0, updated: 1, unchanged: 0 });
   });
 
+  it("does not let an archive that counted nothing zero out a count", () => {
+    const plan = planBlueskyArchiveMerge(
+      existing({
+        posts: [
+          {
+            ...post({ likeCount: 5, replyCount: 2, savedAt: 5_000 }),
+            preserve: 0,
+          },
+        ],
+      }),
+      incoming({
+        posts: [
+          archived(
+            post({ likeCount: 0, replyCount: 3, savedAt: 9_000 }),
+          ),
+        ],
+      }),
+    );
+
+    expect(plan.posts[0]).toMatchObject({ likeCount: 5, replyCount: 3 });
+  });
+
   it("keeps a like the archive was taken before, and takes one it was taken after", () => {
     const plan = planBlueskyArchiveMerge(
       existing({

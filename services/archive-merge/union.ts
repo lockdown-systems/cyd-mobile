@@ -32,6 +32,30 @@ export function preferPopulated<T>(
   return incomingIsNewer ? incoming : local;
 }
 
+/**
+ * An engagement count, where a zero is usually "not counted".
+ *
+ * The interchange model carries metrics inside a record's payload, and an
+ * archive written by a client that did not capture them translates to zero
+ * rather than to nothing. A zero is therefore not an observation that a post
+ * has no likes, and must not overwrite a number this device actually saw. A
+ * count that really did fall to zero is the price, and it is the safe side of
+ * the trade: nothing is lost, and the next save corrects it.
+ */
+export function preferCounted(
+  local: number,
+  incoming: number,
+  incomingIsNewer: boolean,
+): number {
+  if (incoming === 0) {
+    return local;
+  }
+  if (local === 0) {
+    return incoming;
+  }
+  return incomingIsNewer ? incoming : local;
+}
+
 /** A flag either side set stays set: a union never takes a like back. */
 export function unionFlag(
   local: number | null,

@@ -404,8 +404,8 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
       );
     },
 
-    removeLocalAccount: async (account: DiscardableAccount) =>
-      removeAccount(account),
+    removeLocalAccount: async (accountUuid: string) =>
+      removeAccount({ accountId: null, accountUuid }),
 
     discardLocalAccount: async (account: DiscardableAccount) =>
       removeAccount(account),

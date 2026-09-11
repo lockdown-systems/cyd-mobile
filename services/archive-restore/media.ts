@@ -18,6 +18,60 @@ export function restoredMediaFileName(sha256: string): string {
   return `sha256-${sha256}`;
 }
 
+/**
+ * What an asset the archive cannot supply looks like, wherever it is noticed.
+ *
+ * A merge works this out before it copies anything, so that somebody can be
+ * shown the rows it would write; a restore works it out as it copies. Both
+ * have to reach the same answer, so they ask the same function.
+ */
+function missingPlacement(asset: InterchangeAsset): RestoredAssetPlacement {
+  return {
+    assetId: asset.id,
+    availability: "missing",
+    reason:
+      asset.unavailable_reason ?? "This file was not included in the archive.",
+  };
+}
+
+/** Whether the archive claims to carry this file's bytes at all. */
+function isPackaged(
+  asset: InterchangeAsset,
+): asset is InterchangeAsset & { archive_path: string; sha256: string } {
+  return (
+    asset.availability === "available" &&
+    asset.archive_path !== null &&
+    asset.sha256 !== null
+  );
+}
+
+/**
+ * Where each packaged asset will end up, without moving a byte.
+ *
+ * Media is content-addressed, so its path is a fact about the file rather than
+ * a result of copying it. That is what lets a merge plan the exact rows it
+ * would write before anybody has agreed to the merge (ADR 0018).
+ */
+export function predictArchivedMedia(
+  assets: InterchangeAsset[],
+  mediaUriFor: (fileName: string) => string,
+): Map<string, RestoredAssetPlacement> {
+  const placements = new Map<string, RestoredAssetPlacement>();
+  for (const asset of assets) {
+    placements.set(
+      asset.id,
+      isPackaged(asset)
+        ? {
+            assetId: asset.id,
+            availability: "restored",
+            localPath: mediaUriFor(restoredMediaFileName(asset.sha256)),
+          }
+        : missingPlacement(asset),
+    );
+  }
+  return placements;
+}
+
 /** The one capability placing media needs, out of the larger environments. */
 export type MediaStore = {
   storeAccountMedia(
@@ -50,14 +104,8 @@ export async function placeArchivedMedia(
   let placed = 0;
 
   for (const asset of options.assets) {
-    if (asset.availability !== "available" || !asset.archive_path || !asset.sha256) {
-      placements.set(asset.id, {
-        assetId: asset.id,
-        availability: "missing",
-        reason:
-          asset.unavailable_reason ??
-          "This file was not included in the archive.",
-      });
+    if (!isPackaged(asset)) {
+      placements.set(asset.id, missingPlacement(asset));
       continue;
     }
 

@@ -82,8 +82,6 @@ export type BlueskyArchiveImportRuntime = {
   intake: BlueskyArchiveIntakeEnvironment;
   restore: BlueskyArchiveRestoreEnvironment;
   merge: BlueskyArchiveMergeEnvironment;
-  /** Server-scheduled reminders, which reconciliation has to keep honest. */
-  reminders: ScheduledReminderSync;
   newIntakeId(): string;
 };
 
@@ -104,7 +102,6 @@ function createDeviceRuntime(): BlueskyArchiveImportRuntime {
     intake: createBlueskyArchiveIntakeEnvironment(),
     restore: createBlueskyArchiveRestoreEnvironment(),
     merge: createBlueskyArchiveMergeEnvironment(),
-    reminders: NO_SCHEDULED_REMINDERS,
     newIntakeId: () => Crypto.randomUUID(),
   };
 }
@@ -113,7 +110,6 @@ type Session = {
   intakeId: string;
   sourceUri: string;
   confirmedLargeArchive: boolean;
-  cancelled: boolean;
   /** Set once intake ends *prepared*, so a later step can reach the staging. */
   prepared: PreparedBlueskyArchive | null;
 };
@@ -163,8 +159,30 @@ export function useBlueskyArchiveImport(
     runtime ?? null,
   );
   const sessionRef = useRef<Session | null>(null);
+  /**
+   * Which import the person is actually in.
+   *
+   * Every step of an import is asynchronous and none of them can be called
+   * back: reading an archive off the device, or working out what a merge would
+   * do, runs to completion whatever happens on screen. Walking away moves the
+   * count on, and a step that finishes afterwards finds it has been left
+   * behind and says nothing — otherwise a cancelled import would reappear,
+   * pointing at staging it no longer has.
+   */
+  const generationRef = useRef(0);
 
-  const environments = useCallback((): BlueskyArchiveImportRuntime => {
+  const settle = useCallback(
+    (generation: number, next: BlueskyArchiveImportState): boolean => {
+      if (generationRef.current !== generation) {
+        return false;
+      }
+      setState(next);
+      return true;
+    },
+    [],
+  );
+
+  const importRuntime = useCallback((): BlueskyArchiveImportRuntime => {
     if (!runtimeRef.current) {
       runtimeRef.current = createDeviceRuntime();
     }
@@ -178,19 +196,20 @@ export function useBlueskyArchiveImport(
       return;
     }
     try {
-      cancelBlueskyArchiveIntake(environments().intake, session.intakeId);
+      cancelBlueskyArchiveIntake(importRuntime().intake, session.intakeId);
     } catch (error) {
       console.warn("[archive-import] could not clear staging", error);
     }
     sessionRef.current = null;
-  }, [environments]);
+  }, [importRuntime]);
 
   const runRestore = useCallback(
     async (
       prepared: PreparedBlueskyArchive,
       environment: BlueskyArchiveRestoreEnvironment,
+      generation: number,
     ): Promise<void> => {
-      setState({
+      settle(generation, {
         status: "working",
         message: "Restoring the account…",
         fraction: null,
@@ -203,7 +222,7 @@ export function useBlueskyArchiveImport(
           stagingRoot: prepared.stagingRoot,
         },
         onProgress: (progress) =>
-          setState({
+          settle(generation, {
             status: "working",
             message: "Restoring the account…",
             fraction:
@@ -216,7 +235,7 @@ export function useBlueskyArchiveImport(
 
       sessionRef.current = null;
       emitLocalAccountsChanged();
-      setState({
+      settle(generation, {
         status: "done",
         title: `Restored @${result.handle}`,
         lines: [
@@ -227,7 +246,7 @@ export function useBlueskyArchiveImport(
         ],
       });
     },
-    [],
+    [settle],
   );
 
   const openMergePreview = useCallback(
@@ -235,8 +254,9 @@ export function useBlueskyArchiveImport(
       prepared: PreparedBlueskyArchive,
       environment: BlueskyArchiveMergeEnvironment,
       account: LocalAccountIdentity,
+      generation: number,
     ): Promise<void> => {
-      setState({
+      settle(generation, {
         status: "working",
         message: "Working out what this archive would add…",
         fraction: null,
@@ -251,56 +271,63 @@ export function useBlueskyArchiveImport(
         account,
       });
 
-      setState({
+      settle(generation, {
         status: "reviewing",
         preview,
         handle: account.handle ?? preview.accountDid,
       });
     },
-    [],
+    [settle],
   );
 
   /** Where this archive goes, decided by the DID intake reported. */
   const route = useCallback(
     async (
       prepared: PreparedBlueskyArchive,
-      environment: Pick<BlueskyArchiveImportRuntime, "restore" | "merge">,
+      ports: Pick<BlueskyArchiveImportRuntime, "restore" | "merge">,
+      generation: number,
     ): Promise<void> => {
       const identities =
-        await environment.merge.listLocalAccountIdentities();
+        await ports.merge.listLocalAccountIdentities();
       const destination = chooseBlueskyArchiveImportDestination(
         prepared.metadata.accountDid,
         identities,
       );
 
       if (destination.kind === "restore") {
-        await runRestore(prepared, environment.restore);
+        await runRestore(prepared, ports.restore, generation);
         return;
       }
       if (destination.kind === "merge") {
-        await openMergePreview(prepared, environment.merge, destination.account);
+        await openMergePreview(
+          prepared,
+          ports.merge,
+          destination.account,
+          generation,
+        );
         return;
       }
 
-      setState({
+      const reconciliation = await previewDuplicateReconciliation(
+        ports.merge,
+        { did: destination.did, accounts: identities },
+      );
+      settle(generation, {
         status: "reconciling",
         message:
           "This device has more than one Bluesky account for the identity in this archive. Choose which one to keep before importing.",
-        preview: await previewDuplicateReconciliation(environment.merge, {
-          did: destination.did,
-          accounts: identities,
-        }),
+        preview: reconciliation,
       });
     },
-    [openMergePreview, runRestore],
+    [openMergePreview, runRestore, settle],
   );
 
   const run = useCallback(
-    async (session: Session): Promise<void> => {
-      const { intake, restore, merge } = environments();
+    async (session: Session, generation: number): Promise<void> => {
+      const { intake, restore, merge } = importRuntime();
       sessionRef.current = session;
 
-      setState({
+      settle(generation, {
         status: "working",
         message: "Reading the archive…",
         fraction: null,
@@ -313,9 +340,11 @@ export function useBlueskyArchiveImport(
         openReader: async () =>
           openBlueskyArchiveByteReader(session.sourceUri),
         confirmLargeArchive: session.confirmedLargeArchive,
-        shouldCancel: () => session.cancelled,
+        // Intake asks between payloads, so walking away stops the extraction
+        // itself rather than only what it reports.
+        shouldCancel: () => generationRef.current !== generation,
         onProgress: (progress) =>
-          setState({
+          settle(generation, {
             status: "working",
             message: "Reading the archive…",
             fraction:
@@ -328,7 +357,7 @@ export function useBlueskyArchiveImport(
 
       if (outcome.status === "cancelled") {
         sessionRef.current = null;
-        setState({ status: "idle" });
+        settle(generation, { status: "idle" });
         return;
       }
       if (outcome.status === "rejected") {
@@ -337,52 +366,69 @@ export function useBlueskyArchiveImport(
         // again resumes. Nothing offers to resume from here, so a rejection
         // ends the import and takes any staging with it either way.
         discardStaging();
-        setState({ status: "failed", message: outcome.message });
+        settle(generation, { status: "failed", message: outcome.message });
         return;
       }
       if (outcome.status === "needs-confirmation") {
-        setState({ status: "needs-confirmation", message: outcome.message });
+        settle(generation, {
+          status: "needs-confirmation",
+          message: outcome.message,
+        });
+        return;
+      }
+
+      if (generationRef.current !== generation) {
+        // Somebody walked away while the last of the archive was being read.
+        // Intake finished anyway, so the staging it prepared is this import's
+        // to clear.
+        discardStaging();
         return;
       }
 
       sessionRef.current = { ...session, prepared: outcome };
-      await route(outcome, { restore, merge });
+      await route(outcome, { restore, merge }, generation);
     },
-    [discardStaging, environments, route],
+    [discardStaging, importRuntime, route, settle],
   );
 
   /** Pick the archive and take it as far as it can go without a decision. */
   const start = useCallback(async (): Promise<void> => {
+    const generation = (generationRef.current += 1);
     try {
-      const picked = await environments().pickArchive();
+      const picked = await importRuntime().pickArchive();
       if (!picked) {
         return;
       }
-      await run({
-        intakeId: environments().newIntakeId(),
-        sourceUri: picked.uri,
-        confirmedLargeArchive: false,
-        cancelled: false,
-        prepared: null,
-      });
+      await run(
+        {
+          intakeId: importRuntime().newIntakeId(),
+          sourceUri: picked.uri,
+          confirmedLargeArchive: false,
+          prepared: null,
+        },
+        generation,
+      );
     } catch (error) {
       discardStaging();
-      setState({ status: "failed", message: messageFor(error) });
+      settle(generation, { status: "failed", message: messageFor(error) });
     }
-  }, [discardStaging, environments, run]);
+  }, [discardStaging, importRuntime, run, settle]);
 
   const confirmLargeArchive = useCallback(async (): Promise<void> => {
     const session = sessionRef.current;
     if (!session) {
       return;
     }
+    // The same import, carried on: the generation does not move, so cancelling
+    // still reaches everything this starts.
+    const generation = generationRef.current;
     try {
-      await run({ ...session, confirmedLargeArchive: true });
+      await run({ ...session, confirmedLargeArchive: true }, generation);
     } catch (error) {
       discardStaging();
-      setState({ status: "failed", message: messageFor(error) });
+      settle(generation, { status: "failed", message: messageFor(error) });
     }
-  }, [discardStaging, run]);
+  }, [discardStaging, run, settle]);
 
   /** Commit a merge the person has looked at. */
   const confirmMerge = useCallback(async (): Promise<void> => {
@@ -390,19 +436,20 @@ export function useBlueskyArchiveImport(
       return;
     }
     const { preview, handle } = state;
+    const generation = generationRef.current;
     try {
-      setState({
+      settle(generation, {
         status: "working",
         message: "Merging the archive…",
         fraction: null,
         cancellable: false,
       });
       const result = await commitBlueskyArchiveMerge(
-        environments().merge,
+        importRuntime().merge,
         preview,
         {
           onProgress: (progress) =>
-            setState({
+            settle(generation, {
               status: "working",
               message: "Merging the archive…",
               fraction:
@@ -416,7 +463,7 @@ export function useBlueskyArchiveImport(
 
       sessionRef.current = null;
       emitLocalAccountsChanged();
-      setState({
+      settle(generation, {
         status: "done",
         title: `Merged into @${handle}`,
         lines:
@@ -430,9 +477,9 @@ export function useBlueskyArchiveImport(
       });
     } catch (error) {
       discardStaging();
-      setState({ status: "failed", message: messageFor(error) });
+      settle(generation, { status: "failed", message: messageFor(error) });
     }
-  }, [discardStaging, environments, state]);
+  }, [discardStaging, importRuntime, settle, state]);
 
   /**
    * Keep one of the duplicate Bluesky local accounts, then carry on importing.
@@ -450,9 +497,10 @@ export function useBlueskyArchiveImport(
         return;
       }
       const { prepared } = session;
-      const { merge } = environments();
+      const { merge } = importRuntime();
+      const generation = generationRef.current;
       try {
-        setState({
+        settle(generation, {
           status: "working",
           message: "Merging the duplicate accounts…",
           fraction: null,
@@ -465,10 +513,7 @@ export function useBlueskyArchiveImport(
           settingsFromUuid: choice.settingsFromUuid,
         });
         emitLocalAccountsChanged();
-        await syncReminders(
-          reminders ?? environments().reminders,
-          reconciled,
-        );
+        await syncReminders(reminders ?? NO_SCHEDULED_REMINDERS, reconciled);
 
         const survivor = (await merge.listLocalAccountIdentities()).find(
           (account) => account.uuid === choice.survivingUuid,
@@ -478,26 +523,30 @@ export function useBlueskyArchiveImport(
             "Cyd could not find the Bluesky account it just kept.",
           );
         }
-        await openMergePreview(prepared, merge, survivor);
+        await openMergePreview(prepared, merge, survivor, generation);
       } catch (error) {
         discardStaging();
-        setState({ status: "failed", message: messageFor(error) });
+        settle(generation, { status: "failed", message: messageFor(error) });
       }
     },
-    [discardStaging, environments, openMergePreview, reminders, state],
+    [discardStaging, importRuntime, openMergePreview, reminders, settle, state],
   );
 
-  /** Walk away: nothing has been written, and nothing stays staged. */
+  /**
+   * Walk away: nothing has been written, and nothing stays staged.
+   *
+   * Moving the generation on is what makes this final. A step already in
+   * flight — an archive being read, a merge being worked out — cannot be
+   * stopped mid-call, but it can be made to report to nobody.
+   */
   const cancel = useCallback((): void => {
-    const session = sessionRef.current;
-    if (session) {
-      session.cancelled = true;
-    }
+    generationRef.current += 1;
     discardStaging();
     setState({ status: "idle" });
   }, [discardStaging]);
 
   const dismiss = useCallback((): void => {
+    generationRef.current += 1;
     sessionRef.current = null;
     setState({ status: "idle" });
   }, []);

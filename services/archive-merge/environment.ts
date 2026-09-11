@@ -58,8 +58,18 @@ function asMergeableAccountDatabase(
   };
 }
 
+/**
+ * Where a media file lives, in the exact form storing it reports back.
+ *
+ * A merge previews the rows it would write before it copies any bytes, so the
+ * predicted path has to be the one `storeAccountMedia` ends up returning —
+ * otherwise every import would look like it had media to update. Going through
+ * `File` is what guarantees they agree: the same normalization on both sides.
+ */
 function mediaUri(accountUuid: string, fileName: string): string {
-  return `${buildAccountPaths("bluesky", accountUuid).mediaDir}${fileName}`;
+  return new File(
+    `${buildAccountPaths("bluesky", accountUuid).mediaDir}${fileName}`,
+  ).uri;
 }
 
 export function createBlueskyArchiveMergeEnvironment(): BlueskyArchiveMergeEnvironment {
@@ -154,18 +164,21 @@ export function createBlueskyArchiveMergeEnvironment(): BlueskyArchiveMergeEnvir
       );
     },
 
-    removeLocalAccount: async (account) => {
-      if (account.accountId !== null) {
-        await deleteAccount(account.accountId);
+    removeLocalAccount: async (accountUuid) => {
+      const account = (await listAccounts()).find(
+        (candidate) => candidate.uuid === accountUuid,
+      );
+      if (account) {
+        // `deleteAccount` takes the Bluesky connection with it, which is the
+        // right end for an account nobody is keeping.
+        await deleteAccount(account.id);
       }
       const directory = new Directory(
-        buildAccountPaths("bluesky", account.accountUuid).accountDir,
+        buildAccountPaths("bluesky", accountUuid).accountDir,
       );
       if (directory.exists) {
         directory.delete();
       }
     },
-
-    now: () => new Date(),
   };
 }
