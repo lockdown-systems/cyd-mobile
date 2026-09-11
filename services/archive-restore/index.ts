@@ -12,8 +12,14 @@
  *
  * What leaves this module is the entry point, the failures a caller has to
  * tell somebody about, and the ports an adapter has to implement. Everything
- * else — the interchange reader, the translation, the row writer — is internal,
- * and its tests reach for it directly.
+ * else — the translation and the row writer — is internal, and its tests reach
+ * for it directly.
+ *
+ * The pieces a merge needs are the exception. Reading a version 2 interchange
+ * database, translating it into Mobile's rows, and copying its media into an
+ * account are the same work whichever half of the import is running, so they
+ * are exported here and #97 consumes them rather than growing a second v2
+ * adapter that can drift from this one.
  */
 
 export { createBlueskyArchiveRestoreEnvironment } from "./environment";
@@ -32,7 +38,27 @@ export type {
   RestoredAssetSummary,
   RestoredCategoryCounts,
 } from "./restore";
-export type { UnrestorableContent } from "./mobile-rows";
+export { readBlueskyInterchange } from "./interchange-reader";
+export type {
+  BlueskyInterchangeSnapshot,
+  InterchangeAsset,
+} from "./interchange-reader";
+export { placeArchivedMedia, restoredMediaFileName } from "./media";
+export { translateInterchangeToMobileRows } from "./mobile-rows";
+export type {
+  MobileBookmarkWrite,
+  MobileConversationWrite,
+  MobileFollowWrite,
+  MobileMediaAssetWrite,
+  MobileMessageWrite,
+  MobilePostExternalWrite,
+  MobilePostMediaWrite,
+  MobilePostWrite,
+  MobileProfileWrite,
+  RestoredAssetPlacement,
+  RestoredMobileAccount,
+  UnrestorableContent,
+} from "./mobile-rows";
 export type {
   BlueskyArchiveRestoreEnvironment,
   CreatedLocalAccount,

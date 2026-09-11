@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router/react-navigation";
 
 import { type AccountListItem, listAccounts } from "@/database/accounts";
+import { onLocalAccountsChanged } from "@/services/account-events";
 
 export type UseAccountsResult = {
   accounts: AccountListItem[];
@@ -53,6 +54,10 @@ export function useAccounts(): UseAccountsResult {
       void refresh();
     }, [refresh]),
   );
+
+  // An import can add or remove an account while this screen keeps focus, so
+  // focus alone is not enough to keep the list honest (#97).
+  useEffect(() => onLocalAccountsChanged(() => void refresh()), [refresh]);
 
   return { accounts, loading, error, refresh };
 }

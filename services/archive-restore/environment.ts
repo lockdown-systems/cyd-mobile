@@ -91,7 +91,13 @@ async function openAccountDatabase(accountUuid: string): Promise<SQLiteDatabase>
   return database;
 }
 
-function openPreparedArchive(
+/**
+ * Reading a prepared archive out of intake staging.
+ *
+ * Exported because a merge reads the same staging the same way (#97): the
+ * archive does not care which half of the import opened it.
+ */
+export function openPreparedArchive(
   archive: PreparedArchiveLocation,
 ): PreparedArchiveStore {
   const nativeRoot = `${nativeStagingRoot()}/${archive.intakeId}`;
