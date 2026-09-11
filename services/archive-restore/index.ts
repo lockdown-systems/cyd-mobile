@@ -9,48 +9,21 @@
  * It covers the case where the identity is new to this installation. Merging
  * an archive into a Bluesky local account that already exists is a recovery
  * union with its own reconciliation rules (#97).
+ *
+ * What leaves this module is the entry point, the failures a caller has to
+ * tell somebody about, and the ports an adapter has to implement. Everything
+ * else — the interchange reader, the translation, the row writer — is internal,
+ * and its tests reach for it directly.
  */
 
 export { createBlueskyArchiveRestoreEnvironment } from "./environment";
 export { BlueskyArchiveRestoreError } from "./errors";
 export type { BlueskyArchiveRestoreErrorCode } from "./errors";
-export {
-  chooseRestoredAccountHandle,
-  chooseRestoredAccountUuid,
-} from "./identity";
 export type {
-  ChosenRestoredAccountUuid,
   LocalAccountIdentity,
   RestoredUuidRemapping,
 } from "./identity";
-export { readBlueskyInterchange } from "./interchange-reader";
-export type {
-  BlueskyInterchangeSnapshot,
-  InterchangeAsset,
-  InterchangeSelectionCategory,
-} from "./interchange-reader";
-export { translateInterchangeToMobileRows } from "./mobile-rows";
-export type {
-  MobileMediaAssetWrite,
-  MobilePostWrite,
-  RestoredAssetPlacement,
-  RestoredMobileAccount,
-  UnrestorableContent,
-} from "./mobile-rows";
-export type {
-  BlueskyArchiveRestoreEnvironment,
-  CreatedLocalAccount,
-  DiscardableAccount,
-  NewLocalAccountRequest,
-  PreparedArchiveLocation,
-  PreparedArchiveStore,
-  ReadableInterchangeDatabase,
-  RestoredAccountDatabase,
-} from "./ports";
-export {
-  restoreBlueskyArchiveAccount,
-  restoredMediaFileName,
-} from "./restore";
+export { restoreBlueskyArchiveAccount } from "./restore";
 export type {
   BlueskyArchiveRestorePhase,
   BlueskyArchiveRestoreProgress,
@@ -59,5 +32,17 @@ export type {
   RestoredAssetSummary,
   RestoredCategoryCounts,
 } from "./restore";
-export { accountSettingsFromPortableSettings } from "./portable-settings";
-export { writeRestoredAccountRows } from "./account-writer";
+export type { UnrestorableContent } from "./mobile-rows";
+export type {
+  BlueskyArchiveRestoreEnvironment,
+  CreatedLocalAccount,
+  DiscardableAccount,
+  NewLocalAccountRequest,
+  PreparedArchiveLocation,
+  PreparedArchiveStore,
+  ReadableInterchangeDatabase,
+  RestorableSettingColumn,
+  RestoredAccountDatabase,
+  RestoredAccountSettings,
+  StoredMediaFile,
+} from "./ports";

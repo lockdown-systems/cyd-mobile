@@ -51,13 +51,36 @@ export type RestoredAccountDatabase = {
 };
 
 /**
- * Mobile's private per-account settings columns, by column name.
+ * The `bsky_account` columns a Cyd Bluesky archive's portable settings can set.
  *
- * Restore never spells out a column here — {@link
- * accountSettingsFromPortableSettings} does that — so the environment applies
- * whatever the archive actually carried and nothing else.
+ * A closed set rather than free strings, because both adapters interpolate
+ * these names straight into SQL: nothing that is not one of Mobile's own
+ * settings columns can reach a statement.
  */
-export type RestoredAccountSettings = Record<string, number>;
+export const RESTORABLE_SETTING_COLUMNS = [
+  "settingSavePosts",
+  "settingSaveLikes",
+  "settingSaveBookmarks",
+  "settingSaveChats",
+  "settingDeletePosts",
+  "settingDeleteReposts",
+  "settingDeleteLikes",
+  "settingDeleteBookmarks",
+  "settingDeleteChats",
+  "settingDeleteUnfollowEveryone",
+] as const;
+
+export type RestorableSettingColumn = (typeof RESTORABLE_SETTING_COLUMNS)[number];
+
+/**
+ * What the archive asked for, as Mobile's own columns.
+ *
+ * Only the settings it actually carried appear, so an archive that says
+ * nothing about chats leaves Mobile's default alone.
+ */
+export type RestoredAccountSettings = Partial<
+  Record<RestorableSettingColumn, 0 | 1>
+>;
 
 export type NewLocalAccountRequest = {
   uuid: string;

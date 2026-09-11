@@ -7,9 +7,7 @@ export const ACCOUNT_CONFIG_KEYS = {
    * account is still worth having (#96).
    */
   restoredArchiveCompleteness: "restoredArchiveCompleteness",
-  restoredArchiveCreatedAt: "restoredArchiveCreatedAt",
   restoredArchiveUuid: "restoredArchiveUuid",
-  restoredAt: "restoredAt",
 } as const;
 
 export const ACCOUNT_AUTH_STATUS = {

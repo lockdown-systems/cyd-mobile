@@ -23,6 +23,7 @@ import { ARCHIVE_STAGING_DIRECTORY } from "@/services/device-storage";
 import type { LocalAccountIdentity } from "./identity";
 import type {
   BlueskyArchiveRestoreEnvironment,
+  RestorableSettingColumn,
   PreparedArchiveLocation,
   PreparedArchiveStore,
   ReadableInterchangeDatabase,
@@ -163,14 +164,17 @@ export function createBlueskyArchiveRestoreEnvironment(): BlueskyArchiveRestoreE
       // Portable settings apply only to an account being created, so they are
       // written here rather than through the settings screens' own updates,
       // which exist to record a choice somebody just made (ADR 0015).
-      const columns = Object.keys(request.settings);
-      if (columns.length > 0) {
+      const settings = Object.entries(request.settings) as [
+        RestorableSettingColumn,
+        0 | 1,
+      ][];
+      if (settings.length > 0) {
         const main = await getDatabase();
         await main.runAsync(
           `UPDATE bsky_account
-           SET ${columns.map((column) => `${column} = ?`).join(", ")}
+           SET ${settings.map(([column]) => `${column} = ?`).join(", ")}
            WHERE id = (SELECT bskyAccountID FROM account WHERE id = ?);`,
-          [...columns.map((column) => request.settings[column]), account.id],
+          [...settings.map(([, value]) => value), account.id],
         );
       }
 

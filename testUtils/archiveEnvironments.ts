@@ -34,6 +34,7 @@ import { stagedPayloadPath } from "@/services/archive-import";
 import type {
   BlueskyArchiveRestoreEnvironment,
   DiscardableAccount,
+  RestorableSettingColumn,
   NewLocalAccountRequest,
   PreparedArchiveStore,
   ReadableInterchangeDatabase,
@@ -164,6 +165,13 @@ export type NodeRestoreEnvironmentOptions = {
   now?: () => Date;
 };
 
+/**
+ * `main.db` and the account databases are the real thing — Mobile's own
+ * migrations, applied here — but creating an account is written out again
+ * rather than reused from `database/accounts.ts`, which speaks expo-sqlite's
+ * async API. The schema is what keeps the double honest: a column that moves
+ * breaks these statements the same way it breaks the app's.
+ */
 export function createNodeBlueskyArchiveRestoreEnvironment(
   options: NodeRestoreEnvironmentOptions,
 ): NodeRestoreEnvironment {
@@ -239,7 +247,11 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
 
     createLocalAccount: async (request: NewLocalAccountRequest) => {
       const now = Date.now();
-      const settingColumns = Object.keys(request.settings);
+      const settings = Object.entries(request.settings) as [
+        RestorableSettingColumn,
+        0 | 1,
+      ][];
+      const settingColumns = settings.map(([column]) => column);
       const insert = mainDatabase
         .prepare(
           `INSERT INTO bsky_account (
@@ -255,7 +267,7 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
           request.displayName,
           request.avatarUrl,
           request.did,
-          ...settingColumns.map((column) => request.settings[column]),
+          ...settings.map(([, value]) => value),
         );
       const sortOrder = (
         mainDatabase

@@ -1,8 +1,8 @@
+import type { BlueskyInterchangeSnapshot } from "../interchange-reader";
 import {
   translateInterchangeToMobileRows,
-  type BlueskyInterchangeSnapshot,
   type RestoredAssetPlacement,
-} from "..";
+} from "../mobile-rows";
 
 const ACCOUNT_DID = "did:plc:owner";
 const OTHER_DID = "did:plc:other";
@@ -437,6 +437,118 @@ describe("translating a Cyd Bluesky archive into Mobile's rows", () => {
         fullsizeUrl: "https://cdn.example/image",
       }),
     ]);
+  });
+
+  it("points a retry at the repository the media actually lives in", () => {
+    // Media on somebody else's post is in their repository, not this account's,
+    // and `sourceDid` is what a retry fetches the blob from.
+    const snapshot = emptySnapshot();
+    snapshot.records = [
+      postRecord(OTHER_POST, { author_profile_id: profileId(OTHER_DID) }),
+    ];
+    snapshot.profiles.push({
+      id: profileId(OTHER_DID),
+      did: OTHER_DID,
+      handle: "other.bsky.social",
+      display_name: null,
+      avatar_asset_id: null,
+      banner_asset_id: null,
+      captured_at: OBSERVED,
+    });
+    snapshot.selections = [
+      { category: "likes", subject_id: OTHER_POST, selected_at: OBSERVED },
+    ];
+    snapshot.assets = [
+      {
+        id: "bafyimage",
+        kind: "image",
+        media_type: "image/jpeg",
+        byte_count: 10,
+        sha256: "d".repeat(64),
+        archive_path: `media/sha256/dd/${"d".repeat(64)}`,
+        availability: "available",
+        unavailable_reason: null,
+        source_url: "https://cdn.example/image",
+        width: null,
+        height: null,
+        alt_text: null,
+      },
+    ];
+    snapshot.recordAssets = [
+      {
+        owner_type: "record",
+        owner_id: OTHER_POST,
+        asset_id: "bafyimage",
+        role: "content",
+        position: 0,
+      },
+    ];
+
+    const { mediaAssets } = translate(snapshot, [
+      {
+        assetId: "bafyimage",
+        availability: "restored",
+        localPath: "file:///accounts/media/sha256-ddd",
+      },
+    ]);
+
+    expect(mediaAssets[0].sourceDid).toBe(OTHER_DID);
+  });
+
+  it("reports a selection whose record the archive does not carry", () => {
+    const snapshot = emptySnapshot();
+    snapshot.selections = [
+      { category: "likes", subject_id: OTHER_POST, selected_at: OBSERVED },
+      { category: "bookmarks", subject_id: OTHER_POST, selected_at: OBSERVED },
+    ];
+
+    const { posts, bookmarks, unrestorable } = translate(snapshot);
+
+    // Better one fewer like than a post nobody can open.
+    expect(posts).toHaveLength(0);
+    expect(bookmarks).toHaveLength(0);
+    expect(unrestorable.selections).toBe(2);
+  });
+
+  it("does not call a restored avatar unrestorable", () => {
+    const snapshot = emptySnapshot();
+    snapshot.profiles[0].avatar_asset_id = "avatar-asset";
+    snapshot.assets = [
+      {
+        id: "avatar-asset",
+        kind: "image",
+        media_type: "image/jpeg",
+        byte_count: 100,
+        sha256: "e".repeat(64),
+        archive_path: `media/sha256/ee/${"e".repeat(64)}`,
+        availability: "available",
+        unavailable_reason: null,
+        source_url: null,
+        width: null,
+        height: null,
+        alt_text: null,
+      },
+    ];
+    snapshot.recordAssets = [
+      {
+        owner_type: "profile",
+        owner_id: profileId(ACCOUNT_DID),
+        asset_id: "avatar-asset",
+        role: "avatar",
+        position: 0,
+      },
+    ];
+
+    const { profiles, unrestorable } = translate(snapshot, [
+      {
+        assetId: "avatar-asset",
+        availability: "restored",
+        localPath: "file:///accounts/media/sha256-eee",
+      },
+    ]);
+
+    expect(profiles[0].avatarUrl).toBe("file:///accounts/media/sha256-eee");
+    expect(unrestorable.assets).toBe(0);
   });
 
   it("keeps a missing asset explicit, retryable, and still attached to its record", () => {

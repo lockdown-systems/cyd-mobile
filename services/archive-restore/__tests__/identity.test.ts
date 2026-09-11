@@ -1,8 +1,9 @@
+import { BlueskyArchiveRestoreError } from "../errors";
 import {
-  BlueskyArchiveRestoreError,
   chooseRestoredAccountHandle,
   chooseRestoredAccountUuid,
-} from "..";
+  requireUnknownIdentity,
+} from "../identity";
 
 const ARCHIVE_UUID = "b67bfc6c-6155-47ef-8273-71593e04f01a";
 const ARCHIVE_DID = "did:plc:yn45xekh5kqrat27w6rmafcg";
@@ -14,7 +15,6 @@ describe("choosing the restored account's UUID", () => {
     expect(
       chooseRestoredAccountUuid({
         archiveUuid: ARCHIVE_UUID,
-        archiveDid: ARCHIVE_DID,
         existing: [{ uuid: "other-uuid", did: "did:plc:somebodyelse", handle: null }],
         newUuid,
       }),
@@ -24,7 +24,6 @@ describe("choosing the restored account's UUID", () => {
   it("remaps, and reports the remapping, when another identity holds the UUID", () => {
     const chosen = chooseRestoredAccountUuid({
       archiveUuid: ARCHIVE_UUID,
-      archiveDid: ARCHIVE_DID,
       existing: [{ uuid: ARCHIVE_UUID, did: "did:plc:somebodyelse", handle: null }],
       newUuid,
     });
@@ -41,7 +40,6 @@ describe("choosing the restored account's UUID", () => {
     const generated = ["11111111-2222-3333-4444-555555555555", "fresh-uuid"];
     const chosen = chooseRestoredAccountUuid({
       archiveUuid: ARCHIVE_UUID,
-      archiveDid: ARCHIVE_DID,
       existing: [
         { uuid: ARCHIVE_UUID, did: "did:plc:somebodyelse", handle: null },
         { uuid: "11111111-2222-3333-4444-555555555555", did: "did:plc:another", handle: null },
@@ -52,29 +50,29 @@ describe("choosing the restored account's UUID", () => {
     expect(chosen.uuid).toBe("fresh-uuid");
   });
 
-  it("refuses to restore a DID this installation already has a local account for", () => {
-    // Merging into an existing local account is a recovery union (#97), not a
-    // restore, and doing it by accident would create a duplicate identity.
+});
+
+describe("refusing an identity this installation already holds", () => {
+  it("passes an identity Cyd has never seen", () => {
     expect(() =>
-      chooseRestoredAccountUuid({
-        archiveUuid: ARCHIVE_UUID,
-        archiveDid: ARCHIVE_DID,
-        existing: [{ uuid: "some-other-uuid", did: ARCHIVE_DID, handle: null }],
-        newUuid,
-      }),
-    ).toThrow(BlueskyArchiveRestoreError);
+      requireUnknownIdentity(ARCHIVE_DID, [
+        { uuid: "other", did: "did:plc:somebodyelse", handle: null },
+      ]),
+    ).not.toThrow();
   });
 
-  it("adopts the archive UUID even when a local account holds it for the same DID", () => {
-    // Nothing should reach here — the DID check above rejects first — so this
-    // pins the order of the two rules rather than a reachable case.
+  it("refuses a DID this installation already has a Bluesky account for", () => {
+    // Merging into an existing Bluesky local account is a recovery union
+    // (#97), not a restore, and doing it by accident would create a duplicate.
     expect(() =>
-      chooseRestoredAccountUuid({
-        archiveUuid: ARCHIVE_UUID,
-        archiveDid: ARCHIVE_DID,
-        existing: [{ uuid: ARCHIVE_UUID, did: ARCHIVE_DID, handle: null }],
-        newUuid,
-      }),
+      requireUnknownIdentity(ARCHIVE_DID, [
+        { uuid: "some-other-uuid", did: ARCHIVE_DID, handle: null },
+      ]),
+    ).toThrow(BlueskyArchiveRestoreError);
+    expect(() =>
+      requireUnknownIdentity(ARCHIVE_DID, [
+        { uuid: "some-other-uuid", did: ARCHIVE_DID, handle: null },
+      ]),
     ).toThrow(/already has a Bluesky account/i);
   });
 });
