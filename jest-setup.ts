@@ -188,6 +188,12 @@ jest.mock("expo-crypto", () => {
   };
 });
 
+// Mock expo-document-picker: tests never open a real file picker, and an
+// import that is cancelled is the default because it touches nothing.
+jest.mock("expo-document-picker", () => ({
+  getDocumentAsync: jest.fn(() => Promise.resolve({ canceled: true })),
+}));
+
 // Mock expo-file-system
 jest.mock("expo-file-system", () => {
   const fileContents = new Map<string, string>();

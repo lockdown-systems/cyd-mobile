@@ -32,15 +32,20 @@ import type {
 } from "@/services/archive-import/ports";
 import { stagedPayloadPath } from "@/services/archive-import";
 import type {
+  BlueskyArchiveMergeEnvironment,
+  MergeableAccountDatabase,
+  ReconcilableSettingColumn,
+} from "@/services/archive-merge";
+import { RECONCILABLE_SETTING_COLUMNS } from "@/services/archive-merge";
+import type {
   BlueskyArchiveRestoreEnvironment,
   DiscardableAccount,
+  LocalAccountIdentity,
   RestorableSettingColumn,
   NewLocalAccountRequest,
   PreparedArchiveStore,
   ReadableInterchangeDatabase,
-  RestoredAccountDatabase,
 } from "@/services/archive-restore";
-import type { LocalAccountIdentity } from "@/services/archive-restore";
 
 const createNodeHasher = (): Hasher => {
   const hash = crypto.createHash("sha256");
@@ -129,10 +134,12 @@ function asReadableInterchange(
   };
 }
 
-function asRestoredAccountDatabase(
+function asMergeableAccountDatabase(
   database: DatabaseSync,
-): RestoredAccountDatabase {
+): MergeableAccountDatabase {
   return {
+    all: async <T>(sql: string): Promise<T[]> =>
+      database.prepare(sql).all() as T[],
     run: async (sql, params) => {
       database.prepare(sql).run(...(params as never[]));
     },
@@ -150,13 +157,21 @@ function asRestoredAccountDatabase(
   };
 }
 
-export type NodeRestoreEnvironment = BlueskyArchiveRestoreEnvironment & {
+/**
+ * One Node-backed environment for both halves of an import.
+ *
+ * Restore and merge run against the same `main.db`, the same account
+ * directories and the same media, so splitting them into two doubles would
+ * only invite the two to disagree about what the device looks like.
+ */
+export type NodeRestoreEnvironment = BlueskyArchiveRestoreEnvironment &
+  BlueskyArchiveMergeEnvironment & {
   /** Mobile's own `main.db`, for asserting what a restore created. */
   mainDatabase: DatabaseSync;
   accountDirectory(accountUuid: string): string;
   openRestoredAccountDatabase(accountUuid: string): DatabaseSync;
   close(): void;
-};
+  };
 
 export type NodeRestoreEnvironmentOptions = {
   /** A directory standing in for the app's private storage. */
@@ -186,6 +201,12 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
   const accountDirectory = (accountUuid: string): string =>
     path.join(options.root, "accounts", `bluesky-${accountUuid}`);
 
+  const mediaDirectory = (accountUuid: string): string =>
+    path.join(accountDirectory(accountUuid), "media");
+
+  const accountMediaUri = (accountUuid: string, fileName: string): string =>
+    `file://${path.join(mediaDirectory(accountUuid), fileName)}`;
+
   const openAccount = (accountUuid: string): DatabaseSync => {
     const directory = accountDirectory(accountUuid);
     fs.mkdirSync(directory, { recursive: true });
@@ -209,6 +230,30 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
       blueskyAccountMigrations,
     );
     return database;
+  };
+
+  const removeAccount = (account: DiscardableAccount): void => {
+    const row = mainDatabase
+      .prepare(
+        account.accountId === null
+          ? "SELECT bskyAccountID FROM account WHERE uuid = ?;"
+          : "SELECT bskyAccountID FROM account WHERE id = ?;",
+      )
+      .get(account.accountId ?? account.accountUuid) as
+      | { bskyAccountID: number }
+      | undefined;
+    mainDatabase
+      .prepare("DELETE FROM account WHERE uuid = ?;")
+      .run(account.accountUuid);
+    if (row) {
+      mainDatabase
+        .prepare("DELETE FROM bsky_account WHERE id = ?;")
+        .run(row.bskyAccountID);
+    }
+    fs.rmSync(accountDirectory(account.accountUuid), {
+      recursive: true,
+      force: true,
+    });
   };
 
   let generated = 0;
@@ -293,10 +338,10 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
     },
 
     openAccountDatabase: async (accountUuid) =>
-      asRestoredAccountDatabase(openAccount(accountUuid)),
+      asMergeableAccountDatabase(openAccount(accountUuid)),
 
     storeAccountMedia: async (accountUuid, fileName, write) => {
-      const directory = path.join(accountDirectory(accountUuid), "media");
+      const directory = mediaDirectory(accountUuid);
       fs.mkdirSync(directory, { recursive: true });
       const location = path.join(directory, fileName);
       const chunks: Uint8Array[] = [];
@@ -306,25 +351,64 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
       return { uri: `file://${location}`, byteLength: contents.byteLength };
     },
 
-    discardLocalAccount: async (account: DiscardableAccount) => {
-      if (account.accountId !== null) {
-        const row = mainDatabase
-          .prepare("SELECT bskyAccountID FROM account WHERE id = ?;")
-          .get(account.accountId) as { bskyAccountID: number } | undefined;
-        mainDatabase
-          .prepare("DELETE FROM account WHERE id = ?;")
-          .run(account.accountId);
-        if (row) {
-          mainDatabase
-            .prepare("DELETE FROM bsky_account WHERE id = ?;")
-            .run(row.bskyAccountID);
-        }
-      }
-      fs.rmSync(accountDirectory(account.accountUuid), {
-        recursive: true,
-        force: true,
-      });
+    accountMediaUri,
+
+    readAccountSettings: async (accountUuid) => {
+      const row = mainDatabase
+        .prepare(
+          `SELECT ${RECONCILABLE_SETTING_COLUMNS.join(", ")}
+           FROM bsky_account b
+           INNER JOIN account a ON a.bskyAccountID = b.id
+           WHERE a.uuid = ?;`,
+        )
+        .get(accountUuid);
+      return row ?? {};
     },
+
+    applyAccountSettings: async (accountUuid, settings) => {
+      const entries = Object.entries(settings) as [
+        ReconcilableSettingColumn,
+        string | number | null,
+      ][];
+      if (entries.length === 0) {
+        return;
+      }
+      mainDatabase
+        .prepare(
+          `UPDATE bsky_account
+           SET ${entries.map(([column]) => `${column} = ?`).join(", ")}
+           WHERE id = (SELECT bskyAccountID FROM account WHERE uuid = ?);`,
+        )
+        .run(...entries.map(([, value]) => value as never), accountUuid);
+    },
+
+    adoptAccountMedia: async (sourceAccountUuid, targetAccountUuid, localPath) => {
+      const source = localPath.replace(/^file:\/\//, "");
+      if (!fs.existsSync(source)) {
+        return null;
+      }
+      const directory = mediaDirectory(targetAccountUuid);
+      fs.mkdirSync(directory, { recursive: true });
+      const location = path.join(directory, path.basename(source));
+      fs.copyFileSync(source, location);
+      return {
+        uri: `file://${location}`,
+        byteLength: fs.statSync(location).size,
+      };
+    },
+
+    enforceOneAccountPerDid: async () => {
+      mainDatabase.exec(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did
+         ON bsky_account(did);`,
+      );
+    },
+
+    removeLocalAccount: async (account: DiscardableAccount) =>
+      removeAccount(account),
+
+    discardLocalAccount: async (account: DiscardableAccount) =>
+      removeAccount(account),
 
     newUuid: options.newUuid ?? (() => `generated-uuid-${(generated += 1)}`),
     now: options.now ?? (() => new Date("2026-09-12T00:00:00.000Z")),

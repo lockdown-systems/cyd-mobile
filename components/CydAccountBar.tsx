@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Linking,
   Modal,
@@ -12,8 +12,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getThemePalette } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
+import { useBlueskyArchiveImport } from "@/hooks/use-bluesky-archive-import";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { createScheduledReminderSync } from "@/services/scheduled-reminder-sync";
 
+import { BlueskyArchiveImportModal } from "./BlueskyArchiveImportModal";
 import { CydSignInModal } from "./CydSignInModal";
 
 type CydAccountBarProps = {
@@ -31,10 +34,18 @@ export function CydAccountBar({
     Platform.OS === "android" ? Math.max(bottomInset, 8) : bottomInset;
   const colorScheme = useColorScheme();
   const palette = getThemePalette(colorScheme);
-  const { state, signOut, getDashboardURL } = useCydAccount();
+  const { state, signOut, getDashboardURL, apiClient } = useCydAccount();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [signInModalVisible, setSignInModalVisible] = useState(false);
+  const archiveImport = useBlueskyArchiveImport({
+    // Reconciling duplicate accounts can retire a local-account UUID the
+    // server schedules reminders against (ADR 0005), so the import tells it.
+    reminders: useMemo(
+      () => createScheduledReminderSync(apiClient, state.isSignedIn),
+      [apiClient, state.isSignedIn],
+    ),
+  });
 
   const handleMenuPress = useCallback(() => {
     setMenuVisible(true);
@@ -70,6 +81,19 @@ export function CydAccountBar({
     setMenuVisible(false);
     onShowOnboarding?.();
   }, [onShowOnboarding]);
+
+  /**
+   * Import a Cyd Bluesky archive.
+   *
+   * Importing needs no Cyd account and no premium subscription — it is how
+   * somebody gets their own data back — so the menu item is here whether or
+   * not they are signed in. Where the archive lands is decided by the Bluesky
+   * identity inside it, not by anything about the file (#97).
+   */
+  const handleImportArchive = useCallback(() => {
+    setMenuVisible(false);
+    void archiveImport.start();
+  }, [archiveImport]);
 
   if (state.isLoading || hidden) {
     return null;
@@ -214,6 +238,22 @@ export function CydAccountBar({
               ]}
             />
             <Pressable
+              onPress={handleImportArchive}
+              style={({ pressed }) => [
+                styles.sheetActionButton,
+                {
+                  borderColor: palette.icon + "22",
+                  backgroundColor: palette.background,
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.sheetActionText, { color: palette.text }]}>
+                Import Bluesky archive
+              </Text>
+            </Pressable>
+            <Pressable
               onPress={handleShowOnboarding}
               style={({ pressed }) => [
                 styles.sheetActionButton,
@@ -239,6 +279,14 @@ export function CydAccountBar({
         onClose={handleCloseSignInModal}
       />
 
+      <BlueskyArchiveImportModal
+        state={archiveImport.state}
+        onConfirmLargeArchive={() => void archiveImport.confirmLargeArchive()}
+        onConfirmMerge={() => void archiveImport.confirmMerge()}
+        onKeepAccount={(choice) => void archiveImport.keepAccount(choice)}
+        onCancel={archiveImport.cancel}
+        onDismiss={archiveImport.dismiss}
+      />
     </>
   );
 }

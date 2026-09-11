@@ -1,0 +1,3 @@
+# Preview a recovery merge before committing it
+
+Cyd Mobile splits a Bluesky archive merge into a preview that reads the prepared Cyd Bluesky archive and works out every row it would write, and a commit that carries that preview out, because a recovery union can restore Bluesky saved records the person removed through Bluesky local deletion and they must see which ones before it happens. The preview names the records coming back rather than only counting them; the commit re-reads the Bluesky local account instead of trusting the preview's copy, so work that ran in between is merged rather than overwritten, and committing the same Cyd Bluesky archive again writes nothing.
