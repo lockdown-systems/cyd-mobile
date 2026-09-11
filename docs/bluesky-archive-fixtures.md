@@ -109,9 +109,12 @@ own idea of the format:
 npm run check:archive-conformance -- testUtils/fixtures/bluesky-archive/complete.cyd
 ```
 
-This matters more than usual right now: Mobile builds its writer before the
-reader that would otherwise catch its mistakes (ADR 0004), so until #96 lands
-this checker is the only thing standing between a broken writer and a fixture
+This matters more than usual: Mobile built its writer before the reader that
+would otherwise catch its mistakes (ADR 0004). Since #96, Bluesky archive
+restore reads both committed fixtures back into a browseable Bluesky local
+account in `services/archive-restore/__tests__/restore.test.ts`, but that
+proves the two halves agree with each other, not with the contract. The
+conformance checker is still what stands between a broken writer and a fixture
 that enshrines its bugs.
 
 ## 5. Produce the incomplete variant
