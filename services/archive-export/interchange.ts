@@ -686,6 +686,14 @@ class InterchangeBuilder {
     });
   }
 
+  /**
+   * Follows, which Mobile does not actually save today.
+   *
+   * The `follow` table exists in Mobile's schema but nothing writes it — the
+   * unfollow-everyone job fetches follows live instead — so `relationships` is
+   * empty in practice. The translation is here because the table is, and
+   * because the day Mobile starts saving follows this should already be right.
+   */
   private addFollows(): void {
     for (const row of this.snapshot.follows) {
       this.ensureProfile(row.subjectDid, { handle: row.handle });
