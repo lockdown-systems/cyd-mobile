@@ -23,7 +23,7 @@ SIZE_BUDGET_BYTES = 5 * 1024 * 1024
 # Interchange groups Mobile cannot populate today, so a fixture exported from
 # Mobile is a complement to the canonical fixtures rather than a superset.
 KNOWN_GAPS = (
-    ("relationships (block, mute)", "Mobile stores follows only"),
+    ("relationships (follow, block, mute)", "nothing writes the follow table; follows are fetched live to unfollow"),
     ("profiles.avatar_asset_id / banner", "avatars are URLs, never content-addressed"),
     ("profiles.description", "not stored"),
     ("captured historical profiles", "profile is UNIQUE(did), updated in place"),
@@ -79,7 +79,6 @@ def main() -> int:
         "bookmarks": "SELECT COUNT(*) FROM bookmark",
         "chats": "SELECT COUNT(*) FROM conversation",
         "messages": "SELECT COUNT(*) FROM message",
-        "follows": "SELECT COUNT(*) FROM follow",
     }
     for label, query in counts.items():
         total = scalar(database, query)

@@ -16,7 +16,7 @@ groups at all, so these fixtures exercise less of the contract than
 
 | Interchange | Why Mobile leaves it empty, or fills it differently |
 | --- | --- |
-| `relationships` block, mute | Mobile stores follows only |
+| `relationships` follow, block, mute | nothing writes Mobile's `follow` table: follows are fetched live when unfollowing everyone, never saved. A Mobile fixture's `relationships` is always empty |
 | `profiles.avatar_asset_id`, banner | avatars are URLs, never content-addressed |
 | `profiles.description`, `records.indexed_at` | not stored |
 | captured historical profiles | `profile` is `UNIQUE(did)`, updated in place |
@@ -44,13 +44,15 @@ regenerated a few times over is permanently expensive.
 
 Aim to cover, in as few records as possible: a plain post, a reply, a quote
 post, a post with an external link, a post with images, a post with video, a
-repost, a like, a bookmark, one chat conversation with a couple of messages,
-and a follow. One or two records per category is enough — this is a semantic
-fixture, not a load test.
+repost, a like, a bookmark, and one chat conversation with a couple of
+messages. One or two records per category is enough — this is a semantic
+fixture, not a load test. Following someone will not show up: Mobile never
+saves follows.
 
-Third parties land in `relationships` and `conversation_members`. Point the
-follow and the chat at a second account you control so the fixture is entirely
-yours.
+Everything the account liked, reposted, replied to, or quoted is somebody
+else's post, and it is committed to this repository permanently. Point the
+likes, reposts, and the chat at a second account you control so the fixture is
+entirely yours; the account's own posts are the ones worth keeping.
 
 ## 2. Save everything, and let media finish
 
@@ -127,9 +129,14 @@ npm run export:archive -- /tmp/cyd-fixture-account \
 
 `--fail-asset` marks that one `media_asset` row failed for the length of the
 export and puts it back afterwards, and only ever touches the pulled copy. Pick
-the video: it is the largest payload, so leaving it out is also what keeps the
-incomplete fixture small. The result must report `completeness: incomplete`,
-keep every other record intact, and still pass conformance.
+the largest payload, since leaving it out is also what keeps the incomplete
+fixture small. The result must report `completeness: incomplete`, keep every
+other record intact, and still pass conformance.
+
+Pass **the same `--created-at` to both exports**. An export stamps anything it
+captured that has no time of its own — a profile known only by its DID — with
+the moment it ran, so without a pinned timestamp the pair differs by the clock
+as well as by the asset.
 
 ## 6. Commit with provenance
 

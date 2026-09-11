@@ -28,6 +28,11 @@ import { createNodeBlueskyArchiveExportEnvironment } from "./node-export-environ
  *   --fail-asset <cid>    Mark one asset's download failed for this export, to
  *                         produce the `incomplete` fixture. The change is
  *                         reverted afterwards, and only ever touches the copy.
+ *   --created-at <iso>    Pin the export time. Pass the same value to both
+ *                         fixtures so the pair differs by the failed asset
+ *                         alone, rather than also by the clock: an export
+ *                         timestamps anything it captured with no time of its
+ *                         own, such as a profile known only by its DID.
  */
 
 type Options = {
@@ -38,6 +43,7 @@ type Options = {
   uuid: string | null;
   handle: string | null;
   failAsset: string | null;
+  createdAt: Date | null;
 };
 
 function parseOptions(argv: string[]): Options {
@@ -70,6 +76,7 @@ function parseOptions(argv: string[]): Options {
     uuid: flags.get("uuid") ?? null,
     handle: flags.get("handle") ?? null,
     failAsset: flags.get("fail-asset") ?? null,
+    createdAt: flags.get("created-at") ? new Date(flags.get("created-at")!) : null,
   };
 }
 
@@ -183,6 +190,7 @@ async function main(): Promise<number> {
     const environment = createNodeBlueskyArchiveExportEnvironment({
       accountDirectory: options.accountDirectory,
       stagingRoot: path.join(workspace, "staging"),
+      ...(options.createdAt ? { now: () => options.createdAt as Date } : {}),
     });
     return runBlueskyArchiveExport(environment, {
       exportId: "fixture",
