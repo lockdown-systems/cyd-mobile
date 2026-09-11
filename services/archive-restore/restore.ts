@@ -1,9 +1,9 @@
 import { ACCOUNT_AUTH_STATUS, ACCOUNT_CONFIG_KEYS } from "@/controllers/config";
 
-import { BlueskyArchiveRestoreError } from "./errors";
 import {
   chooseRestoredAccountHandle,
   chooseRestoredAccountUuid,
+  requireUnknownIdentity,
   type RestoredUuidRemapping,
 } from "./identity";
 import {
@@ -22,7 +22,9 @@ import type {
   BlueskyArchiveRestoreEnvironment,
   CreatedLocalAccount,
   PreparedArchiveLocation,
+  PreparedArchiveStore,
   RestoredAccountDatabase,
+  StoredMediaFile,
 } from "./ports";
 import { writeRestoredAccountRows } from "./account-writer";
 
@@ -124,9 +126,9 @@ export async function restoreBlueskyArchiveAccount(
   }
 
   const existing = await environment.listLocalAccountIdentities();
+  requireUnknownIdentity(snapshot.archive.account_did, existing);
   const { uuid: accountUuid, remapping } = chooseRestoredAccountUuid({
     archiveUuid: snapshot.archive.account_uuid,
-    archiveDid: snapshot.archive.account_did,
     existing,
     newUuid: environment.newUuid,
   });
@@ -163,7 +165,7 @@ export async function restoreBlueskyArchiveAccount(
     try {
       await database.transaction(async () => {
         await writeRestoredAccountRows(database, restored);
-        await writeRestoreConfig(database, environment, snapshot);
+        await writeRestoreConfig(database, snapshot);
       });
     } finally {
       await database.close();
@@ -181,7 +183,7 @@ export async function restoreBlueskyArchiveAccount(
       handle,
       uuidRemapping: remapping,
       completeness: restored.completeness,
-      counts: countRestored(snapshot, restored),
+      counts: countRestored(restored),
       assets: summarizeAssets(placements, snapshot.assets.length),
       unrestorable: restored.unrestorable,
     };
@@ -211,7 +213,7 @@ async function placeArchivedMedia(
   environment: BlueskyArchiveRestoreEnvironment,
   options: {
     accountUuid: string;
-    archive: { readPayload: (path: string, onBytes: (bytes: Uint8Array) => void) => Promise<void> };
+    archive: Pick<PreparedArchiveStore, "readPayload">;
     assets: InterchangeAsset[];
     onPlaced: (placed: number) => void;
   },
@@ -243,33 +245,38 @@ async function placeArchivedMedia(
     }
 
     const archivePath = asset.archive_path;
+    let stored: StoredMediaFile | null = null;
     try {
-      const stored = await environment.storeAccountMedia(
+      stored = await environment.storeAccountMedia(
         options.accountUuid,
         restoredMediaFileName(asset.sha256),
         (push) => options.archive.readPayload(archivePath, push),
       );
-      if (asset.byte_count !== null && stored.byteLength !== asset.byte_count) {
-        throw new BlueskyArchiveRestoreError(
-          "storage-failed",
-          `${archivePath} is not the size the archive declares.`,
-        );
-      }
-      byDigest.set(asset.sha256, stored.uri);
-      placements.set(asset.id, {
-        assetId: asset.id,
-        availability: "restored",
-        localPath: stored.uri,
-      });
-      placed += 1;
-      options.onPlaced(placed);
     } catch {
+      stored = null;
+    }
+
+    const wrongSize =
+      stored !== null &&
+      asset.byte_count !== null &&
+      stored.byteLength !== asset.byte_count;
+    if (stored === null || wrongSize) {
       placements.set(asset.id, {
         assetId: asset.id,
         availability: "missing",
         reason: "Cyd could not restore this file from the archive.",
       });
+      continue;
     }
+
+    byDigest.set(asset.sha256, stored.uri);
+    placements.set(asset.id, {
+      assetId: asset.id,
+      availability: "restored",
+      localPath: stored.uri,
+    });
+    placed += 1;
+    options.onPlaced(placed);
   }
 
   return placements;
@@ -284,18 +291,17 @@ async function placeArchivedMedia(
  */
 async function writeRestoreConfig(
   database: RestoredAccountDatabase,
-  environment: BlueskyArchiveRestoreEnvironment,
   snapshot: BlueskyInterchangeSnapshot,
 ): Promise<void> {
   const entries: [string, string][] = [
-    // A restored account holds no Bluesky connection. Saying so here means the
-    // account opens straight into its saved data instead of trying to reach
-    // Bluesky for an authorization this installation never had.
+    // A restored Bluesky local account holds no Bluesky connection. Saying so
+    // here means it opens straight into its Bluesky saved data instead of
+    // reaching for an authorization this installation never had.
     [ACCOUNT_CONFIG_KEYS.authStatus, ACCOUNT_AUTH_STATUS.signedOut],
     [ACCOUNT_CONFIG_KEYS.restoredArchiveCompleteness, snapshot.archive.completeness],
-    [ACCOUNT_CONFIG_KEYS.restoredArchiveCreatedAt, snapshot.archive.created_at],
+    // The identifier the archive carried, which is what a remapping report
+    // refers to once the restored account is listed under a different one.
     [ACCOUNT_CONFIG_KEYS.restoredArchiveUuid, snapshot.archive.account_uuid],
-    [ACCOUNT_CONFIG_KEYS.restoredAt, environment.now().toISOString()],
   ];
 
   for (const [key, value] of entries) {
@@ -307,19 +313,26 @@ async function writeRestoreConfig(
   }
 }
 
+/**
+ * What the restored account actually holds, counted the way browse counts it.
+ *
+ * Deliberately not a count of what the archive selected: a selection naming a
+ * record the archive does not carry restores nothing, and reporting it anyway
+ * would tell somebody they recovered likes they cannot open.
+ * `unrestorable.selections` is where those go.
+ */
 function countRestored(
-  snapshot: BlueskyInterchangeSnapshot,
   restored: RestoredMobileAccount,
 ): RestoredCategoryCounts {
-  const selected = (category: string): number =>
-    snapshot.selections.filter((row) => row.category === category).length;
-
+  const posts = restored.posts;
   return {
-    posts: selected("posts"),
-    reposts: selected("reposts"),
-    likes: selected("likes"),
-    bookmarks: selected("bookmarks"),
-    chats: selected("chats"),
+    posts: posts.filter(
+      (post) => post.authorDid === restored.identity.did && post.isRepost === 0,
+    ).length,
+    reposts: posts.filter((post) => post.viewerReposted === 1).length,
+    likes: posts.filter((post) => post.viewerLiked === 1).length,
+    bookmarks: posts.filter((post) => post.viewerBookmarked === 1).length,
+    chats: restored.conversations.length,
     messages: restored.messages.length,
     profiles: restored.profiles.length,
     follows: restored.follows.length,

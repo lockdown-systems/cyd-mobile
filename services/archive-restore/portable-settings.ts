@@ -1,5 +1,7 @@
+import type { PortableSettingKey } from "@/services/archive-export";
+
 import type { InterchangePortableSetting } from "./interchange-reader";
-import type { RestoredAccountSettings } from "./ports";
+import type { RestorableSettingColumn, RestoredAccountSettings } from "./ports";
 
 /**
  * Turning an archive's portable settings into a new account's defaults.
@@ -14,7 +16,13 @@ import type { RestoredAccountSettings } from "./ports";
  * from the merge path (#97).
  */
 
-const SETTING_COLUMNS: Record<string, string> = {
+/**
+ * The twin of `PORTABLE_COLUMNS` in `services/archive-export`, read the other
+ * way. Both sides are keyed by the contract's setting names and typed against
+ * them, so a key this repo stops recognising fails to compile rather than
+ * silently restoring nothing.
+ */
+const SETTING_COLUMNS = {
   save_posts: "settingSavePosts",
   save_likes: "settingSaveLikes",
   save_bookmarks: "settingSaveBookmarks",
@@ -28,7 +36,10 @@ const SETTING_COLUMNS: Record<string, string> = {
   delete_follows: "settingDeleteUnfollowEveryone",
   // `save_reposts` has no Mobile column: reposts are saved with posts. Leaving
   // it out means Mobile keeps its own behaviour rather than inventing a switch.
-};
+} as const satisfies Partial<Record<PortableSettingKey, RestorableSettingColumn>>;
+
+const COLUMN_FOR_KEY: Partial<Record<PortableSettingKey, RestorableSettingColumn>> =
+  SETTING_COLUMNS;
 
 export function accountSettingsFromPortableSettings(
   rows: InterchangePortableSetting[],
@@ -36,7 +47,7 @@ export function accountSettingsFromPortableSettings(
   const settings: RestoredAccountSettings = {};
 
   for (const row of rows) {
-    const column = SETTING_COLUMNS[row.key];
+    const column = COLUMN_FOR_KEY[row.key as PortableSettingKey];
     if (!column) {
       continue;
     }

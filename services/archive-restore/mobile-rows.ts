@@ -181,8 +181,10 @@ export type MobileMediaAssetWrite = {
 export type UnrestorableContent = {
   /** Blocks and mutes: Mobile stores neither. */
   relationships: number;
-  /** Media attached to a chat message or carried as a profile banner. */
+  /** Media attached to a chat message, or a profile banner. */
   assets: number;
+  /** A selection whose subject record the archive does not carry. */
+  selections: number;
 };
 
 export type RestoredMobileAccount = {
@@ -280,6 +282,7 @@ class MobileRowBuilder {
   private readonly subjectByRelationship: Map<string, string>;
   private unrestorableRelationships = 0;
   private unrestorableAssets = 0;
+  private unrestorableSelections = 0;
 
   constructor(
     private readonly snapshot: BlueskyInterchangeSnapshot,
@@ -320,6 +323,7 @@ class MobileRowBuilder {
       unrestorable: {
         relationships: this.unrestorableRelationships,
         assets: this.unrestorableAssets,
+        selections: this.unrestorableSelections,
       },
     };
   }
@@ -508,6 +512,9 @@ class MobileRowBuilder {
       : subjectId;
     const post = targetUri ? this.posts.get(targetUri) : undefined;
     if (!post) {
+      // Nothing to hang the like on: the archive selected a post it does not
+      // carry. Counted rather than dropped, so the restore can say so.
+      this.unrestorableSelections += 1;
       return;
     }
     post.viewerLiked = 1;
@@ -527,9 +534,11 @@ class MobileRowBuilder {
       // A selection naming a post directly is a repost Cyd saved as the post
       // itself, which is already in `posts`.
       const post = this.posts.get(subjectId);
-      if (post) {
-        post.viewerReposted = 1;
+      if (!post) {
+        this.unrestorableSelections += 1;
+        return;
       }
+      post.viewerReposted = 1;
       return;
     }
 
@@ -582,19 +591,24 @@ class MobileRowBuilder {
         ? this.subjectUriFor(record)
         : subjectId;
     if (!targetUri) {
+      this.unrestorableSelections += 1;
       return;
     }
 
     const post = this.posts.get(targetUri);
+    if (!post) {
+      // Mobile browses bookmarks through the post's own viewer state, so a
+      // bookmark of a record the archive does not carry has nowhere to show.
+      this.unrestorableSelections += 1;
+      return;
+    }
     const deletedAt = millisFrom(
       record && record.record_type !== POST_TYPE
         ? record.source_deleted_at
         : null,
     );
-    if (post) {
-      post.viewerBookmarked = 1;
-      post.deletedBookmarkAt = deletedAt;
-    }
+    post.viewerBookmarked = 1;
+    post.deletedBookmarkAt = deletedAt;
 
     const target = this.recordsByUri.get(targetUri);
     const authorDid = target
@@ -607,8 +621,8 @@ class MobileRowBuilder {
       postAuthorHandle: authorDid
         ? this.profiles.get(authorDid)?.handle ?? null
         : null,
-      postText: target?.text ?? post?.text ?? null,
-      postCreatedAt: target?.created_at ?? post?.createdAt ?? null,
+      postText: target?.text ?? post.text ?? null,
+      postCreatedAt: target?.created_at ?? post.createdAt ?? null,
       savedAt: millisFrom(selectedAt) ?? 0,
       deletedAt,
     });
@@ -690,12 +704,18 @@ class MobileRowBuilder {
       if (!asset) {
         continue;
       }
+      if (link.owner_type === "profile") {
+        // A profile's own media is restored from `profiles.avatar_asset_id`,
+        // and its banner was counted there: Mobile has no column for one.
+        continue;
+      }
       if (link.owner_type !== "record" || !this.posts.has(link.owner_id)) {
-        // Message media and profile banners have no table in Mobile, and a
-        // record Cyd did not restore has nothing to attach them to.
+        // A chat message's media has no table in Mobile, and a record Cyd did
+        // not restore has nothing to attach anything to.
         this.unrestorableAssets += 1;
         continue;
       }
+      const post = this.posts.get(link.owner_id) as MobilePostWrite;
 
       if (link.role === "preview" || link.role === "thumbnail") {
         const placement = this.context.placements.get(asset.id);
@@ -709,7 +729,7 @@ class MobileRowBuilder {
         continue;
       }
 
-      this.addMediaAsset(asset);
+      this.addMediaAsset(asset, post.authorDid);
       this.postMedia.push(this.buildPostMedia(link.owner_id, link.position, asset));
     }
 
@@ -718,7 +738,14 @@ class MobileRowBuilder {
     }
   }
 
-  private addMediaAsset(asset: InterchangeAsset): void {
+  /**
+   * @param sourceDid The repository a retry would fetch the blob from, which
+   * is the author of the record carrying it rather than this account: media on
+   * a liked or bookmarked post lives in somebody else's repository. An asset
+   * two records share keeps the first author it arrived with, the same way
+   * Mobile's own `media_asset` row does.
+   */
+  private addMediaAsset(asset: InterchangeAsset, sourceDid: string): void {
     if (this.mediaAssets.has(asset.id)) {
       return;
     }
@@ -732,7 +759,7 @@ class MobileRowBuilder {
       byteLength: asset.byte_count,
       localPath: restored ? placement.localPath : null,
       sourceUrl: asset.source_url,
-      sourceDid: this.snapshot.archive.account_did,
+      sourceDid,
       sourceMetadataJSON: JSON.stringify({
         thumbUrl: null,
         width: asset.width,
@@ -777,8 +804,8 @@ class MobileRowBuilder {
    *
    * Mobile's `follow` table exists but nothing writes it today, so a follow
    * from a Desktop archive lands somewhere no screen reads yet. It is restored
-   * anyway: the column is there, and discarding saved data because this client
-   * has not caught up would make the import lossy. Blocks and mutes have no
+   * anyway: the column is there, and discarding Bluesky saved data because
+   * this client has not caught up would make the import lossy. Blocks and mutes have no
    * table at all, so they are counted and reported instead.
    */
   private addFollows(): void {
@@ -847,7 +874,7 @@ class MobileRowBuilder {
         memberDids: JSON.stringify(
           membersByConversation.get(conversation.id) ?? [],
         ),
-        // Muting is a live Bluesky preference rather than saved data, so a
+        // Muting is a live Bluesky preference rather than Bluesky saved data, so a
         // restored conversation starts unmuted rather than claiming to know.
         muted: 0,
         lastMessageId: latest?.messageId ?? null,

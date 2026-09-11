@@ -16,13 +16,13 @@ import {
   runBlueskyArchiveIntake,
   type PreparedBlueskyArchive,
 } from "@/services/archive-import";
-import { restoreBlueskyArchiveAccount } from "@/services/archive-restore";
+import { restoreBlueskyArchiveAccount } from "../restore";
 import { createMemoryByteReader } from "@/testUtils/archiveFixtures";
 import {
   createDiskBlueskyArchiveIntakeEnvironment,
   createNodeBlueskyArchiveRestoreEnvironment,
   type NodeRestoreEnvironment,
-} from "@/testUtils/restoreFixtures";
+} from "@/testUtils/archiveEnvironments";
 
 /**
  * Restoring the committed real-data fixtures into a browseable account.
@@ -167,6 +167,34 @@ describe("restoring a complete Cyd Bluesky archive", () => {
     expect(JSON.parse(newest.embedJSON as string)).toMatchObject({
       record: { uri: expect.stringContaining("app.bsky.feed.post/") },
     });
+  });
+
+  it("counts what the account actually holds, and what it could not take", () => {
+    // Counting selections instead would promise likes nobody can open.
+    expect(account.unrestorable).toEqual({
+      relationships: 0,
+      assets: 0,
+      selections: 0,
+    });
+  });
+
+  it("keeps the embed type Mobile records for a saved post", () => {
+    const embedded = database
+      .prepare(
+        `SELECT embedType FROM post WHERE embedType IS NOT NULL ORDER BY uri LIMIT 1;`,
+      )
+      .get() as { embedType: string };
+
+    expect(embedded.embedType).toBe("app.bsky.embed.images#view");
+  });
+
+  it("points a media retry at the repository the file lives in", () => {
+    const assets = database
+      .prepare("SELECT DISTINCT sourceDid FROM media_asset;")
+      .all() as { sourceDid: string }[];
+
+    // Every image in this fixture is on the account's own post.
+    expect(assets).toEqual([{ sourceDid: ACCOUNT_DID }]);
   });
 
   it("restores the captured authors, including one known only by its DID", () => {
