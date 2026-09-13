@@ -811,4 +811,19 @@ describe("translating a Cyd Bluesky archive into Mobile's rows", () => {
       displayName: "Owner",
     });
   });
+
+  it("treats a display name nobody set as no display name", () => {
+    // An account that never set one exports an empty string, which is an
+    // absence rather than a name: keeping it would show a blank where the
+    // account's name goes, instead of falling back to its handle.
+    const snapshot = emptySnapshot();
+    snapshot.profiles[0].display_name = "";
+
+    const { identity } = translate(snapshot);
+
+    expect(identity).toMatchObject({
+      handle: "owner.bsky.social",
+      displayName: null,
+    });
+  });
 });

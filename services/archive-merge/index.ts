@@ -44,11 +44,12 @@ export type {
   BlueskyArchiveMergeResult,
   MergedAssetSummary,
 } from "./merge";
-export { planBlueskyArchiveMerge } from "./merge-plan";
+export { planBlueskyArchiveMerge, totalMergeChanges } from "./merge-plan";
 export type {
   BlueskyArchiveMergeCounts,
   BlueskyArchiveMergePlan,
   BlueskyArchiveMergeSummary,
+  BlueskyArchiveMergeTotals,
   RestorationPreview,
 } from "./merge-plan";
 export { RECONCILABLE_SETTING_COLUMNS } from "./ports";

@@ -17,8 +17,10 @@ import {
   previewBlueskyArchiveMerge,
   previewDuplicateReconciliation,
   reconcileDuplicateBlueskyAccounts,
+  totalMergeChanges,
   type BlueskyArchiveMergeEnvironment,
   type BlueskyArchiveMergePreview,
+  type BlueskyArchiveMergeResult,
   type DuplicateReconciliationPreview,
 } from "@/services/archive-merge";
 import {
@@ -73,7 +75,26 @@ export type BlueskyArchiveImportState =
       preview: BlueskyArchiveMergePreview;
       handle: string;
     }
-  | { status: "done"; title: string; lines: string[] }
+  | {
+      status: "done";
+      title: string;
+      /**
+       * The account the import ended in, kept apart from the title so it can
+       * be shown on its own line: a handle is one unbroken token, and a title
+       * that has to wrap around one breaks it wherever it runs out of room.
+       */
+      handle: string;
+      lines: string[];
+      /**
+       * Whether to offer a Bluesky connection from here.
+       *
+       * A restored Bluesky local account has none — a Cyd Bluesky archive
+       * never carries one — and this is the moment somebody is thinking about
+       * that account, so it is the moment worth asking. A merge leaves the
+       * account's existing connection alone and has nothing to offer.
+       */
+      offerSignIn: boolean;
+    }
   | { status: "failed"; message: string };
 
 /** The device capabilities an import needs, gathered so tests can stand in. */
@@ -143,6 +164,40 @@ async function syncReminders(
 
 function plural(count: number, noun: string): string {
   return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * What a merge did, counting every kind of change it made.
+ *
+ * Only what actually happened is mentioned: a merge that recovered one image
+ * and nothing else should say so, rather than reporting that no records came
+ * back and none gained anything — which is true, and tells somebody their
+ * import did nothing.
+ */
+function describeMergeResult(result: BlueskyArchiveMergeResult): string[] {
+  if (result.written === 0) {
+    return ["This archive held nothing that account did not already have."];
+  }
+
+  const totals = totalMergeChanges(result.summary);
+  const files = totals.files.added + totals.files.updated;
+  const lines: string[] = [];
+  if (totals.records.added > 0) {
+    lines.push(`${plural(totals.records.added, "record")} came back.`);
+  }
+  if (totals.records.updated > 0) {
+    lines.push(`${plural(totals.records.updated, "record")} gained something.`);
+  }
+  if (files > 0) {
+    lines.push(`${plural(files, "media file")} restored.`);
+  }
+  if (lines.length === 0) {
+    lines.push("Some records gained details this account was missing.");
+  }
+  lines.push(
+    "Your settings, schedule and Bluesky connection were left as they were.",
+  );
+  return lines;
 }
 
 export function useBlueskyArchiveImport(
@@ -237,11 +292,13 @@ export function useBlueskyArchiveImport(
       emitLocalAccountsChanged();
       settle(generation, {
         status: "done",
-        title: `Restored @${result.handle}`,
+        title: "Restored",
+        handle: result.handle,
+        offerSignIn: true,
         lines: [
           `${plural(result.counts.posts, "post")}, ${plural(result.counts.likes, "like")}, ${plural(result.counts.chats, "chat")}.`,
           `${plural(result.assets.restored, "file")} restored${result.assets.missing > 0 ? `, ${result.assets.missing} missing` : ""}.`,
-          "This account is not connected to Bluesky. Sign in when you want Cyd to act on it.",
+          "You can browse all of it now. Cyd needs a Bluesky connection before it can save or delete anything for this account.",
           ...(result.uuidRemapping ? [result.uuidRemapping.reason] : []),
         ],
       });
@@ -465,15 +522,10 @@ export function useBlueskyArchiveImport(
       emitLocalAccountsChanged();
       settle(generation, {
         status: "done",
-        title: `Merged into @${handle}`,
-        lines:
-          result.written === 0
-            ? ["This archive held nothing that account did not already have."]
-            : [
-                `${plural(result.summary.restorations.total, "record")} came back.`,
-                `${plural(result.summary.posts.updated + result.summary.messages.updated + result.summary.follows.updated, "record")} gained something.`,
-                "Your settings, schedule and Bluesky connection were left as they were.",
-              ],
+        title: "Merged into",
+        handle,
+        offerSignIn: false,
+        lines: describeMergeResult(result),
       });
     } catch (error) {
       discardStaging();

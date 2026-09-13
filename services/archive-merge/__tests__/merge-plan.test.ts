@@ -1,6 +1,7 @@
 import type { MobilePostWrite } from "@/services/archive-restore";
 
-import { planBlueskyArchiveMerge } from "../merge-plan";
+import { planBlueskyArchiveMerge, totalMergeChanges } from "../merge-plan";
+import type { BlueskyArchiveMergeSummary } from "../merge-plan";
 import type { ExistingAccountRows, ExistingPostRow } from "../rows";
 
 /**
@@ -346,5 +347,69 @@ describe("planning a Cyd Bluesky archive merge", () => {
     );
 
     expect(plan.mediaAssets).toEqual([]);
+  });
+});
+
+/**
+ * Whether a merge would change anything, asked of the summary rather than of
+ * whichever tables somebody remembered to look at.
+ */
+describe("adding a merge summary up", () => {
+  const none = { added: 0, updated: 0, unchanged: 0 };
+  const summary = (
+    overrides: Partial<BlueskyArchiveMergeSummary> = {},
+  ): BlueskyArchiveMergeSummary => ({
+    profiles: none,
+    posts: none,
+    postMedia: none,
+    postExternals: none,
+    bookmarks: none,
+    follows: none,
+    conversations: none,
+    messages: none,
+    mediaAssets: none,
+    restorations: { total: 0, records: [] },
+    ...overrides,
+  });
+
+  it("is nothing only when every table is", () => {
+    expect(totalMergeChanges(summary()).total).toBe(0);
+  });
+
+  it("counts a recovered file, which no record table mentions", () => {
+    const totals = totalMergeChanges(
+      summary({ mediaAssets: { added: 0, updated: 1, unchanged: 4 } }),
+    );
+
+    expect(totals.files).toEqual({ added: 0, updated: 1 });
+    expect(totals.records).toEqual({ added: 0, updated: 0 });
+    expect(totals.total).toBe(1);
+  });
+
+  it("counts the rows a record needs to render, under their own heading", () => {
+    const totals = totalMergeChanges(
+      summary({
+        profiles: { added: 1, updated: 0, unchanged: 2 },
+        postExternals: { added: 0, updated: 1, unchanged: 0 },
+      }),
+    );
+
+    expect(totals.context).toEqual({ added: 1, updated: 1 });
+    expect(totals.total).toBe(2);
+  });
+
+  it("groups every kind of record together", () => {
+    const totals = totalMergeChanges(
+      summary({
+        posts: { added: 2, updated: 1, unchanged: 0 },
+        messages: { added: 3, updated: 0, unchanged: 0 },
+        conversations: { added: 1, updated: 0, unchanged: 0 },
+        bookmarks: { added: 1, updated: 0, unchanged: 0 },
+        follows: { added: 1, updated: 0, unchanged: 0 },
+      }),
+    );
+
+    expect(totals.records).toEqual({ added: 8, updated: 1 });
+    expect(totals.total).toBe(9);
   });
 });

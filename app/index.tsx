@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Linking,
   Pressable,
   RefreshControl,
@@ -16,6 +15,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import WordmarkDark from "@/assets/images/cyd-wordmark-dark.svg";
 import WordmarkLight from "@/assets/images/cyd-wordmark.svg";
+import {
+  AccountAvatar,
+  accountDisplayName,
+  accountUsername,
+} from "@/components/account/identity";
 import { Colors, getThemePalette } from "@/constants/theme";
 import type { AccountListItem } from "@/database/accounts";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -235,12 +239,8 @@ function AccountCard({
   disabled,
   busy,
 }: AccountCardProps) {
-  const avatarUri = account.avatarUrl || null;
-  const username = account.handle.startsWith("@")
-    ? account.handle
-    : `@${account.handle}`;
-  const displayName = account.displayName ?? username;
-  const initial = displayName.replace(/^@/, "").charAt(0).toUpperCase() || "?";
+  const username = accountUsername(account.handle);
+  const displayName = accountDisplayName(account);
 
   return (
     <Pressable
@@ -256,33 +256,11 @@ function AccountCard({
       ]}
       android_ripple={{ color: palette.icon + "33" }}
     >
-      {avatarUri ? (
-        <Image
-          source={{ uri: avatarUri }}
-          style={[
-            styles.avatar,
-            {
-              borderColor: palette.icon + "33",
-              backgroundColor: palette.icon + "20",
-            },
-          ]}
-          accessibilityIgnoresInvertColors
-        />
-      ) : (
-        <View
-          style={[
-            styles.avatarFallback,
-            {
-              borderColor: palette.icon + "33",
-              backgroundColor: palette.icon + "20",
-            },
-          ]}
-        >
-          <Text style={[styles.avatarInitial, { color: palette.text }]}>
-            {initial}
-          </Text>
-        </View>
-      )}
+      <AccountAvatar
+        uri={account.avatarUrl || null}
+        size={48}
+        palette={palette}
+      />
       <View style={styles.accountTextStack}>
         <Text
           style={[styles.accountName, { color: palette.text }]}
@@ -374,24 +352,6 @@ const styles = StyleSheet.create({
   accountUsername: {
     fontSize: 14,
     opacity: 0.9,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  avatarFallback: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInitial: {
-    fontSize: 16,
-    fontWeight: "700",
   },
   addAccountButton: {
     borderRadius: 16,

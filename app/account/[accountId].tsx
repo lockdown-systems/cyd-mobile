@@ -36,6 +36,11 @@ import iconHome from "@/assets/images/icon-home.png";
 import iconSave from "@/assets/images/icon-save.png";
 import iconSchedule from "@/assets/images/icon-schedule.png";
 
+import {
+  AccountAvatar,
+  accountDisplayName,
+  accountUsername,
+} from "@/components/account/identity";
 import { getThemePalette } from "@/constants/theme";
 import {
   ACCOUNT_AUTH_STATUS,
@@ -311,14 +316,8 @@ export default function AccountScreen() {
     }, [account]),
   );
 
-  const avatarUri = account?.avatarUrl ?? null;
-  const username = account?.handle
-    ? account.handle.startsWith("@")
-      ? account.handle
-      : `@${account.handle}`
-    : null;
-  const displayName = account?.displayName ?? username ?? "Unknown";
-  const initial = displayName.replace(/^@/, "").charAt(0).toUpperCase() || "?";
+  const username = account?.handle ? accountUsername(account.handle) : null;
+  const displayName = account ? accountDisplayName(account) : "Unknown";
   const accountStatus = error
     ? "Unable to load account"
     : loading
@@ -374,35 +373,11 @@ export default function AccountScreen() {
             headerBackTitle: "Back",
             headerTitle: () => (
               <View style={styles.headerTitle}>
-                {avatarUri ? (
-                  <Image
-                    source={{ uri: avatarUri }}
-                    style={[
-                      styles.avatar,
-                      {
-                        borderColor: palette.icon + "33",
-                        backgroundColor: palette.icon + "20",
-                      },
-                    ]}
-                    accessibilityIgnoresInvertColors
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.avatarFallback,
-                      {
-                        borderColor: palette.icon + "33",
-                        backgroundColor: palette.icon + "20",
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.avatarInitial, { color: palette.text }]}
-                    >
-                      {initial}
-                    </Text>
-                  </View>
-                )}
+                <AccountAvatar
+                  uri={account?.avatarUrl ?? null}
+                  size={40}
+                  palette={palette}
+                />
                 <View style={styles.headerTextStack}>
                   <View style={styles.accountNameRow}>
                     <Text
@@ -618,24 +593,6 @@ const styles = StyleSheet.create({
   },
   headerTextStack: {
     flex: 1,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  avatarFallback: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInitial: {
-    fontSize: 16,
-    fontWeight: "700",
   },
   accountName: {
     fontSize: 16,
