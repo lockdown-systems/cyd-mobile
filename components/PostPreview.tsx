@@ -1,3 +1,4 @@
+import { MaterialIcons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useVideoPlayer, VideoView } from "expo-video";
 import React, {
@@ -50,7 +51,14 @@ type ImageItem = {
 
 function Avatar({ uri }: { uri?: string | null }) {
   if (!uri) {
-    return <View style={[styles.avatar, styles.avatarPlaceholder]} />;
+    // Avatars are URLs Cyd never preserves, so an author it knows only from a
+    // Cyd Bluesky archive has none at all. A person is a better stand-in for
+    // somebody than an empty circle.
+    return (
+      <View style={[styles.avatar, styles.avatarPlaceholder]}>
+        <MaterialIcons name="person" size={26} color="#8a8f98" />
+      </View>
+    );
   }
   return <Image key={uri} source={{ uri }} style={styles.avatar} />;
 }
@@ -842,6 +850,8 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#0001",
+    alignItems: "center",
+    justifyContent: "center",
   },
   bodyText: {
     fontSize: 17,

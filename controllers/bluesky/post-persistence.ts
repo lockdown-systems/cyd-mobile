@@ -15,6 +15,50 @@ type FeedRecordInfo =
   | { kind: "post"; record: AppBskyFeedPost.Record }
   | { kind: "repost"; record: AppBskyFeedRepost.Record };
 
+/**
+ * Write down what Bluesky currently says about somebody.
+ *
+ * Browse renders a record's author out of this table, so it is also what Cyd
+ * knows about an identity when it is offline. Saving posts refreshes it as a
+ * side effect of saving their author; anything else that learns a fresher
+ * profile — signing in, most of all, for an account restored from a Cyd
+ * Bluesky archive that could not carry an avatar — writes it here too.
+ *
+ * It takes the four fields it stores rather than a particular profile view, so
+ * the detailed profile an account fetches about itself fits as well as the
+ * basic one that arrives attached to a post.
+ */
+export type ProfileRowSource = Pick<
+  AppBskyActorDefs.ProfileViewBasic,
+  "did" | "handle" | "displayName" | "avatar"
+>;
+
+export async function upsertProfileRow(
+  db: SQLiteDatabase,
+  profile: ProfileRowSource
+): Promise<void> {
+  const now = Date.now();
+
+  await db.runAsync(
+    `INSERT INTO profile (
+      did, handle, displayName, avatarUrl, savedAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(did) DO UPDATE SET
+      handle = excluded.handle,
+      displayName = excluded.displayName,
+      avatarUrl = excluded.avatarUrl,
+      updatedAt = excluded.updatedAt;`,
+    [
+      profile.did,
+      profile.handle,
+      profile.displayName ?? null,
+      profile.avatar ?? null,
+      now,
+      now,
+    ]
+  );
+}
+
 export interface PostPersistenceOptions {
   viewerLiked?: number;
   viewerReposted?: number;
@@ -251,26 +295,7 @@ export class PostPersistence {
     db: SQLiteDatabase,
     profile: AppBskyActorDefs.ProfileViewBasic
   ): Promise<void> {
-    const now = Date.now();
-
-    await db.runAsync(
-      `INSERT INTO profile (
-        did, handle, displayName, avatarUrl, savedAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(did) DO UPDATE SET
-        handle = excluded.handle,
-        displayName = excluded.displayName,
-        avatarUrl = excluded.avatarUrl,
-        updatedAt = excluded.updatedAt;`,
-      [
-        profile.did,
-        profile.handle,
-        profile.displayName ?? null,
-        profile.avatar ?? null,
-        now,
-        now,
-      ]
-    );
+    await upsertProfileRow(db, profile);
   }
 
   private async downloadAndSaveMedia(
