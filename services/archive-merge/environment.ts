@@ -1,11 +1,15 @@
 import { Directory, File } from "expo-file-system";
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import type { SQLiteDatabase } from "expo-sqlite";
 
 import { buildAccountPaths } from "@/controllers/BaseAccountController";
 import {
   applyAccountMigrations,
   blueskyAccountMigrations,
 } from "@/database/account-db";
+import {
+  acquireAccountDatabase,
+  releaseAccountDatabase,
+} from "@/database/account-db/shared-handles";
 import { deleteAccount, listAccounts } from "@/database/accounts";
 import { getDatabase } from "@/database";
 import { openPreparedArchive } from "@/services/archive-restore/environment";
@@ -35,26 +39,32 @@ async function openAccountDatabase(accountUuid: string): Promise<SQLiteDatabase>
     intermediates: true,
     idempotent: true,
   });
-  const database = await openDatabaseAsync(
-    paths.dbNameForSQLite,
-    {},
+  // Borrowed rather than opened: the app may already hold this database, and a
+  // second handle over the same connection closes it for the first one when it
+  // is collected.
+  const database = await acquireAccountDatabase(
     paths.dbDirForSQLite,
+    paths.dbNameForSQLite,
   );
-  await database.execAsync("PRAGMA foreign_keys = ON;");
   applyAccountMigrations(database, blueskyAccountMigrations);
   return database;
 }
 
 function asMergeableAccountDatabase(
   database: SQLiteDatabase,
+  accountUuid: string,
 ): MergeableAccountDatabase {
+  const paths = buildAccountPaths("bluesky", accountUuid);
   return {
     all: async <T>(sql: string) => database.getAllAsync<T>(sql),
     run: async (sql, params) => {
       await database.runAsync(sql, params as never[]);
     },
     transaction: (work) => database.withTransactionAsync(work),
-    close: async () => database.closeAsync(),
+    // Handed back rather than closed. The account screen may be holding this
+    // very database, and closing a borrowed handle closes it for them too.
+    close: async () =>
+      releaseAccountDatabase(paths.dbDirForSQLite, paths.dbNameForSQLite),
   };
 }
 
@@ -84,7 +94,10 @@ export function createBlueskyArchiveMergeEnvironment(): BlueskyArchiveMergeEnvir
       })),
 
     openAccountDatabase: async (accountUuid) =>
-      asMergeableAccountDatabase(await openAccountDatabase(accountUuid)),
+      asMergeableAccountDatabase(
+        await openAccountDatabase(accountUuid),
+        accountUuid,
+      ),
 
     storeAccountMedia: async (accountUuid, fileName, write) => {
       const paths = buildAccountPaths("bluesky", accountUuid);

@@ -11,6 +11,10 @@ import {
   blueskyAccountMigrations,
 } from "@/database/account-db";
 import {
+  acquireAccountDatabase,
+  releaseAccountDatabase,
+} from "@/database/account-db/shared-handles";
+import {
   createBlueskyAccount,
   deleteAccount,
   listAccounts,
@@ -65,13 +69,18 @@ function asReadableInterchange(
 
 function asRestoredAccountDatabase(
   database: SQLiteDatabase,
+  accountUuid: string,
 ): RestoredAccountDatabase {
+  const paths = buildAccountPaths("bluesky", accountUuid);
   return {
     run: async (sql, params) => {
       await database.runAsync(sql, params as never[]);
     },
     transaction: (work) => database.withTransactionAsync(work),
-    close: async () => database.closeAsync(),
+    // Handed back rather than closed: the handle is shared with anything else
+    // in the app holding this account open.
+    close: async () =>
+      releaseAccountDatabase(paths.dbDirForSQLite, paths.dbNameForSQLite),
   };
 }
 
@@ -81,12 +90,13 @@ async function openAccountDatabase(accountUuid: string): Promise<SQLiteDatabase>
     intermediates: true,
     idempotent: true,
   });
-  const database = await openDatabaseAsync(
-    paths.dbNameForSQLite,
-    {},
+  // Borrowed rather than opened: the app may already hold this database, and a
+  // second handle over the same connection closes it for the first one when it
+  // is collected.
+  const database = await acquireAccountDatabase(
     paths.dbDirForSQLite,
+    paths.dbNameForSQLite,
   );
-  await database.execAsync("PRAGMA foreign_keys = ON;");
   applyAccountMigrations(database, blueskyAccountMigrations);
   return database;
 }
@@ -186,13 +196,21 @@ export function createBlueskyArchiveRestoreEnvironment(): BlueskyArchiveRestoreE
 
       // Creating the database here means a restore that fails later leaves an
       // account directory to delete rather than a half-migrated one to guess at.
-      (await openAccountDatabase(request.uuid)).closeSync();
+      await openAccountDatabase(request.uuid);
+      const created = buildAccountPaths("bluesky", request.uuid);
+      await releaseAccountDatabase(
+        created.dbDirForSQLite,
+        created.dbNameForSQLite,
+      );
 
       return { accountId: account.id, accountUuid: account.uuid };
     },
 
     openAccountDatabase: async (accountUuid) =>
-      asRestoredAccountDatabase(await openAccountDatabase(accountUuid)),
+      asRestoredAccountDatabase(
+        await openAccountDatabase(accountUuid),
+        accountUuid,
+      ),
 
     storeAccountMedia: async (
       accountUuid,

@@ -1,12 +1,13 @@
 import * as Crypto from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
-import {
-  defaultDatabaseDirectory,
-  openDatabaseAsync,
-  type SQLiteDatabase,
-} from "expo-sqlite";
+import { defaultDatabaseDirectory, type SQLiteDatabase } from "expo-sqlite";
 
 import { getDatabase } from "@/database";
+import {
+  accountDatabaseRefCount,
+  acquireAccountDatabase,
+  releaseAccountDatabase,
+} from "@/database/account-db/shared-handles";
 import { getBackupEligibleDataRoot } from "@/services/device-storage";
 
 /**
@@ -63,15 +64,10 @@ export class CancelledError extends Error {
  * configuration storage, and progress tracking.
  */
 export abstract class BaseAccountController<TProgress = unknown> {
-  private static sharedAccountDbs = new Map<
-    string,
-    { db: SQLiteDatabase; refCount: number }
-  >();
-
   protected accountId: number;
   protected accountUUID: string;
   protected db: SQLiteDatabase | null = null;
-  private sharedDbKey: string | null = null;
+  private sharedDbKey: { dbDir: string; dbName: string } | null = null;
   private _disposed = false;
   protected _progress: TProgress;
   private paused = false;
@@ -265,47 +261,15 @@ export abstract class BaseAccountController<TProgress = unknown> {
 
     await this.ensureAccountDirectory();
     const { dbDir, dbName } = this.getAccountDatabaseSQLiteInfo();
-    const dbKey = `${dbDir}::${dbName}`;
-
-    const existing = BaseAccountController.sharedAccountDbs.get(dbKey);
-    if (existing) {
-      existing.refCount += 1;
-      this.sharedDbKey = dbKey;
-      console.log(
-        "[BaseAccountController] openAccountDatabase -> reuse shared db",
-        {
-          accountId: this.accountId,
-          accountType: this.getAccountType(),
-          accountUUID: this.accountUUID,
-          dbKey,
-          refCount: existing.refCount,
-        },
-      );
-      return existing.db;
-    }
-
-    console.log(
-      "[BaseAccountController] openAccountDatabase -> opening new db",
-      {
-        accountId: this.accountId,
-        accountType: this.getAccountType(),
-        accountUUID: this.accountUUID,
-        dbKey,
-        dbDir,
-        dbName,
-      },
-    );
-    const db = await openDatabaseAsync(dbName, {}, dbDir);
-    await db.execAsync("PRAGMA foreign_keys = ON;");
-
-    BaseAccountController.sharedAccountDbs.set(dbKey, { db, refCount: 1 });
-    this.sharedDbKey = dbKey;
-    console.log("[BaseAccountController] openAccountDatabase -> opened", {
+    const db = await acquireAccountDatabase(dbDir, dbName);
+    this.sharedDbKey = { dbDir, dbName };
+    console.log("[BaseAccountController] openAccountDatabase -> acquired", {
       accountId: this.accountId,
       accountType: this.getAccountType(),
       accountUUID: this.accountUUID,
-      dbKey,
-      refCount: 1,
+      dbDir,
+      dbName,
+      refCount: accountDatabaseRefCount(dbDir, dbName),
     });
 
     return db;
@@ -401,7 +365,7 @@ export abstract class BaseAccountController<TProgress = unknown> {
     }
 
     const dbToRelease = this.db;
-    const dbKey = this.sharedDbKey;
+    const shared = this.sharedDbKey;
 
     this.db = null;
     this.sharedDbKey = null;
@@ -410,44 +374,27 @@ export abstract class BaseAccountController<TProgress = unknown> {
       accountId: this.accountId,
       accountType: this.getAccountType(),
       accountUUID: this.accountUUID,
-      dbKey,
+      ...shared,
     });
 
-    if (dbKey) {
-      const entry = BaseAccountController.sharedAccountDbs.get(dbKey);
-      if (entry) {
-        const beforeRefCount = entry.refCount;
-        entry.refCount -= 1;
-        console.log(
-          "[BaseAccountController] cleanup -> shared refCount decremented",
-          {
-            accountId: this.accountId,
-            accountType: this.getAccountType(),
-            accountUUID: this.accountUUID,
-            dbKey,
-            beforeRefCount,
-            afterRefCount: entry.refCount,
-          },
-        );
-        if (entry.refCount <= 0) {
-          BaseAccountController.sharedAccountDbs.delete(dbKey);
-          console.log("[BaseAccountController] cleanup -> closing shared db", {
-            accountId: this.accountId,
-            accountType: this.getAccountType(),
-            accountUUID: this.accountUUID,
-            dbKey,
-          });
-          await entry.db.closeAsync();
-        }
-        return;
-      }
+    if (shared) {
+      await releaseAccountDatabase(shared.dbDir, shared.dbName);
+      console.log("[BaseAccountController] cleanup -> released", {
+        accountId: this.accountId,
+        accountType: this.getAccountType(),
+        accountUUID: this.accountUUID,
+        ...shared,
+        refCount: accountDatabaseRefCount(shared.dbDir, shared.dbName),
+      });
+      return;
     }
 
+    // A handle that did not come from the shared map is this controller's
+    // alone, so closing it is closing it for nobody else.
     console.log("[BaseAccountController] cleanup -> closing direct db", {
       accountId: this.accountId,
       accountType: this.getAccountType(),
       accountUUID: this.accountUUID,
-      dbKey,
     });
     await dbToRelease.closeAsync();
   }
