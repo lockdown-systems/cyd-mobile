@@ -41,12 +41,14 @@ export type BlueskyArchiveMergeCounts = {
 };
 
 /**
- * One record the account no longer holds.
+ * One record the account does not hold.
  *
- * Restoring these is the point of a recovery import and also the one thing it
- * does that somebody might not want, because a record can be absent because
- * they deleted it from Cyd on purpose (Bluesky local deletion). So they are
- * named in the preview rather than counted in a total.
+ * The merge preview counts these rather than listing them (ADR 0018): Mobile
+ * has no Bluesky local deletion, so a missing record is one this account never
+ * had, and a list of them is nothing somebody can recognise. They are still
+ * carried, because choosing between two Bluesky local accounts that hold one
+ * identity is a different question — there, an example of what one holds and
+ * the other does not is how somebody tells them apart.
  */
 export type RestorationPreview = {
   category: "posts" | "bookmarks" | "follows" | "chats" | "messages";
@@ -55,8 +57,28 @@ export type RestorationPreview = {
   createdAt: string | null;
 };
 
-/** How many named restorations the preview carries before it stops listing. */
+/** How many records a plan names before it only counts them. */
 const MAX_LISTED_RESTORATIONS = 50;
+
+/**
+ * How many of each kind of record a merge would add, named the way Browse
+ * names them.
+ *
+ * Mobile keeps posts, reposts, likes and bookmarks in one table and tells them
+ * apart by column, so this classifies the rows the same way the Browse tabs
+ * count them. A row can land under two headings — the account's own post that
+ * it also liked is both — which is exactly what Browse shows, so agreeing with
+ * it beats adding up to a tidier total.
+ */
+export type AddedRecordCounts = {
+  posts: number;
+  reposts: number;
+  likes: number;
+  bookmarks: number;
+  follows: number;
+  chats: number;
+  messages: number;
+};
 
 export type BlueskyArchiveMergeSummary = {
   profiles: BlueskyArchiveMergeCounts;
@@ -68,9 +90,11 @@ export type BlueskyArchiveMergeSummary = {
   conversations: BlueskyArchiveMergeCounts;
   messages: BlueskyArchiveMergeCounts;
   mediaAssets: BlueskyArchiveMergeCounts;
+  /** The added rows, by the name somebody would give them. */
+  addedRecords: AddedRecordCounts;
   restorations: {
     total: number;
-    /** The first `MAX_LISTED_RESTORATIONS`, for somebody to look through. */
+    /** The first `MAX_LISTED_RESTORATIONS`, for a caller that names them. */
     records: RestorationPreview[];
   };
 };
@@ -89,7 +113,7 @@ export type BlueskyArchiveMergeSummary = {
  * or this does not compile.
  */
 const MERGE_CATEGORIES: Record<
-  Exclude<keyof BlueskyArchiveMergeSummary, "restorations">,
+  Exclude<keyof BlueskyArchiveMergeSummary, "restorations" | "addedRecords">,
   "records" | "files" | "context"
 > = {
   posts: "records",
@@ -232,6 +256,9 @@ function sameRow(left: object, right: object): boolean {
 export function planBlueskyArchiveMerge(
   existing: ExistingAccountRows,
   incoming: ExistingAccountRows,
+  /** Whose account this is, which is what makes a post theirs rather than
+   * somebody else's that they liked. */
+  accountDid: string,
 ): BlueskyArchiveMergePlan {
   const profiles = mergeTable(existing.profiles, incoming.profiles, {
     key: (row) => row.did,
@@ -292,6 +319,13 @@ export function planBlueskyArchiveMerge(
       conversations: conversations.counts,
       messages: messages.counts,
       mediaAssets: mediaAssets.counts,
+      addedRecords: countAddedRecords(accountDid, {
+        posts: posts.added,
+        bookmarks: bookmarks.added,
+        follows: follows.added,
+        conversations: conversations.added,
+        messages: messages.added,
+      }),
       restorations: summarizeRestorations({
         posts: posts.added,
         bookmarks: bookmarks.added,
@@ -300,6 +334,42 @@ export function planBlueskyArchiveMerge(
         messages: messages.added,
       }),
     },
+  };
+}
+
+/**
+ * Count the added rows under the headings Browse uses.
+ *
+ * The rules are Browse's own (`buildTotalCountQuery`): a post is one this
+ * account wrote and did not repost, while a repost, a like and a bookmark are
+ * any post row carrying that mark. Saying "3 posts and 2 likes" rather than
+ * "5 records" is only true if it is counted the way the tabs somebody will go
+ * and look at are counted.
+ */
+function countAddedRecords(
+  accountDid: string,
+  added: {
+    posts: ExistingPostRow[];
+    bookmarks: MobileBookmarkWrite[];
+    follows: MobileFollowWrite[];
+    conversations: MobileConversationWrite[];
+    messages: MobileMessageWrite[];
+  },
+): AddedRecordCounts {
+  const posts = added.posts.filter(
+    (row) => row.authorDid === accountDid && row.isRepost === 0,
+  ).length;
+
+  return {
+    posts,
+    reposts: added.posts.filter((row) => row.viewerReposted === 1).length,
+    likes: added.posts.filter((row) => row.viewerLiked === 1).length,
+    // Bookmarks live in their own table as well as on the post row; the table
+    // is the record, so it is what gets counted.
+    bookmarks: added.bookmarks.length,
+    follows: added.follows.length,
+    chats: added.conversations.length,
+    messages: added.messages.length,
   };
 }
 

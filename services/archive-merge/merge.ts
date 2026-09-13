@@ -128,6 +128,7 @@ export async function previewBlueskyArchiveMerge(
   const plan = await planAgainstAccount(
     environment,
     request.account.uuid,
+    snapshot.archive.account_did,
     incoming,
   );
 
@@ -179,6 +180,7 @@ export async function commitBlueskyArchiveMerge(
   const plan = await planAgainstAccount(
     environment,
     preview.accountUuid,
+    preview.accountDid,
     incoming,
   );
 
@@ -219,6 +221,7 @@ function reporter(options: {
 async function planAgainstAccount(
   environment: BlueskyArchiveMergeEnvironment,
   accountUuid: string,
+  accountDid: string,
   incoming: RestoredMobileAccount,
 ): Promise<BlueskyArchiveMergePlan> {
   const database = await environment.openAccountDatabase(accountUuid);
@@ -226,6 +229,7 @@ async function planAgainstAccount(
     return planBlueskyArchiveMerge(
       await readExistingAccountRows(database),
       accountRowsFromArchive(incoming),
+      accountDid,
     );
   } finally {
     await database.close();

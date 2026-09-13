@@ -242,44 +242,11 @@ export function BlueskyArchiveImportModal({
               <Text style={[styles.handle, { color: palette.text }]}>
                 {breakableHandle(state.handle)}
               </Text>
-              <ScrollView style={styles.scroll}>
-                <Text style={[styles.body, { color: palette.icon }]}>
-                  {describeMerge(state.preview)}
+              {describeMerge(state.preview).map((line) => (
+                <Text key={line} style={[styles.body, { color: palette.icon }]}>
+                  {line}
                 </Text>
-                {state.preview.summary.restorations.total > 0 ? (
-                  <>
-                    <Text style={[styles.subtitle, { color: palette.text }]}>
-                      Coming back to this account
-                    </Text>
-                    <Text style={[styles.body, { color: palette.icon }]}>
-                      These are not in Cyd right now. If you deleted any of them
-                      from Cyd on purpose, importing brings them back.
-                    </Text>
-                    {state.preview.summary.restorations.records.map(
-                      (record) => (
-                        <Text
-                          key={`${record.category}:${record.id}`}
-                          numberOfLines={2}
-                          style={[styles.record, { color: palette.text }]}
-                        >
-                          {record.text?.trim()
-                            ? `${record.category}: ${record.text.trim()}`
-                            : `${record.category}: ${record.id}`}
-                        </Text>
-                      ),
-                    )}
-                    {state.preview.summary.restorations.total >
-                    state.preview.summary.restorations.records.length ? (
-                      <Text style={[styles.body, { color: palette.icon }]}>
-                        …and{" "}
-                        {state.preview.summary.restorations.total -
-                          state.preview.summary.restorations.records.length}{" "}
-                        more.
-                      </Text>
-                    ) : null}
-                  </>
-                ) : null}
-              </ScrollView>
+              ))}
               {action("Import", onConfirmMerge, "primary")}
               {action("Cancel", onCancel)}
             </>
@@ -370,50 +337,60 @@ function count(total: number, noun: string): string {
   return `${total.toLocaleString()} ${noun}${total === 1 ? "" : "s"}`;
 }
 
-/** "a, b and c", so a sentence can be built out of whatever is true. */
-function sentence(clauses: string[]): string {
-  if (clauses.length <= 1) {
-    return clauses[0] ?? "";
-  }
-  return `${clauses.slice(0, -1).join(", ")} and ${clauses[clauses.length - 1]}`;
-}
-
 /**
- * One sentence about what this archive has that the account does not.
+ * What this archive has that the account does not, a line per kind.
  *
- * Every kind of change counts, not only the ones with a familiar name. An
- * export taken again once a download finished differs from the one before it
- * by a single image, and telling somebody that importing it changes nothing
- * would be both wrong and the exact case they are trying to fix.
+ * Named the way Browse names them, so somebody who reads "2 likes will be
+ * added" can go to the Likes tab afterwards and find two more than before.
+ * A kind with nothing to add says nothing at all: a list of zeroes is a list
+ * of things that are not happening.
+ *
+ * What a merge leaves alone is not mentioned either. A merge cannot reach an
+ * account's settings, schedule or Bluesky connection — the ports have no way
+ * to — so saying so every time is a sentence that is never news.
  */
-function describeMerge(preview: BlueskyArchiveMergePreview): string {
+function describeMerge(preview: BlueskyArchiveMergePreview): string[] {
   const totals = totalMergeChanges(preview.summary);
 
   if (totals.total === 0) {
-    return "This archive holds nothing this account does not already have. Importing it will change nothing.";
+    return [
+      "This archive holds nothing this account does not already have. Importing it will change nothing.",
+    ];
   }
 
-  const files = totals.files.added + totals.files.updated;
-  const clauses: string[] = [];
-  if (totals.records.added > 0) {
-    clauses.push(`${count(totals.records.added, "record")} will be added`);
+  const added = preview.summary.addedRecords;
+  const kinds: [number, string][] = [
+    [added.posts, "post"],
+    [added.reposts, "repost"],
+    [added.likes, "like"],
+    [added.bookmarks, "bookmark"],
+    [added.follows, "follow"],
+    [added.chats, "chat"],
+    [added.messages, "message"],
+    [totals.files.added, "media file"],
+  ];
+
+  const lines = kinds
+    .filter(([total]) => total > 0)
+    .map(([total, noun]) => `${count(total, noun)} will be added.`);
+
+  if (totals.files.updated > 0) {
+    // A file this account has a record of but never managed to download.
+    lines.push(`${count(totals.files.updated, "media file")} will be restored.`);
   }
   if (totals.records.updated > 0) {
-    clauses.push(`${totals.records.updated.toLocaleString()} will be filled in`);
+    lines.push(`${count(totals.records.updated, "record")} will be filled in.`);
   }
-  if (files > 0) {
-    clauses.push(`${count(files, "media file")} will arrive`);
-  }
-  if (clauses.length === 0) {
+  if (lines.length === 0) {
     // Only supporting rows changed: an author, an attachment, a link preview.
-    clauses.push("some records will gain details this account is missing");
+    lines.push("Some records will gain details this account is missing.");
   }
-
-  const incomplete =
-    preview.archive.completeness === "incomplete"
-      ? " This archive is missing some files, so a few records will arrive without their media."
-      : "";
-  return `${sentence(clauses)}. Your settings, schedule and Bluesky connection are left alone.${incomplete}`;
+  if (preview.archive.completeness === "incomplete") {
+    lines.push(
+      "This archive is missing some files, so a few records will arrive without their media.",
+    );
+  }
+  return lines;
 }
 
 const styles = StyleSheet.create({
@@ -442,19 +419,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: -4,
   },
-  subtitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginTop: 12,
-  },
   body: {
     fontSize: 14,
     lineHeight: 20,
-  },
-  record: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 6,
   },
   scroll: {
     maxHeight: 280,

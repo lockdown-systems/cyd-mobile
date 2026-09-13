@@ -51,10 +51,10 @@ export type DuplicateAccountPreview = {
   /**
    * What this account would take on from the others if it were the one kept.
    *
-   * Named rather than counted, for the same reason an archive merge names them
-   * (ADR 0018): a record missing from this account may be missing because
-   * somebody deleted it from Cyd here on purpose, and keeping this account
-   * brings it back.
+   * An example is named as well as counted, which the merge preview does not
+   * do. The question there is what an archive would add; the question here is
+   * which of two Bluesky local accounts is which, and a record one holds and
+   * the other does not is the thing somebody recognises.
    */
   gains: {
     total: number;
@@ -132,7 +132,11 @@ export async function previewDuplicateReconciliation(
       .filter((other) => other.uuid !== account.uuid)
       .map((other) => rows.get(other.uuid))
       .filter((other): other is ExistingAccountRows => other !== undefined)
-      .map((other) => planBlueskyArchiveMerge(own, other).summary.restorations);
+      .map(
+        (other) =>
+          planBlueskyArchiveMerge(own, other, identity.did).summary
+            .restorations,
+      );
 
     accounts.push({
       uuid: account.uuid,
@@ -188,6 +192,7 @@ export async function reconcileDuplicateBlueskyAccounts(
       const plan = planBlueskyArchiveMerge(
         await readExistingAccountRows(survivor),
         incoming,
+        choice.did,
       );
       await survivor.transaction(async () => {
         await writeMergedAccountRows(survivor, plan);
