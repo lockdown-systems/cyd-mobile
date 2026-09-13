@@ -187,7 +187,7 @@ describe("merging a Cyd Bluesky archive into an account that holds its identity"
     expect(fs.existsSync(prepared.stagingRoot)).toBe(false);
   });
 
-  it("brings back records deleted from Cyd, and names them before committing", async () => {
+  it("brings back records the account no longer holds, counting them first", async () => {
     const doomed = (
       harness.database
         .prepare(
