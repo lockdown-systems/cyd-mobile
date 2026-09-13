@@ -36,7 +36,6 @@ export type {
   BlueskyArchiveMergePlan,
   BlueskyArchiveMergeSummary,
   BlueskyArchiveMergeTotals,
-  RestorationPreview,
 } from "./merge-plan";
 export type {
   BlueskyArchiveMergeEnvironment,

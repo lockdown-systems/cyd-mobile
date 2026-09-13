@@ -71,8 +71,34 @@ export function BlueskyArchiveImportModal({
     </Pressable>
   );
 
+  /**
+   * What the Android back button does, which is what the nearest button does.
+   *
+   * Backing out of a question is cancelling it, and backing out of a report is
+   * dismissing it. The one state with no button is a merge being written, and
+   * back does nothing there for the same reason there is nothing to press: a
+   * commit cannot be called back, and half a merge is not a state to leave
+   * somebody in.
+   */
+  const handleRequestClose = () => {
+    if (state.status === "done" || state.status === "failed") {
+      onDismiss();
+      return;
+    }
+    if (state.status === "working" && !state.cancellable) {
+      return;
+    }
+    onCancel();
+  };
+
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={handleRequestClose}
+    >
       <View style={styles.overlay}>
         <View style={[styles.sheet, { backgroundColor: palette.background }]}>
           {state.status === "working" ? (
