@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   cancelBlueskyArchiveIntake,
   createBlueskyArchiveIntakeEnvironment,
+  listResumableBlueskyArchiveIntakes,
   openBlueskyArchiveByteReader,
   runBlueskyArchiveIntake,
   type BlueskyArchiveIntakeEnvironment,
@@ -126,6 +127,33 @@ function messageFor(error: unknown): string {
   return error instanceof Error
     ? error.message
     : "Cyd could not import that archive.";
+}
+
+/**
+ * Clear staging that an earlier launch left behind.
+ *
+ * Intake keeps a verified partial extraction on purpose, so that an import
+ * killed by the operating system can be picked up rather than started over
+ * (ADR 0006). Nothing in Mobile offers to pick one up, so what that policy
+ * actually produces is a directory per abandoned import, each the size of the
+ * archive it was reading, kept until the app is uninstalled.
+ *
+ * Starting an import is the moment to sweep them: it is the only thing that
+ * creates them, the person is right there, and anything still in flight
+ * belongs to a generation this one has already moved past. The day something
+ * offers to resume an import, this is what it replaces.
+ */
+function discardAbandonedStaging(
+  intake: BlueskyArchiveIntakeEnvironment,
+): void {
+  try {
+    for (const abandoned of listResumableBlueskyArchiveIntakes(intake)) {
+      cancelBlueskyArchiveIntake(intake, abandoned.intakeId);
+    }
+  } catch (error) {
+    // Debris nobody can see is not worth failing an import over.
+    console.warn("[archive-import] could not clear old staging", error);
+  }
 }
 
 function plural(count: number, noun: string): string {
@@ -409,6 +437,7 @@ export function useBlueskyArchiveImport(
   const start = useCallback(async (): Promise<void> => {
     const generation = (generationRef.current += 1);
     try {
+      discardAbandonedStaging(importRuntime().intake);
       const picked = await importRuntime().pickArchive();
       if (!picked) {
         return;
