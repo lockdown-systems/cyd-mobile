@@ -163,4 +163,49 @@ describe("importing a Cyd Bluesky archive from the menu", () => {
     expect(result.current.state.status).toBe("idle");
     expect(fs.readdirSync(harness.stagingParent)).toEqual([]);
   });
+
+  /**
+   * Intake keeps a verified partial extraction so a killed import can be
+   * resumed (ADR 0006), and nothing in Mobile offers to resume one — so
+   * without this, every import the operating system interrupts leaves an
+   * archive-sized directory behind until the app is uninstalled.
+   */
+  it("clears staging an earlier launch abandoned", async () => {
+    fs.mkdirSync(path.join(harness.stagingParent, "abandoned-with-nothing"), {
+      recursive: true,
+    });
+    const halfDone = path.join(harness.stagingParent, "abandoned-part-way");
+    fs.mkdirSync(halfDone, { recursive: true });
+    fs.writeFileSync(
+      path.join(halfDone, "intake.json"),
+      JSON.stringify({
+        sourceUri: "file:///fixtures/complete.cyd",
+        sourceBytes: 1,
+        phase: "extracting",
+        confirmedLargeArchive: false,
+        totalBytes: 1,
+        metadata: null,
+        payloads: [],
+        extracted: [],
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useBlueskyArchiveImport({
+        runtime: harness.runtime,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(fs.existsSync(halfDone)).toBe(false);
+    expect(
+      fs.readdirSync(harness.stagingParent).filter((name) =>
+        name.startsWith("abandoned-"),
+      ),
+    ).toEqual([]);
+  });
 });
