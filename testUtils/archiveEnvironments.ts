@@ -34,9 +34,7 @@ import { stagedPayloadPath } from "@/services/archive-import";
 import type {
   BlueskyArchiveMergeEnvironment,
   MergeableAccountDatabase,
-  ReconcilableSettingColumn,
 } from "@/services/archive-merge";
-import { RECONCILABLE_SETTING_COLUMNS } from "@/services/archive-merge";
 import type {
   BlueskyArchiveRestoreEnvironment,
   DiscardableAccount,
@@ -352,60 +350,6 @@ export function createNodeBlueskyArchiveRestoreEnvironment(
     },
 
     accountMediaUri,
-
-    readAccountSettings: async (accountUuid) => {
-      const row = mainDatabase
-        .prepare(
-          `SELECT ${RECONCILABLE_SETTING_COLUMNS.join(", ")}
-           FROM bsky_account b
-           INNER JOIN account a ON a.bskyAccountID = b.id
-           WHERE a.uuid = ?;`,
-        )
-        .get(accountUuid);
-      return row ?? {};
-    },
-
-    applyAccountSettings: async (accountUuid, settings) => {
-      const entries = Object.entries(settings) as [
-        ReconcilableSettingColumn,
-        string | number | null,
-      ][];
-      if (entries.length === 0) {
-        return;
-      }
-      mainDatabase
-        .prepare(
-          `UPDATE bsky_account
-           SET ${entries.map(([column]) => `${column} = ?`).join(", ")}
-           WHERE id = (SELECT bskyAccountID FROM account WHERE uuid = ?);`,
-        )
-        .run(...entries.map(([, value]) => value as never), accountUuid);
-    },
-
-    adoptAccountMedia: async (sourceAccountUuid, targetAccountUuid, localPath) => {
-      const source = localPath.replace(/^file:\/\//, "");
-      if (!fs.existsSync(source)) {
-        return null;
-      }
-      const directory = mediaDirectory(targetAccountUuid);
-      fs.mkdirSync(directory, { recursive: true });
-      const location = path.join(directory, path.basename(source));
-      fs.copyFileSync(source, location);
-      return {
-        uri: `file://${location}`,
-        byteLength: fs.statSync(location).size,
-      };
-    },
-
-    enforceOneAccountPerDid: async () => {
-      mainDatabase.exec(
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did
-         ON bsky_account(did);`,
-      );
-    },
-
-    removeLocalAccount: async (accountUuid: string) =>
-      removeAccount({ accountId: null, accountUuid }),
 
     discardLocalAccount: async (account: DiscardableAccount) =>
       removeAccount(account),

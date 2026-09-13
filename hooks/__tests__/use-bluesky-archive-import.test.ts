@@ -3,7 +3,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { NO_SCHEDULED_REMINDERS } from "@/services/scheduled-reminder-sync";
 import {
   createDiskBlueskyArchiveIntakeEnvironment,
   createNodeBlueskyArchiveRestoreEnvironment,
@@ -94,7 +93,6 @@ describe("importing a Cyd Bluesky archive from the menu", () => {
     const { result } = renderHook(() =>
       useBlueskyArchiveImport({
         runtime: harness.runtime,
-        reminders: NO_SCHEDULED_REMINDERS,
       }),
     );
 
@@ -120,7 +118,6 @@ describe("importing a Cyd Bluesky archive from the menu", () => {
     const { result } = renderHook(() =>
       useBlueskyArchiveImport({
         runtime: harness.runtime,
-        reminders: NO_SCHEDULED_REMINDERS,
       }),
     );
 
@@ -147,7 +144,6 @@ describe("importing a Cyd Bluesky archive from the menu", () => {
     const { result } = renderHook(() =>
       useBlueskyArchiveImport({
         runtime: harness.runtime,
-        reminders: NO_SCHEDULED_REMINDERS,
       }),
     );
 

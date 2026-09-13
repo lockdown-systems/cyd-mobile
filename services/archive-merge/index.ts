@@ -8,27 +8,13 @@
  * identifier collapse into one, and the account's own settings, schedules,
  * Bluesky connection and local choices are not the archive's business.
  *
- * Three things leave this module: where an archive should go, what merging it
- * would do, and how a Bluesky identity this installation holds twice is
- * reconciled down to one (ADR 0011). The union rules, the row reader and the
- * writer are internal, and the tests reach for them directly.
+ * Two things leave this module: where an archive should go, and what merging
+ * it would do. The union rules, the row reader and the writer are internal,
+ * and the tests reach for them directly.
  */
 
 export { chooseBlueskyArchiveImportDestination } from "./destination";
 export type { BlueskyArchiveImportDestination } from "./destination";
-export {
-  findDuplicateBlueskyIdentities,
-  previewDuplicateReconciliation,
-  reconcileDuplicateBlueskyAccounts,
-} from "./duplicates";
-export type {
-  DuplicateBlueskyIdentity,
-  DuplicateAccountCounts,
-  DuplicateAccountPreview,
-  DuplicateReconciliationChoice,
-  DuplicateReconciliationPreview,
-  DuplicateReconciliationResult,
-} from "./duplicates";
 export { createBlueskyArchiveMergeEnvironment } from "./environment";
 export { BlueskyArchiveMergeError } from "./errors";
 export type { BlueskyArchiveMergeErrorCode } from "./errors";
@@ -52,12 +38,9 @@ export type {
   BlueskyArchiveMergeTotals,
   RestorationPreview,
 } from "./merge-plan";
-export { RECONCILABLE_SETTING_COLUMNS } from "./ports";
 export type {
   BlueskyArchiveMergeEnvironment,
   MergeableAccountDatabase,
-  ReconcilableAccountSettings,
-  ReconcilableSettingColumn,
 } from "./ports";
 export type {
   ExistingAccountRows,
