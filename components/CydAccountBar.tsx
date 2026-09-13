@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   Linking,
   Modal,
   Platform,
@@ -14,6 +15,8 @@ import { getThemePalette } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
 import { useBlueskyArchiveImport } from "@/hooks/use-bluesky-archive-import";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { emitLocalAccountsChanged } from "@/services/account-events";
+import { connectBlueskyAccount } from "@/services/bluesky-sign-in";
 import { createScheduledReminderSync } from "@/services/scheduled-reminder-sync";
 
 import { BlueskyArchiveImportModal } from "./BlueskyArchiveImportModal";
@@ -94,6 +97,38 @@ export function CydAccountBar({
     setMenuVisible(false);
     void archiveImport.start();
   }, [archiveImport]);
+
+  /**
+   * Connect the Bluesky account an import just restored.
+   *
+   * A restored Bluesky local account holds somebody's data and no authorization
+   * to act on it, because a Cyd Bluesky archive never carries a Bluesky
+   * connection. Offering the sign-in here is offering it at the one moment the
+   * person is already thinking about that account — and signing in is also what
+   * fills in the display name and avatar an archive cannot carry.
+   *
+   * The import is dismissed first: the OAuth session is a full-screen browser,
+   * and it should not open over a modal reporting an import that has finished.
+   */
+  const handleSignIn = useCallback(
+    (handle: string) => {
+      archiveImport.dismiss();
+      void (async () => {
+        try {
+          await connectBlueskyAccount(handle);
+          emitLocalAccountsChanged();
+        } catch (err) {
+          Alert.alert(
+            "Sign in failed",
+            err instanceof Error
+              ? err.message
+              : "Cyd could not connect to Bluesky right now.",
+          );
+        }
+      })();
+    },
+    [archiveImport],
+  );
 
   if (state.isLoading || hidden) {
     return null;
@@ -284,6 +319,7 @@ export function CydAccountBar({
         onConfirmLargeArchive={() => void archiveImport.confirmLargeArchive()}
         onConfirmMerge={() => void archiveImport.confirmMerge()}
         onKeepAccount={(choice) => void archiveImport.keepAccount(choice)}
+        onSignIn={handleSignIn}
         onCancel={archiveImport.cancel}
         onDismiss={archiveImport.dismiss}
       />

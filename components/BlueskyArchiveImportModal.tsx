@@ -10,6 +10,10 @@ import {
 } from "react-native";
 
 import { getThemePalette } from "@/constants/theme";
+import {
+  totalMergeChanges,
+  type BlueskyArchiveMergePreview,
+} from "@/services/archive-merge";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import type { BlueskyArchiveImportState } from "@/hooks/use-bluesky-archive-import";
 
@@ -36,6 +40,8 @@ export type BlueskyArchiveImportModalProps = {
     survivingUuid: string;
     settingsFromUuid: string;
   }) => void;
+  /** Connect the account an import just restored, from where it was restored. */
+  onSignIn: (handle: string) => void;
   onCancel: () => void;
   onDismiss: () => void;
 };
@@ -45,6 +51,7 @@ export function BlueskyArchiveImportModal({
   onConfirmLargeArchive,
   onConfirmMerge,
   onKeepAccount,
+  onSignIn,
   onCancel,
   onDismiss,
 }: BlueskyArchiveImportModalProps) {
@@ -230,7 +237,10 @@ export function BlueskyArchiveImportModal({
           {state.status === "reviewing" ? (
             <>
               <Text style={[styles.title, { color: palette.text }]}>
-                Merge into @{state.handle}
+                Merge into
+              </Text>
+              <Text style={[styles.handle, { color: palette.text }]}>
+                {breakableHandle(state.handle)}
               </Text>
               <ScrollView style={styles.scroll}>
                 <Text style={[styles.body, { color: palette.icon }]}>
@@ -280,12 +290,26 @@ export function BlueskyArchiveImportModal({
               <Text style={[styles.title, { color: palette.text }]}>
                 {state.title}
               </Text>
+              <Text style={[styles.handle, { color: palette.text }]}>
+                {breakableHandle(state.handle)}
+              </Text>
               {state.lines.map((line) => (
                 <Text key={line} style={[styles.body, { color: palette.icon }]}>
                   {line}
                 </Text>
               ))}
-              {action("Done", onDismiss, "primary")}
+              {state.offerSignIn ? (
+                <>
+                  {action(
+                    "Sign in to Bluesky",
+                    () => onSignIn(state.handle),
+                    "primary",
+                  )}
+                  {action("Not now", onDismiss)}
+                </>
+              ) : (
+                action("Done", onDismiss, "primary")
+              )}
             </>
           ) : null}
 
@@ -304,6 +328,20 @@ export function BlueskyArchiveImportModal({
       </View>
     </Modal>
   );
+}
+
+/**
+ * A handle written so a line box breaks it where a reader would.
+ *
+ * A handle is a single token with no spaces in it, so a heading wide enough
+ * for most of one splits it wherever it happens to run out of room —
+ * "@glittertop-cyd.bsky" above ".social". A zero-width space before each dot
+ * offers the layout the same break points a person would choose, and leaves
+ * nothing on screen. Nothing is truncated: a handle is how somebody knows
+ * which account this is.
+ */
+function breakableHandle(handle: string): string {
+  return `@${handle.replace(/^@/, "")}`.replace(/\./g, "\u200B.");
 }
 
 /** One restored record, short enough to sit inside a sentence. */
@@ -327,33 +365,55 @@ function totalRecords(account: {
   );
 }
 
-/** One sentence about what this archive has that the account does not. */
-function describeMerge(preview: {
-  summary: {
-    posts: { added: number; updated: number };
-    messages: { added: number; updated: number };
-    follows: { added: number; updated: number };
-    restorations: { total: number };
-  };
-  archive: { completeness: "complete" | "incomplete" };
-}): string {
-  const added =
-    preview.summary.posts.added +
-    preview.summary.messages.added +
-    preview.summary.follows.added;
-  const updated =
-    preview.summary.posts.updated +
-    preview.summary.messages.updated +
-    preview.summary.follows.updated;
+/** `2 posts`, and `1 post` rather than `1 posts`. */
+function count(total: number, noun: string): string {
+  return `${total.toLocaleString()} ${noun}${total === 1 ? "" : "s"}`;
+}
 
-  if (added === 0 && updated === 0) {
+/** "a, b and c", so a sentence can be built out of whatever is true. */
+function sentence(clauses: string[]): string {
+  if (clauses.length <= 1) {
+    return clauses[0] ?? "";
+  }
+  return `${clauses.slice(0, -1).join(", ")} and ${clauses[clauses.length - 1]}`;
+}
+
+/**
+ * One sentence about what this archive has that the account does not.
+ *
+ * Every kind of change counts, not only the ones with a familiar name. An
+ * export taken again once a download finished differs from the one before it
+ * by a single image, and telling somebody that importing it changes nothing
+ * would be both wrong and the exact case they are trying to fix.
+ */
+function describeMerge(preview: BlueskyArchiveMergePreview): string {
+  const totals = totalMergeChanges(preview.summary);
+
+  if (totals.total === 0) {
     return "This archive holds nothing this account does not already have. Importing it will change nothing.";
   }
+
+  const files = totals.files.added + totals.files.updated;
+  const clauses: string[] = [];
+  if (totals.records.added > 0) {
+    clauses.push(`${count(totals.records.added, "record")} will be added`);
+  }
+  if (totals.records.updated > 0) {
+    clauses.push(`${totals.records.updated.toLocaleString()} will be filled in`);
+  }
+  if (files > 0) {
+    clauses.push(`${count(files, "media file")} will arrive`);
+  }
+  if (clauses.length === 0) {
+    // Only supporting rows changed: an author, an attachment, a link preview.
+    clauses.push("some records will gain details this account is missing");
+  }
+
   const incomplete =
     preview.archive.completeness === "incomplete"
       ? " This archive is missing some files, so a few records will arrive without their media."
       : "";
-  return `${added} records will be added and ${updated} filled in. Your settings, schedule and Bluesky connection are left alone.${incomplete}`;
+  return `${sentence(clauses)}. Your settings, schedule and Bluesky connection are left alone.${incomplete}`;
 }
 
 const styles = StyleSheet.create({
@@ -375,6 +435,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     textAlign: "center",
+  },
+  handle: {
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: -4,
   },
   subtitle: {
     fontSize: 15,

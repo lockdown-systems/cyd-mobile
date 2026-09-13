@@ -227,6 +227,12 @@ function millisFrom(value: string | null | undefined): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+/** A name, or nothing: blank is an absence of one rather than an empty one. */
+function named(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
 function parseJson(value: string | null): unknown {
   if (!value) {
     return null;
@@ -338,7 +344,11 @@ class MobileRowBuilder {
     return {
       did,
       handle: restored?.handle ?? profile?.handle ?? did,
-      displayName: restored?.displayName ?? profile?.display_name ?? null,
+      // A display name nobody ever set arrives as an empty string, which is an
+      // absence rather than a name — the same thing the merge's `populated`
+      // rule refuses to treat as an observation. Storing it as nothing is what
+      // lets the account fall back to its handle instead of showing a blank.
+      displayName: named(restored?.displayName ?? profile?.display_name),
       avatarUrl: restored?.avatarUrl ?? null,
     };
   }

@@ -24,6 +24,7 @@ import {
   commitBlueskyArchiveMerge,
   previewBlueskyArchiveMerge,
 } from "../merge";
+import { totalMergeChanges } from "../merge-plan";
 
 /**
  * Importing a Cyd Bluesky archive into the Bluesky local account that already
@@ -54,8 +55,11 @@ type Harness = {
   accountUuid: string;
   accountId: number;
   database: DatabaseSync;
-  /** Stage the fixture again, the way a second import would. */
-  prepare: (intakeId: string) => Promise<PreparedBlueskyArchive>;
+  /** Stage a fixture again, the way a second import would. */
+  prepare: (
+    intakeId: string,
+    name?: string,
+  ) => Promise<PreparedBlueskyArchive>;
 };
 
 async function stage(
@@ -78,12 +82,12 @@ async function stage(
 }
 
 /** An account restored from the fixture, ready to have the fixture merged in. */
-async function restoredAccount(): Promise<Harness> {
+async function restoredAccount(fixture = "complete.cyd"): Promise<Harness> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cyd-merge-"));
   const environment = createNodeBlueskyArchiveRestoreEnvironment({
     root: path.join(root, "app"),
   });
-  const prepared = await stage(root, "intake-restore");
+  const prepared = await stage(root, "intake-restore", fixture);
   const restored = await restoreBlueskyArchiveAccount(environment, {
     archive: {
       intakeId: prepared.intakeId,
@@ -97,7 +101,7 @@ async function restoredAccount(): Promise<Harness> {
     accountUuid: restored.accountUuid,
     accountId: restored.accountId,
     database: environment.openRestoredAccountDatabase(restored.accountUuid),
-    prepare: (intakeId) => stage(root, intakeId),
+    prepare: (intakeId, name) => stage(root, intakeId, name),
   };
 }
 
@@ -292,5 +296,76 @@ describe("merging a Cyd Bluesky archive into an account that holds its identity"
         },
       }),
     ).rejects.toThrow(/identity/i);
+  });
+});
+
+/**
+ * The recovery somebody actually performs: exporting again once a download
+ * that had failed has finished, and importing that over the account the first
+ * export built.
+ *
+ * The committed fixtures are exactly this pair — `incomplete.cyd` differs from
+ * `complete.cyd` by one asset and nothing else — so this is the merge whose
+ * only change is a file, and the one that used to describe itself as changing
+ * nothing at all.
+ */
+describe("merging an archive carrying a file an earlier one could not", () => {
+  let harness: Harness;
+
+  beforeAll(async () => {
+    harness = await restoredAccount("incomplete.cyd");
+  });
+
+  afterAll(() => {
+    harness.database.close();
+    harness.environment.close();
+    fs.rmSync(harness.root, { recursive: true, force: true });
+  });
+
+  function unavailable(): { contentCid: string; localPath: string | null }[] {
+    return harness.database
+      .prepare(
+        `SELECT contentCid, localPath FROM media_asset
+          WHERE downloadState != 'complete';`,
+      )
+      .all() as { contentCid: string; localPath: string | null }[];
+  }
+
+  it("recovers the file, and counts it as a change", async () => {
+    const missing = unavailable();
+    expect(missing).toHaveLength(1);
+
+    const prepared = await harness.prepare("intake-upgrade", "complete.cyd");
+    const preview = await previewBlueskyArchiveMerge(harness.environment, {
+      archive: {
+        intakeId: prepared.intakeId,
+        stagingRoot: prepared.stagingRoot,
+      },
+      account: identity(harness),
+    });
+
+    // Every record is identical across the pair, so a summary read one table
+    // at a time finds nothing: the file is the whole of the difference.
+    expect(preview.summary.posts).toMatchObject({ added: 0, updated: 0 });
+    expect(preview.summary.messages).toMatchObject({ added: 0, updated: 0 });
+    expect(preview.summary.mediaAssets).toMatchObject({ added: 0, updated: 1 });
+    expect(totalMergeChanges(preview.summary)).toMatchObject({
+      records: { added: 0, updated: 0 },
+      files: { added: 0, updated: 1 },
+      total: 1,
+    });
+
+    const result = await commitBlueskyArchiveMerge(harness.environment, preview);
+
+    expect(result.written).toBe(1);
+    expect(unavailable()).toEqual([]);
+
+    const restored = harness.database
+      .prepare("SELECT localPath FROM media_asset WHERE contentCid = ?;")
+      .get(missing[0].contentCid) as { localPath: string | null };
+    expect(restored.localPath).not.toBeNull();
+    expect(
+      fs.existsSync(restored.localPath!.replace(/^file:\/\//, "")),
+    ).toBe(true);
   });
 });

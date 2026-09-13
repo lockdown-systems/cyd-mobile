@@ -75,6 +75,76 @@ export type BlueskyArchiveMergeSummary = {
   };
 };
 
+/**
+ * What each table in a summary amounts to, for somebody deciding about it.
+ *
+ * A merge summary has one entry per table, and the tables are not equally
+ * interesting: somebody recognises a post, has no idea what a `post_external`
+ * is, and thinks of a recovered image as a file rather than a row. Grouping
+ * them is what lets a preview say something true in one sentence.
+ *
+ * The map is exhaustive on purpose. Reading a nine-table summary by hand is
+ * how a merge that recovers a missing image comes to announce itself as
+ * changing nothing: whoever adds the tenth table has to say what it is here,
+ * or this does not compile.
+ */
+const MERGE_CATEGORIES: Record<
+  Exclude<keyof BlueskyArchiveMergeSummary, "restorations">,
+  "records" | "files" | "context"
+> = {
+  posts: "records",
+  bookmarks: "records",
+  follows: "records",
+  conversations: "records",
+  messages: "records",
+  mediaAssets: "files",
+  profiles: "context",
+  postMedia: "context",
+  postExternals: "context",
+};
+
+export type BlueskyArchiveMergeTotals = {
+  /** Records somebody would recognise as theirs. */
+  records: { added: number; updated: number };
+  /** Media files: one this account never had, or one it failed to download. */
+  files: { added: number; updated: number };
+  /** What a record needs to render: authors, attachments, link previews. */
+  context: { added: number; updated: number };
+  /** Every write the plan would make. Zero is the only honest "nothing". */
+  total: number;
+};
+
+/**
+ * Add a summary up, so that "would this change anything?" has one answer.
+ *
+ * Both the preview somebody agrees to and the report afterwards ask it, and a
+ * merge is only a no-op when every table is: an archive whose single
+ * difference is the image an earlier export could not carry changes something
+ * worth being told about.
+ */
+export function totalMergeChanges(
+  summary: BlueskyArchiveMergeSummary,
+): BlueskyArchiveMergeTotals {
+  const totals: BlueskyArchiveMergeTotals = {
+    records: { added: 0, updated: 0 },
+    files: { added: 0, updated: 0 },
+    context: { added: 0, updated: 0 },
+    total: 0,
+  };
+
+  for (const [table, group] of Object.entries(MERGE_CATEGORIES) as [
+    keyof typeof MERGE_CATEGORIES,
+    "records" | "files" | "context",
+  ][]) {
+    const counts = summary[table];
+    totals[group].added += counts.added;
+    totals[group].updated += counts.updated;
+    totals.total += counts.added + counts.updated;
+  }
+
+  return totals;
+}
+
 export type BlueskyArchiveMergePlan = {
   profiles: MobileProfileWrite[];
   posts: ExistingPostRow[];

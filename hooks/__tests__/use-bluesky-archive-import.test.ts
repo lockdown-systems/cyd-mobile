@@ -106,7 +106,11 @@ describe("importing a Cyd Bluesky archive from the menu", () => {
       expect(result.current.state.status).toBe("done");
     });
     expect(result.current.state).toMatchObject({
-      title: "Restored @glittertop-cyd.bsky.social",
+      title: "Restored",
+      handle: "glittertop-cyd.bsky.social",
+      // A restored account has no Bluesky connection, so this is where one is
+      // offered.
+      offerSignIn: true,
     });
     // Staging is the import's working state, and the import is over.
     expect(fs.readdirSync(harness.stagingParent)).toEqual([]);
