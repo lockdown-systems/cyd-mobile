@@ -166,7 +166,6 @@ describe("merging a Cyd Bluesky archive into an account that holds its identity"
 
     const { preview, result } = await mergeFixture(harness, "intake-again");
 
-    expect(preview.summary.restorations.total).toBe(0);
     expect(preview.summary.posts).toEqual({
       added: 0,
       updated: 0,
@@ -212,7 +211,6 @@ describe("merging a Cyd Bluesky archive into an account that holds its identity"
       account: identity(harness),
     });
 
-    expect(preview.summary.restorations.total).toBe(doomed.length);
     // What the preview says out loud: three posts, and nothing else.
     expect(preview.summary.addedRecords).toMatchObject({
       posts: doomed.length,
@@ -220,17 +218,23 @@ describe("merging a Cyd Bluesky archive into an account that holds its identity"
       likes: 0,
       messages: 0,
     });
-    expect(
-      preview.summary.restorations.records
-        .map((record) => record.id)
-        .sort(),
-    ).toEqual([...doomed].sort());
-    // Nothing is written until the restorations have been shown.
+    // Nothing is written until somebody has agreed to the preview.
     expect(browseCount(harness.database, "posts")).toBe(before - doomed.length);
 
     await commitBlueskyArchiveMerge(harness.environment, preview);
 
     expect(browseCount(harness.database, "posts")).toBe(before);
+    // The three that came back are the three that went, not three of
+    // something else that happens to add up.
+    expect(
+      (
+        harness.database
+          .prepare(
+            `SELECT uri FROM post WHERE uri IN (${doomed.map(() => "?").join(", ")}) ORDER BY uri;`,
+          )
+          .all(...doomed) as { uri: string }[]
+      ).map((row) => row.uri),
+    ).toEqual([...doomed].sort());
   });
 
   it("keeps the account's own identifier, settings and schedule", async () => {

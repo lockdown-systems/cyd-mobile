@@ -92,7 +92,7 @@ function incoming(
 }
 
 describe("planning a Cyd Bluesky archive merge", () => {
-  it("adds a record the account no longer holds, and previews it as a restoration", () => {
+  it("adds a record the account no longer holds, and counts it", () => {
     const plan = planBlueskyArchiveMerge(
       existing(),
       incoming({ posts: [archived(post({ text: "a post deleted from Cyd" }))] }),
@@ -106,15 +106,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
       preserve: 0,
     });
     expect(plan.summary.posts).toEqual({ added: 1, updated: 0, unchanged: 0 });
-    expect(plan.summary.restorations.total).toBe(1);
-    expect(plan.summary.restorations.records).toEqual([
-      {
-        category: "posts",
-        id: "at://did:plc:archive/app.bsky.feed.post/one",
-        text: "a post deleted from Cyd",
-        createdAt: "2026-01-01T00:00:00.000Z",
-      },
-    ]);
+    expect(plan.summary.addedRecords.posts).toBe(1);
   });
 
   it("writes nothing when the archive holds what the account already holds", () => {
@@ -126,7 +118,6 @@ describe("planning a Cyd Bluesky archive merge", () => {
 
     expect(plan.posts).toEqual([]);
     expect(plan.summary.posts).toEqual({ added: 0, updated: 0, unchanged: 1 });
-    expect(plan.summary.restorations.total).toBe(0);
   });
   it("does not let a quieter archive blank out what the account knows", () => {
     const plan = planBlueskyArchiveMerge(
@@ -270,7 +261,6 @@ describe("planning a Cyd Bluesky archive merge", () => {
 
     expect(plan.posts).toEqual([]);
     expect(plan.summary.posts).toEqual({ added: 0, updated: 0, unchanged: 0 });
-    expect(plan.summary.restorations.total).toBe(0);
   });
 
   it("upgrades a failed download when the archive brought the file", () => {
@@ -448,7 +438,6 @@ describe("adding a merge summary up", () => {
       chats: 0,
       messages: 0,
     },
-    restorations: { total: 0, records: [] },
     ...overrides,
   });
 

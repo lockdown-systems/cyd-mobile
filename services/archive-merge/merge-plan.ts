@@ -41,25 +41,6 @@ export type BlueskyArchiveMergeCounts = {
 };
 
 /**
- * One record the account does not hold.
- *
- * Nothing shows these: the preview counts what it would add rather than naming
- * it, because Mobile has no Bluesky local deletion and a missing record is one
- * the account never had (ADR 0018). The plan works them out anyway so that
- * naming them stays a presentation change rather than new capability, for a
- * client — or a later Mobile — where a record can go missing on purpose.
- */
-export type RestorationPreview = {
-  category: "posts" | "bookmarks" | "follows" | "chats" | "messages";
-  id: string;
-  text: string | null;
-  createdAt: string | null;
-};
-
-/** How many records a plan names before it only counts them. */
-const MAX_LISTED_RESTORATIONS = 50;
-
-/**
  * How many of each kind of record a merge would add, named the way Browse
  * names them.
  *
@@ -91,11 +72,6 @@ export type BlueskyArchiveMergeSummary = {
   mediaAssets: BlueskyArchiveMergeCounts;
   /** The added rows, by the name somebody would give them. */
   addedRecords: AddedRecordCounts;
-  restorations: {
-    total: number;
-    /** The first `MAX_LISTED_RESTORATIONS`, for a caller that names them. */
-    records: RestorationPreview[];
-  };
 };
 
 /**
@@ -112,7 +88,7 @@ export type BlueskyArchiveMergeSummary = {
  * or this does not compile.
  */
 const MERGE_CATEGORIES: Record<
-  Exclude<keyof BlueskyArchiveMergeSummary, "restorations" | "addedRecords">,
+  Exclude<keyof BlueskyArchiveMergeSummary, "addedRecords">,
   "records" | "files" | "context"
 > = {
   posts: "records",
@@ -324,13 +300,6 @@ export function planBlueskyArchiveMerge(
         conversations: conversations.added,
         messages: messages.added,
       }),
-      restorations: summarizeRestorations({
-        posts: posts.added,
-        bookmarks: bookmarks.added,
-        follows: follows.added,
-        conversations: conversations.added,
-        messages: messages.added,
-      }),
     },
   };
 }
@@ -371,58 +340,6 @@ function countAddedRecords(
   };
 }
 
-/**
- * The records coming back, in the order somebody would read them.
- *
- * Only records count: a profile or a media file arrives because a record
- * needs it, and listing them would bury the posts and messages the person is
- * actually being asked about.
- */
-function summarizeRestorations(added: {
-  posts: ExistingPostRow[];
-  bookmarks: MobileBookmarkWrite[];
-  follows: MobileFollowWrite[];
-  conversations: MobileConversationWrite[];
-  messages: MobileMessageWrite[];
-}): BlueskyArchiveMergeSummary["restorations"] {
-  const records: RestorationPreview[] = [
-    ...added.posts.map((row) => ({
-      category: "posts" as const,
-      id: row.uri,
-      text: row.text,
-      createdAt: row.createdAt,
-    })),
-    ...added.bookmarks.map((row) => ({
-      category: "bookmarks" as const,
-      id: row.subjectUri,
-      text: row.postText,
-      createdAt: row.postCreatedAt,
-    })),
-    ...added.follows.map((row) => ({
-      category: "follows" as const,
-      id: row.uri,
-      text: row.handle,
-      createdAt: row.createdAt,
-    })),
-    ...added.conversations.map((row) => ({
-      category: "chats" as const,
-      id: row.convoId,
-      text: row.lastMessageText,
-      createdAt: row.lastMessageSentAt,
-    })),
-    ...added.messages.map((row) => ({
-      category: "messages" as const,
-      id: row.messageId,
-      text: row.text,
-      createdAt: row.sentAt,
-    })),
-  ];
-
-  return {
-    total: records.length,
-    records: records.slice(0, MAX_LISTED_RESTORATIONS),
-  };
-}
 
 function unionProfile(
   local: MobileProfileWrite,

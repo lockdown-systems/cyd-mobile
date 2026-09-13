@@ -122,8 +122,28 @@ export function CydAccountBar({
     [archiveImport],
   );
 
+  /**
+   * The import, which outlives the bar that starts it.
+   *
+   * The bar hides itself on the account screen, and an import started from the
+   * accounts list is still running when somebody opens the account it just
+   * restored. Rendering this outside the bar's own visibility is what keeps
+   * the progress and the questions on screen rather than leaving the import
+   * running invisibly.
+   */
+  const importModal = (
+    <BlueskyArchiveImportModal
+      state={archiveImport.state}
+      onConfirmLargeArchive={() => void archiveImport.confirmLargeArchive()}
+      onConfirmMerge={() => void archiveImport.confirmMerge()}
+      onSignIn={handleSignIn}
+      onCancel={archiveImport.cancel}
+      onDismiss={archiveImport.dismiss}
+    />
+  );
+
   if (state.isLoading || hidden) {
-    return null;
+    return importModal;
   }
 
   return (
@@ -306,14 +326,7 @@ export function CydAccountBar({
         onClose={handleCloseSignInModal}
       />
 
-      <BlueskyArchiveImportModal
-        state={archiveImport.state}
-        onConfirmLargeArchive={() => void archiveImport.confirmLargeArchive()}
-        onConfirmMerge={() => void archiveImport.confirmMerge()}
-        onSignIn={handleSignIn}
-        onCancel={archiveImport.cancel}
-        onDismiss={archiveImport.dismiss}
-      />
+      {importModal}
     </>
   );
 }
