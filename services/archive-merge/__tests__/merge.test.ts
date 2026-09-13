@@ -213,6 +213,13 @@ describe("merging a Cyd Bluesky archive into an account that holds its identity"
     });
 
     expect(preview.summary.restorations.total).toBe(doomed.length);
+    // What the preview says out loud: three posts, and nothing else.
+    expect(preview.summary.addedRecords).toMatchObject({
+      posts: doomed.length,
+      reposts: 0,
+      likes: 0,
+      messages: 0,
+    });
     expect(
       preview.summary.restorations.records
         .map((record) => record.id)
@@ -353,6 +360,16 @@ describe("merging an archive carrying a file an earlier one could not", () => {
       records: { added: 0, updated: 0 },
       files: { added: 0, updated: 1 },
       total: 1,
+    });
+    // Nothing to say about any kind of record: the file is the whole of it.
+    expect(preview.summary.addedRecords).toEqual({
+      posts: 0,
+      reposts: 0,
+      likes: 0,
+      bookmarks: 0,
+      follows: 0,
+      chats: 0,
+      messages: 0,
     });
 
     const result = await commitBlueskyArchiveMerge(harness.environment, preview);

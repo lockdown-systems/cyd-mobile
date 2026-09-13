@@ -96,6 +96,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
     const plan = planBlueskyArchiveMerge(
       existing(),
       incoming({ posts: [archived(post({ text: "a post deleted from Cyd" }))] }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts).toHaveLength(1);
@@ -120,6 +121,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
     const plan = planBlueskyArchiveMerge(
       existing({ posts: [{ ...post(), preserve: 0 }] }),
       incoming({ posts: [archived(post())] }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts).toEqual([]);
@@ -137,6 +139,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
         ],
       }),
       incoming({ posts: [archived(post({ text: "", langs: null, savedAt: 9_000 }))] }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts).toEqual([]);
@@ -158,6 +161,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
           archived(post({ text: "after an edit", likeCount: 4, savedAt: 9_000 })),
         ],
       }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts[0]).toMatchObject({
@@ -186,6 +190,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
           ),
         ],
       }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts[0]).toMatchObject({ likeCount: 5, replyCount: 3 });
@@ -218,6 +223,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
           ),
         ],
       }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts.map((row) => [row.uri, row.viewerLiked])).toEqual([
@@ -232,6 +238,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
         posts: [{ ...post({ deletedPostAt: null }), preserve: 0 }],
       }),
       incoming({ posts: [archived(post({ deletedPostAt: 4_000 }))] }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts[0]).toMatchObject({ deletedPostAt: 4_000 });
@@ -243,6 +250,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
         posts: [{ ...post({ text: "kept", savedAt: 1_000 }), preserve: 1 }],
       }),
       incoming({ posts: [archived(post({ text: "kept again", savedAt: 9_000 }))] }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts[0]).toMatchObject({ text: "kept again", preserve: 1 });
@@ -257,6 +265,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
     const plan = planBlueskyArchiveMerge(
       existing({ posts: [untouched] }),
       incoming({ posts: [] }),
+    ARCHIVE_DID,
     );
 
     expect(plan.posts).toEqual([]);
@@ -302,6 +311,7 @@ describe("planning a Cyd Bluesky archive merge", () => {
           },
         ],
       }),
+    ARCHIVE_DID,
     );
 
     expect(plan.mediaAssets[0]).toMatchObject({
@@ -344,9 +354,70 @@ describe("planning a Cyd Bluesky archive merge", () => {
           },
         ],
       }),
+    ARCHIVE_DID,
     );
 
     expect(plan.mediaAssets).toEqual([]);
+  });
+});
+
+/**
+ * Counting the added rows the way the Browse tabs count them, so a preview can
+ * say "2 likes" to somebody who will go and look at the Likes tab.
+ */
+describe("naming what a merge would add", () => {
+  const added = (rows: MobilePostWrite[]) =>
+    planBlueskyArchiveMerge(
+      existing(),
+      incoming({ posts: rows.map(archived) }),
+      ARCHIVE_DID,
+    ).summary.addedRecords;
+
+  it("counts the account's own posts as posts", () => {
+    expect(added([post()])).toMatchObject({ posts: 1, likes: 0, reposts: 0 });
+  });
+
+  it("counts somebody else's post the account liked as a like, not a post", () => {
+    const liked = post({
+      uri: "at://did:plc:someone/app.bsky.feed.post/two",
+      authorDid: "did:plc:someone",
+      viewerLiked: 1,
+    });
+
+    expect(added([liked])).toMatchObject({ posts: 0, likes: 1 });
+  });
+
+  it("counts a repost as a repost", () => {
+    const reposted = post({
+      uri: "at://did:plc:someone/app.bsky.feed.post/three",
+      authorDid: "did:plc:someone",
+      isRepost: 1,
+      viewerReposted: 1,
+    });
+
+    expect(added([reposted])).toMatchObject({ posts: 0, reposts: 1 });
+  });
+
+  it("counts the account's own post that it also liked under both, as Browse does", () => {
+    // Browse shows this row in the Posts tab and in the Likes tab, so a
+    // preview that claimed one or the other would disagree with what somebody
+    // finds when they go and look.
+    expect(added([post({ viewerLiked: 1 })])).toMatchObject({
+      posts: 1,
+      likes: 1,
+    });
+  });
+
+  it("says nothing about a kind with nothing to add", () => {
+    expect(added([])).toEqual({
+      posts: 0,
+      reposts: 0,
+      likes: 0,
+      bookmarks: 0,
+      follows: 0,
+      chats: 0,
+      messages: 0,
+    });
   });
 });
 
@@ -368,6 +439,15 @@ describe("adding a merge summary up", () => {
     conversations: none,
     messages: none,
     mediaAssets: none,
+    addedRecords: {
+      posts: 0,
+      reposts: 0,
+      likes: 0,
+      bookmarks: 0,
+      follows: 0,
+      chats: 0,
+      messages: 0,
+    },
     restorations: { total: 0, records: [] },
     ...overrides,
   });

@@ -167,12 +167,10 @@ function plural(count: number, noun: string): string {
 }
 
 /**
- * What a merge did, counting every kind of change it made.
+ * What a merge did, a line per kind of thing it did it to.
  *
- * Only what actually happened is mentioned: a merge that recovered one image
- * and nothing else should say so, rather than reporting that no records came
- * back and none gained anything — which is true, and tells somebody their
- * import did nothing.
+ * The same headings the preview used, in the past tense: somebody who agreed
+ * to "3 posts will be added" should be told that 3 posts were.
  */
 function describeMergeResult(result: BlueskyArchiveMergeResult): string[] {
   if (result.written === 0) {
@@ -180,23 +178,31 @@ function describeMergeResult(result: BlueskyArchiveMergeResult): string[] {
   }
 
   const totals = totalMergeChanges(result.summary);
-  const files = totals.files.added + totals.files.updated;
-  const lines: string[] = [];
-  if (totals.records.added > 0) {
-    lines.push(`${plural(totals.records.added, "record")} came back.`);
+  const added = result.summary.addedRecords;
+  const kinds: [number, string][] = [
+    [added.posts, "post"],
+    [added.reposts, "repost"],
+    [added.likes, "like"],
+    [added.bookmarks, "bookmark"],
+    [added.follows, "follow"],
+    [added.chats, "chat"],
+    [added.messages, "message"],
+    [totals.files.added, "media file"],
+  ];
+
+  const lines = kinds
+    .filter(([total]) => total > 0)
+    .map(([total, noun]) => `${plural(total, noun)} added.`);
+
+  if (totals.files.updated > 0) {
+    lines.push(`${plural(totals.files.updated, "media file")} restored.`);
   }
   if (totals.records.updated > 0) {
-    lines.push(`${plural(totals.records.updated, "record")} gained something.`);
-  }
-  if (files > 0) {
-    lines.push(`${plural(files, "media file")} restored.`);
+    lines.push(`${plural(totals.records.updated, "record")} filled in.`);
   }
   if (lines.length === 0) {
     lines.push("Some records gained details this account was missing.");
   }
-  lines.push(
-    "Your settings, schedule and Bluesky connection were left as they were.",
-  );
   return lines;
 }
 
