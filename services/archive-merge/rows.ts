@@ -53,9 +53,9 @@ export type ExistingAccountRows = {
  * A Cyd Bluesky archive's rows, in the shape the account holds them.
  *
  * The two columns an archive cannot know get the value a newly saved record
- * would have, and the union rules carry the account's own values across. It
- * is what lets one plan serve both jobs: merging an archive into an account,
- * and merging two duplicate accounts into one (ADR 0011).
+ * would have, and the union rules carry the account's own values across, so an
+ * archive can never reset a person's own decision to preserve a post or a
+ * downloader's record of what it has been through.
  */
 export function accountRowsFromArchive(
   restored: RestoredMobileAccount,

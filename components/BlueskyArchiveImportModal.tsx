@@ -1,9 +1,7 @@
-import { useState } from "react";
 import {
   ActivityIndicator,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -27,19 +25,10 @@ import type { BlueskyArchiveImportState } from "@/hooks/use-bluesky-archive-impo
  * of somebody's own posts should never look like a frozen screen.
  */
 
-type ReconciliationChoice = {
-  survivingUuid: string;
-  settingsFromUuid: string;
-};
-
 export type BlueskyArchiveImportModalProps = {
   state: BlueskyArchiveImportState;
   onConfirmLargeArchive: () => void;
   onConfirmMerge: () => void;
-  onKeepAccount: (choice: {
-    survivingUuid: string;
-    settingsFromUuid: string;
-  }) => void;
   /** Connect the account an import just restored, from where it was restored. */
   onSignIn: (handle: string) => void;
   onCancel: () => void;
@@ -50,36 +39,11 @@ export function BlueskyArchiveImportModal({
   state,
   onConfirmLargeArchive,
   onConfirmMerge,
-  onKeepAccount,
   onSignIn,
   onCancel,
   onDismiss,
 }: BlueskyArchiveImportModalProps) {
   const palette = getThemePalette(useColorScheme());
-  const [picked, setPicked] = useState<ReconciliationChoice | null>(null);
-
-  const reconciling = state.status === "reconciling" ? state.preview : null;
-  /**
-   * Which account is selected, before anybody has touched anything.
-   *
-   * The default is the one holding the most, because it is the one somebody is
-   * most likely to recognise as theirs — but it is only a default, and a
-   * selection that names an account this preview does not hold is stale and
-   * falls back to it.
-   */
-  const known = (uuid: string | undefined): boolean =>
-    reconciling?.accounts.some((account) => account.uuid === uuid) === true;
-  const fallback = reconciling
-    ? [...reconciling.accounts].sort(
-        (left, right) => totalRecords(right) - totalRecords(left),
-      )[0]?.uuid
-    : undefined;
-  const survivingUuid = known(picked?.survivingUuid)
-    ? picked!.survivingUuid
-    : fallback;
-  const settingsFromUuid = known(picked?.settingsFromUuid)
-    ? picked!.settingsFromUuid
-    : survivingUuid;
 
   if (state.status === "idle") {
     return null;
@@ -135,101 +99,6 @@ export function BlueskyArchiveImportModal({
                 {state.message}
               </Text>
               {action("Import it", onConfirmLargeArchive, "primary")}
-              {action("Cancel", onCancel)}
-            </>
-          ) : null}
-
-          {state.status === "reconciling" && survivingUuid ? (
-            <>
-              <Text style={[styles.title, { color: palette.text }]}>
-                Two accounts, one Bluesky identity
-              </Text>
-              <Text style={[styles.body, { color: palette.icon }]}>
-                {state.message}
-              </Text>
-              <ScrollView style={styles.scroll}>
-                {state.preview.accounts.map((account) => (
-                  <View key={account.uuid} style={styles.choice}>
-                    <Pressable
-                      onPress={() =>
-                        setPicked({
-                          survivingUuid: account.uuid,
-                          settingsFromUuid: settingsFromUuid ?? account.uuid,
-                        })
-                      }
-                      accessibilityRole="radio"
-                      accessibilityState={{
-                        selected: account.uuid === survivingUuid,
-                      }}
-                      style={[
-                        styles.choiceButton,
-                        {
-                          borderColor:
-                            account.uuid === survivingUuid
-                              ? palette.tint
-                              : palette.icon + "22",
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.choiceTitle, { color: palette.text }]}>
-                        {account.handle ?? account.uuid}
-                      </Text>
-                      <Text style={[styles.body, { color: palette.icon }]}>
-                        {account.counts.posts} posts · {account.counts.chats}{" "}
-                        chats · {account.counts.follows} follows
-                      </Text>
-                      {account.gains.total > 0 ? (
-                        <Text style={[styles.body, { color: palette.icon }]}>
-                          Keeping this one brings back {account.gains.total}{" "}
-                          records it does not have, including{" "}
-                          {describeRecord(account.gains.records[0])}.
-                        </Text>
-                      ) : null}
-                    </Pressable>
-                    <Pressable
-                      onPress={() =>
-                        setPicked({
-                          survivingUuid,
-                          settingsFromUuid: account.uuid,
-                        })
-                      }
-                      accessibilityRole="radio"
-                      accessibilityState={{
-                        selected: account.uuid === settingsFromUuid,
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.settingsPick,
-                          {
-                            color:
-                              account.uuid === settingsFromUuid
-                                ? palette.tint
-                                : palette.icon,
-                          },
-                        ]}
-                      >
-                        {account.uuid === settingsFromUuid
-                          ? "✓ Keeping these settings and schedule"
-                          : "Keep these settings and schedule"}
-                      </Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-              <Text style={[styles.body, { color: palette.icon }]}>
-                Nothing is lost either way: the account you keep ends up with
-                everything both of them held.
-              </Text>
-              {action(
-                "Keep this account and continue",
-                () =>
-                  onKeepAccount({
-                    survivingUuid,
-                    settingsFromUuid: settingsFromUuid ?? survivingUuid,
-                  }),
-                "primary",
-              )}
               {action("Cancel", onCancel)}
             </>
           ) : null}
@@ -297,6 +166,7 @@ export function BlueskyArchiveImportModal({
   );
 }
 
+
 /**
  * A handle written so a line box breaks it where a reader would.
  *
@@ -309,27 +179,6 @@ export function BlueskyArchiveImportModal({
  */
 function breakableHandle(handle: string): string {
   return `@${handle.replace(/^@/, "")}`.replace(/\./g, "\u200B.");
-}
-
-/** One restored record, short enough to sit inside a sentence. */
-function describeRecord(record: {
-  category: string;
-  id: string;
-  text: string | null;
-}): string {
-  const text = record.text?.trim();
-  return text ? `“${text.slice(0, 60)}”` : `one ${record.category} record`;
-}
-
-function totalRecords(account: {
-  counts: { posts: number; chats: number; messages: number; follows: number };
-}): number {
-  return (
-    account.counts.posts +
-    account.counts.chats +
-    account.counts.messages +
-    account.counts.follows
-  );
 }
 
 /** `2 posts`, and `1 post` rather than `1 posts`. */

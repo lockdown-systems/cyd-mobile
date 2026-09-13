@@ -48,10 +48,6 @@ _Avoid_: restore, import, replace
 The commit half of a Bluesky archive import for an identity this installation already holds: a union of the Cyd Bluesky archive into that Bluesky local account's Bluesky saved data, previewed before it is written. It adds and enriches Bluesky saved records and never touches the account's identifier, Bluesky account settings, schedules or Bluesky connection.
 _Avoid_: merge, sync, overwrite, import
 
-**Bluesky identity reconciliation**:
-Collapsing several Bluesky local accounts that hold one Bluesky identity into a single surviving one, after the person chooses which local-account UUID and whose Bluesky account settings it keeps. It unions their Bluesky saved data and restores the rule that one Bluesky identity has one Bluesky local account.
-_Avoid_: deduplication, account merge, cleanup
-
 **Bluesky account settings**:
 Local preferences governing how Cyd saves and manages a Bluesky identity. A Cyd Bluesky archive can supply defaults for a new Bluesky local account, but does not silently override an existing Bluesky local account's preferences or schedules.
 _Avoid_: account settings, account data, archive state

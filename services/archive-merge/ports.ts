@@ -11,56 +11,17 @@ import type {
  *
  * What is missing from this list is the point of it. There is no way from here
  * to write a Bluesky local account's settings or schedule, to touch a Bluesky
- * connection, or to rename an account: a merge into an existing Bluesky local
- * account can only add to that account's Bluesky saved data, so "an existing
- * identity keeps its UUID, its settings, its schedules and its connection" is
- * a property of the interface rather than a promise somebody has to keep.
- *
- * The exceptions are the two ports duplicate-DID reconciliation needs, which
- * is the one moment a person is asked to choose between two local accounts'
- * settings (ADR 0011). They are named for that job so they cannot be reached
- * for by accident.
+ * connection, to rename an account or to remove one: a merge into an existing
+ * Bluesky local account can only add to that account's Bluesky saved data, so
+ * "an existing identity keeps its UUID, its settings, its schedules and its
+ * connection" is a property of the interface rather than a promise somebody
+ * has to keep.
  */
 
 /** An existing account's database, which a merge reads before it writes. */
 export type MergeableAccountDatabase = RestoredAccountDatabase & {
   all<T>(sql: string): Promise<T[]>;
 };
-
-/**
- * The `bsky_account` columns duplicate-DID reconciliation carries over from
- * the account whose settings the person chose to keep.
- *
- * Schedule columns are here because a surviving Bluesky local account has to
- * keep a schedule somebody set. A Bluesky scheduled reminder still only
- * prompts a review — carrying it across does not authorize unattended
- * deletion, and there is nothing here that could.
- */
-export const RECONCILABLE_SETTING_COLUMNS = [
-  "settingSavePosts",
-  "settingSaveLikes",
-  "settingSaveBookmarks",
-  "settingSaveChats",
-  "settingDeletePosts",
-  "settingDeleteReposts",
-  "settingDeleteLikes",
-  "settingDeleteBookmarks",
-  "settingDeleteChats",
-  "settingDeleteUnfollowEveryone",
-  "settingScheduleDeletion",
-  "settingScheduleDeletionFrequency",
-  "settingScheduleDeletionDayOfMonth",
-  "settingScheduleDeletionDayOfWeek",
-  "settingScheduleDeletionTime",
-] as const;
-
-export type ReconcilableSettingColumn =
-  (typeof RECONCILABLE_SETTING_COLUMNS)[number];
-
-/** One account's settings, as the person would compare them side by side. */
-export type ReconcilableAccountSettings = Partial<
-  Record<ReconcilableSettingColumn, string | number | null>
->;
 
 export type BlueskyArchiveMergeEnvironment = {
   openPreparedArchive(archive: PreparedArchiveLocation): PreparedArchiveStore;
@@ -90,46 +51,6 @@ export type BlueskyArchiveMergeEnvironment = {
    * rows a merge would write without anything being written.
    */
   accountMediaUri(accountUuid: string, fileName: string): string;
-
-  /** What a duplicate Bluesky local account is set to do, for the preview. */
-  readAccountSettings(
-    accountUuid: string,
-  ): Promise<ReconcilableAccountSettings>;
-
-  /** Give the surviving account the settings the person picked (ADR 0011). */
-  applyAccountSettings(
-    accountUuid: string,
-    settings: ReconcilableAccountSettings,
-  ): Promise<void>;
-
-  /**
-   * Move a media file from a duplicate Bluesky local account into the one that
-   * survives, returning where it now lives. Null when the file is gone, which
-   * makes the record a failed download rather than a failed reconciliation.
-   */
-  adoptAccountMedia(
-    sourceAccountUuid: string,
-    targetAccountUuid: string,
-    localPath: string,
-  ): Promise<StoredMediaFile | null>;
-
-  /**
-   * Make one Bluesky local account per DID a rule of the database again.
-   *
-   * Mobile has carried a unique index on `bsky_account.did` since its first
-   * migration, so duplicates can only reach an installation from outside it —
-   * a database restored from an OS backup, or one that predates the index.
-   * Putting the rule back is a no-op on a database that still has it, which is
-   * why reconciliation does not treat it as proof: it checks the accounts
-   * itself afterwards.
-   */
-  enforceOneAccountPerDid(): Promise<void>;
-
-  /**
-   * Remove a reconciled-away Bluesky local account, its storage and its
-   * Bluesky connection, identified the way reconciliation knows it.
-   */
-  removeLocalAccount(accountUuid: string): Promise<void>;
 };
 
 export type { PreparedArchiveLocation, StoredMediaFile };

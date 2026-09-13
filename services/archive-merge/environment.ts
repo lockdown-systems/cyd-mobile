@@ -10,17 +10,13 @@ import {
   acquireAccountDatabase,
   releaseAccountDatabase,
 } from "@/database/account-db/shared-handles";
-import { deleteAccount, listAccounts } from "@/database/accounts";
-import { getDatabase } from "@/database";
+import { listAccounts } from "@/database/accounts";
 import { openPreparedArchive } from "@/services/archive-restore/environment";
 import type { LocalAccountIdentity } from "@/services/archive-restore";
 
-import {
-  RECONCILABLE_SETTING_COLUMNS,
-  type BlueskyArchiveMergeEnvironment,
-  type MergeableAccountDatabase,
-  type ReconcilableAccountSettings,
-  type ReconcilableSettingColumn,
+import type {
+  BlueskyArchiveMergeEnvironment,
+  MergeableAccountDatabase,
 } from "./ports";
 
 /**
@@ -122,76 +118,5 @@ export function createBlueskyArchiveMergeEnvironment(): BlueskyArchiveMergeEnvir
     },
 
     accountMediaUri: mediaUri,
-
-    readAccountSettings: async (accountUuid) => {
-      const main = await getDatabase();
-      const row = await main.getFirstAsync<ReconcilableAccountSettings>(
-        `SELECT ${RECONCILABLE_SETTING_COLUMNS.join(", ")}
-         FROM bsky_account b
-         INNER JOIN account a ON a.bskyAccountID = b.id
-         WHERE a.uuid = ?;`,
-        [accountUuid],
-      );
-      return row ?? {};
-    },
-
-    applyAccountSettings: async (accountUuid, settings) => {
-      const entries = Object.entries(settings) as [
-        ReconcilableSettingColumn,
-        string | number | null,
-      ][];
-      if (entries.length === 0) {
-        return;
-      }
-      const main = await getDatabase();
-      await main.runAsync(
-        `UPDATE bsky_account
-         SET ${entries.map(([column]) => `${column} = ?`).join(", ")}
-         WHERE id = (SELECT bskyAccountID FROM account WHERE uuid = ?);`,
-        [...entries.map(([, value]) => value), accountUuid],
-      );
-    },
-
-    adoptAccountMedia: async (_sourceAccountUuid, targetAccountUuid, localPath) => {
-      const source = new File(localPath);
-      if (!source.exists) {
-        return null;
-      }
-      const paths = buildAccountPaths("bluesky", targetAccountUuid);
-      new Directory(paths.mediaDir).create({
-        intermediates: true,
-        idempotent: true,
-      });
-      const destination = new File(mediaUri(targetAccountUuid, source.name));
-      if (!destination.exists) {
-        await source.copy(destination);
-      }
-      return { uri: destination.uri, byteLength: destination.size ?? 0 };
-    },
-
-    enforceOneAccountPerDid: async () => {
-      const main = await getDatabase();
-      await main.execAsync(
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_bsky_account_did
-         ON bsky_account(did);`,
-      );
-    },
-
-    removeLocalAccount: async (accountUuid) => {
-      const account = (await listAccounts()).find(
-        (candidate) => candidate.uuid === accountUuid,
-      );
-      if (account) {
-        // `deleteAccount` takes the Bluesky connection with it, which is the
-        // right end for an account nobody is keeping.
-        await deleteAccount(account.id);
-      }
-      const directory = new Directory(
-        buildAccountPaths("bluesky", accountUuid).accountDir,
-      );
-      if (directory.exists) {
-        directory.delete();
-      }
-    },
   };
 }

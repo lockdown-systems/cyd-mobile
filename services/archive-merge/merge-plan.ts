@@ -43,12 +43,11 @@ export type BlueskyArchiveMergeCounts = {
 /**
  * One record the account does not hold.
  *
- * The merge preview counts these rather than listing them (ADR 0018): Mobile
- * has no Bluesky local deletion, so a missing record is one this account never
- * had, and a list of them is nothing somebody can recognise. They are still
- * carried, because choosing between two Bluesky local accounts that hold one
- * identity is a different question — there, an example of what one holds and
- * the other does not is how somebody tells them apart.
+ * Nothing shows these: the preview counts what it would add rather than naming
+ * it, because Mobile has no Bluesky local deletion and a missing record is one
+ * the account never had (ADR 0018). The plan works them out anyway so that
+ * naming them stays a presentation change rather than new capability, for a
+ * client — or a later Mobile — where a record can go missing on purpose.
  */
 export type RestorationPreview = {
   category: "posts" | "bookmarks" | "follows" | "chats" | "messages";
@@ -246,12 +245,11 @@ function sameRow(left: object, right: object): boolean {
 }
 
 /**
- * Union two accounts' worth of Bluesky saved data.
+ * Union an account's Bluesky saved data with an archive's.
  *
- * Both sides are the same shape on purpose: importing a Cyd Bluesky archive
- * and collapsing two duplicate Bluesky local accounts (ADR 0011) are the same
- * union, so they are the same code and cannot drift into disagreeing about
- * what "the same record" means.
+ * Both sides are the same shape on purpose: what the account holds and what
+ * the archive carries are compared as the same rows by the same rules, so
+ * "the same record" cannot come to mean two things.
  */
 export function planBlueskyArchiveMerge(
   existing: ExistingAccountRows,

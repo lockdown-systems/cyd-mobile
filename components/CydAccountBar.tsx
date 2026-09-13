@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Alert,
   Linking,
@@ -17,7 +17,6 @@ import { useBlueskyArchiveImport } from "@/hooks/use-bluesky-archive-import";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { emitLocalAccountsChanged } from "@/services/account-events";
 import { connectBlueskyAccount } from "@/services/bluesky-sign-in";
-import { createScheduledReminderSync } from "@/services/scheduled-reminder-sync";
 
 import { BlueskyArchiveImportModal } from "./BlueskyArchiveImportModal";
 import { CydSignInModal } from "./CydSignInModal";
@@ -37,18 +36,11 @@ export function CydAccountBar({
     Platform.OS === "android" ? Math.max(bottomInset, 8) : bottomInset;
   const colorScheme = useColorScheme();
   const palette = getThemePalette(colorScheme);
-  const { state, signOut, getDashboardURL, apiClient } = useCydAccount();
+  const { state, signOut, getDashboardURL } = useCydAccount();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [signInModalVisible, setSignInModalVisible] = useState(false);
-  const archiveImport = useBlueskyArchiveImport({
-    // Reconciling duplicate accounts can retire a local-account UUID the
-    // server schedules reminders against (ADR 0005), so the import tells it.
-    reminders: useMemo(
-      () => createScheduledReminderSync(apiClient, state.isSignedIn),
-      [apiClient, state.isSignedIn],
-    ),
-  });
+  const archiveImport = useBlueskyArchiveImport();
 
   const handleMenuPress = useCallback(() => {
     setMenuVisible(true);
@@ -318,7 +310,6 @@ export function CydAccountBar({
         state={archiveImport.state}
         onConfirmLargeArchive={() => void archiveImport.confirmLargeArchive()}
         onConfirmMerge={() => void archiveImport.confirmMerge()}
-        onKeepAccount={(choice) => void archiveImport.keepAccount(choice)}
         onSignIn={handleSignIn}
         onCancel={archiveImport.cancel}
         onDismiss={archiveImport.dismiss}

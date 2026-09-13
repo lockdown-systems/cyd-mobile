@@ -45,20 +45,18 @@ describe("choosing where a Cyd Bluesky archive is committed", () => {
     expect(destination).toEqual({ kind: "restore" });
   });
 
-  it("asks for reconciliation when duplicate local accounts hold the DID", () => {
-    const first = identity("uuid-a", "did:plc:archive");
-    const second = identity("uuid-b", "did:plc:archive");
-
-    const destination = chooseBlueskyArchiveImportDestination("did:plc:archive", [
-      first,
-      identity("uuid-c", "did:plc:someone-else"),
-      second,
-    ]);
-
-    expect(destination).toEqual({
-      kind: "reconcile",
-      did: "did:plc:archive",
-      accounts: [first, second],
-    });
+  /**
+   * `bsky_account.did` is unique and has been since the column existed, so no
+   * database Cyd Mobile built can reach this. If one ever does, an archive has
+   * no unambiguous destination and there is nothing sensible to pick.
+   */
+  it("refuses rather than guess when two local accounts hold the DID", () => {
+    expect(() =>
+      chooseBlueskyArchiveImportDestination("did:plc:archive", [
+        identity("uuid-a", "did:plc:archive"),
+        identity("uuid-c", "did:plc:someone-else"),
+        identity("uuid-b", "did:plc:archive"),
+      ]),
+    ).toThrow(/more than one Bluesky account/);
   });
 });

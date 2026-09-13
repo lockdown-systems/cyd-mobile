@@ -15,18 +15,11 @@ import {
   commitBlueskyArchiveMerge,
   createBlueskyArchiveMergeEnvironment,
   previewBlueskyArchiveMerge,
-  previewDuplicateReconciliation,
-  reconcileDuplicateBlueskyAccounts,
   totalMergeChanges,
   type BlueskyArchiveMergeEnvironment,
   type BlueskyArchiveMergePreview,
   type BlueskyArchiveMergeResult,
-  type DuplicateReconciliationPreview,
 } from "@/services/archive-merge";
-import {
-  NO_SCHEDULED_REMINDERS,
-  type ScheduledReminderSync,
-} from "@/services/scheduled-reminder-sync";
 import {
   createBlueskyArchiveRestoreEnvironment,
   restoreBlueskyArchiveAccount,
@@ -50,9 +43,8 @@ import { emitLocalAccountsChanged } from "@/services/account-events";
  * against the manifest before it lands in staging.
  *
  * The person is asked before anything irreversible: to confirm an unusually
- * large archive, to look at records a merge would bring back, and to choose
- * which Bluesky local account survives when this installation holds one
- * identity twice. Cancelling at any of those points takes the staging with it.
+ * large archive, and to agree to what a merge would add. Cancelling at either
+ * point takes the staging with it.
  */
 
 export type BlueskyArchiveImportState =
@@ -65,11 +57,6 @@ export type BlueskyArchiveImportState =
       cancellable: boolean;
     }
   | { status: "needs-confirmation"; message: string }
-  | {
-      status: "reconciling";
-      message: string;
-      preview: DuplicateReconciliationPreview;
-    }
   | {
       status: "reviewing";
       preview: BlueskyArchiveMergePreview;
@@ -141,27 +128,6 @@ function messageFor(error: unknown): string {
     : "Cyd could not import that archive.";
 }
 
-/**
- * Tell the server which Bluesky local account its reminders belong to now.
- *
- * A reconciliation is finished either way: reminders are a convenience, and an
- * offline phone must not be told its accounts failed to merge. The worst case
- * is a reminder that opens an account which now holds more than it did.
- */
-async function syncReminders(
-  reminders: ScheduledReminderSync,
-  reconciled: { survivingUuid: string; removedUuids: string[] },
-): Promise<void> {
-  try {
-    for (const uuid of reconciled.removedUuids) {
-      await reminders.retire(uuid);
-    }
-    await reminders.resync(reconciled.survivingUuid);
-  } catch (error) {
-    console.warn("[archive-import] could not update reminders", error);
-  }
-}
-
 function plural(count: number, noun: string): string {
   return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
 }
@@ -209,10 +175,9 @@ function describeMergeResult(result: BlueskyArchiveMergeResult): string[] {
 export function useBlueskyArchiveImport(
   options: {
     runtime?: BlueskyArchiveImportRuntime;
-    reminders?: ScheduledReminderSync;
   } = {},
 ) {
-  const { runtime, reminders } = options;
+  const { runtime } = options;
   const [state, setState] = useState<BlueskyArchiveImportState>({
     status: "idle",
   });
@@ -361,28 +326,14 @@ export function useBlueskyArchiveImport(
         await runRestore(prepared, ports.restore, generation);
         return;
       }
-      if (destination.kind === "merge") {
-        await openMergePreview(
-          prepared,
-          ports.merge,
-          destination.account,
-          generation,
-        );
-        return;
-      }
-
-      const reconciliation = await previewDuplicateReconciliation(
+      await openMergePreview(
+        prepared,
         ports.merge,
-        { did: destination.did, accounts: identities },
+        destination.account,
+        generation,
       );
-      settle(generation, {
-        status: "reconciling",
-        message:
-          "This device has more than one Bluesky account for the identity in this archive. Choose which one to keep before importing.",
-        preview: reconciliation,
-      });
     },
-    [openMergePreview, runRestore, settle],
+    [openMergePreview, runRestore],
   );
 
   const run = useCallback(
@@ -540,57 +491,6 @@ export function useBlueskyArchiveImport(
   }, [discardStaging, importRuntime, settle, state]);
 
   /**
-   * Keep one of the duplicate Bluesky local accounts, then carry on importing.
-   *
-   * The reconciliation runs first because the import has nowhere to land until
-   * the identity is held once (ADR 0011).
-   */
-  const keepAccount = useCallback(
-    async (choice: {
-      survivingUuid: string;
-      settingsFromUuid: string;
-    }): Promise<void> => {
-      const session = sessionRef.current;
-      if (state.status !== "reconciling" || !session?.prepared) {
-        return;
-      }
-      const { prepared } = session;
-      const { merge } = importRuntime();
-      const generation = generationRef.current;
-      try {
-        settle(generation, {
-          status: "working",
-          message: "Merging the duplicate accounts…",
-          fraction: null,
-          cancellable: false,
-        });
-        const reconciled = await reconcileDuplicateBlueskyAccounts(merge, {
-          did: state.preview.did,
-          accounts: await merge.listLocalAccountIdentities(),
-          survivingUuid: choice.survivingUuid,
-          settingsFromUuid: choice.settingsFromUuid,
-        });
-        emitLocalAccountsChanged();
-        await syncReminders(reminders ?? NO_SCHEDULED_REMINDERS, reconciled);
-
-        const survivor = (await merge.listLocalAccountIdentities()).find(
-          (account) => account.uuid === choice.survivingUuid,
-        );
-        if (!survivor) {
-          throw new Error(
-            "Cyd could not find the Bluesky account it just kept.",
-          );
-        }
-        await openMergePreview(prepared, merge, survivor, generation);
-      } catch (error) {
-        discardStaging();
-        settle(generation, { status: "failed", message: messageFor(error) });
-      }
-    },
-    [discardStaging, importRuntime, openMergePreview, reminders, settle, state],
-  );
-
-  /**
    * Walk away: nothing has been written, and nothing stays staged.
    *
    * Moving the generation on is what makes this final. A step already in
@@ -614,7 +514,6 @@ export function useBlueskyArchiveImport(
     start,
     confirmLargeArchive,
     confirmMerge,
-    keepAccount,
     cancel,
     dismiss,
   };
