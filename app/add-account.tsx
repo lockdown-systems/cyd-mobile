@@ -13,16 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getThemePalette } from "@/constants/theme";
-import { withBlueskyController } from "@/controllers";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { trackEvent } from "@/services/analytics";
-import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
-import {
-  authenticateBlueskyAccount,
-  normalizeHandle,
-} from "@/services/bluesky-oauth";
-import { PlausibleEvents } from "@/types/analytics";
+import { normalizeHandle } from "@/services/bluesky-oauth";
+import { connectBlueskyAccount } from "@/services/bluesky-sign-in";
 
 export default function AddAccountScreen() {
   const router = useRouter();
@@ -56,25 +50,7 @@ export default function AddAccountScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const savedAccount = await authenticateBlueskyAccount(handle);
-      // Track successful sign-in
-      trackEvent(PlausibleEvents.BLUESKY_USER_SIGNED_IN);
-      try {
-        await withBlueskyController(
-          savedAccount.id,
-          savedAccount.uuid,
-          async (controller) => {
-            await verifyBlueskyAccountAuthStatus(controller, savedAccount, {
-              force: true,
-            });
-          },
-        );
-      } catch (verifyError) {
-        console.warn(
-          "[AddAccount] Failed to persist auth status after OAuth",
-          verifyError,
-        );
-      }
+      const { account: savedAccount } = await connectBlueskyAccount(handle);
       router.replace({
         pathname: "/account/[accountId]",
         params: { accountId: savedAccount.uuid },

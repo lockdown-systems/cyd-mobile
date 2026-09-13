@@ -55,6 +55,7 @@ import {
     type SaveAndDeleteJobOptions,
     type SaveJobOptions,
 } from "./bluesky/job-types";
+import { upsertProfileRow } from "./bluesky/post-persistence";
 import { BlueskyRateLimiter, type ApiRequestFn } from "./bluesky/rate-limiter";
 import type {
     BlueskyDatabaseStats,
@@ -402,6 +403,28 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
     return this.rateLimiter.makeApiRequest(() =>
       this.agent!.getProfile({ actor: target }),
     );
+  }
+
+  /**
+   * Write down what Bluesky says about this account's own identity now.
+   *
+   * Browse renders a record's author from the account's `profile` table rather
+   * than from the account row, so the two can disagree: an account restored
+   * from a Cyd Bluesky archive has the profile the archive carried, which has
+   * no avatar in it at all and may have no name. Saving posts refreshes it
+   * eventually, as a side effect of saving their authors — but signing in is
+   * the first moment Cyd has anything fresher, and somebody who browses before
+   * saving should see what Cyd knows rather than what it used to know.
+   */
+  async refreshOwnProfile(): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+    const profile = await this.getProfile();
+    if (!profile) {
+      return;
+    }
+    await upsertProfileRow(this.db, profile);
   }
 
   /**

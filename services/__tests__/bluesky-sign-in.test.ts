@@ -6,13 +6,16 @@ jest.mock("@/services/bluesky-account-auth-status", () => ({
   verifyBlueskyAccountAuthStatus: jest.fn(async () => "authenticated"),
 }));
 
+const mockRefreshOwnProfile = jest.fn(async () => {});
+
 jest.mock("@/controllers", () => ({
+  ACCOUNT_AUTH_STATUS: { authenticated: "authenticated", signedOut: "signedOut" },
   withBlueskyController: jest.fn(
     async (
       _accountId: number,
       _accountUUID: string,
       fn: (controller: unknown) => Promise<unknown>,
-    ) => fn({ controller: true }),
+    ) => fn({ refreshOwnProfile: mockRefreshOwnProfile }),
   ),
 }));
 
@@ -45,9 +48,9 @@ describe("signing in to a Bluesky local account", () => {
    * stopping there leaves it asking to be authorized again.
    */
   it("refreshes the account's cached auth status, not only its connection", async () => {
-    const account = await connectBlueskyAccount("glittertop-cyd.bsky.social");
+    const signIn = await connectBlueskyAccount("glittertop-cyd.bsky.social");
 
-    expect(account).toBe(ACCOUNT);
+    expect(signIn).toEqual({ account: ACCOUNT, status: "authenticated" });
     expect(withBlueskyController).toHaveBeenCalledWith(
       ACCOUNT.id,
       ACCOUNT.uuid,
@@ -67,9 +70,32 @@ describe("signing in to a Bluesky local account", () => {
       new Error("no controller"),
     );
 
-    await expect(
-      connectBlueskyAccount("glittertop-cyd.bsky.social"),
-    ).resolves.toBe(ACCOUNT);
+    const signIn = await connectBlueskyAccount("glittertop-cyd.bsky.social");
+
+    // Authorized, but nothing wrote down what that means, so the account is
+    // reported as it will actually read until some forced check succeeds.
+    expect(signIn).toEqual({ account: ACCOUNT, status: "signedOut" });
+  });
+
+  /**
+   * The account row learns the fresh handle, display name and avatar, but
+   * Browse renders authors out of the account's own database — which, for an
+   * account restored from an archive, still holds what the archive carried.
+   */
+  it("writes down the profile it just fetched, for Browse to show", async () => {
+    await connectBlueskyAccount("glittertop-cyd.bsky.social");
+
+    expect(mockRefreshOwnProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not try to read a profile it could not authenticate for", async () => {
+    (verifyBlueskyAccountAuthStatus as jest.Mock).mockResolvedValueOnce(
+      "signedOut",
+    );
+
+    await connectBlueskyAccount("glittertop-cyd.bsky.social");
+
+    expect(mockRefreshOwnProfile).not.toHaveBeenCalled();
   });
 
   it("does not authorize twice", async () => {

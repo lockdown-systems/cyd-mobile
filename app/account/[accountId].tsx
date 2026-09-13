@@ -56,7 +56,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { onAuthStatusChange } from "@/services/auth-events";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
 import { disconnectBlueskyAccount } from "@/services/bluesky-disconnect";
-import { authenticateBlueskyAccount } from "@/services/bluesky-oauth";
+import { connectBlueskyAccount } from "@/services/bluesky-sign-in";
 import type { AccountTabKey, AccountTabProps } from "@/types/account-tabs";
 import { BrowseTab } from "./tabs/browse-tab";
 import { DashboardTab } from "./tabs/dashboard-tab";
@@ -152,13 +152,10 @@ export default function AccountScreen() {
 
     try {
       console.log("[AccountScreen] handleReauthenticate -> start", account.id);
-      await authenticateBlueskyAccount(account.handle);
-      console.log(
-        "[AccountScreen] authenticateBlueskyAccount -> success",
-        account.id,
-      );
-      const nextStatus = await runWithAccountController(account, (controller) =>
-        verifyBlueskyAccountAuthStatus(controller, account, { force: true }),
+      // Signing in is more than authorizing: it also refreshes what this
+      // account knows about itself, which is why it is not done by hand here.
+      const { status: nextStatus } = await connectBlueskyAccount(
+        account.handle,
       );
       console.log(
         "[AccountScreen] handleReauthenticate -> verified",
