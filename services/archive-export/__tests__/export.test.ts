@@ -1,14 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
-import { unzipSync } from "fflate";
-
-import {
-  applyAccountMigrations,
-  blueskyAccountMigrations,
-} from "@/database/account-db";
 import { createNodeBlueskyArchiveExportEnvironment } from "@/scripts/dev/node-export-environment";
 import { runBlueskyArchiveIntake } from "@/services/archive-import";
 import { classifyBlueskyArchiveMetadata } from "@/services/archive-metadata";
@@ -16,6 +9,19 @@ import {
   createMemoryByteReader,
   createTestBlueskyArchiveIntakeEnvironment,
 } from "@/testUtils/archiveFixtures";
+import {
+  ACCOUNT_DID,
+  ACCOUNT_UUID,
+  LIKED_URI,
+  OTHER_DID,
+  POST_URI,
+  addMedia,
+  createAccount,
+  openArchive,
+  run,
+  seedAccount,
+  type Account,
+} from "@/testUtils/blueskyExportAccount";
 
 import { runBlueskyArchiveExport } from "../export";
 
@@ -26,226 +32,6 @@ import { runBlueskyArchiveExport } from "../export";
  * writer ever drifts from the runtime schema it translates, and the archive is
  * inspected as bytes and SQLite rather than through the writer's own types.
  */
-
-const ACCOUNT_DID = "did:plc:alice";
-const ACCOUNT_UUID = "018d5f7a-9b3c-7d10-8a2e-1f4c6b8d0e12";
-const OTHER_DID = "did:plc:bob";
-const POST_URI = `at://${ACCOUNT_DID}/app.bsky.feed.post/one`;
-const LIKED_URI = `at://${OTHER_DID}/app.bsky.feed.post/liked`;
-const SAVED_AT = Date.UTC(2026, 8, 1, 12, 0, 0);
-
-type Account = {
-  directory: string;
-  database: DatabaseSync;
-  mediaDirectory: string;
-};
-
-function createAccount(root: string): Account {
-  const directory = path.join(root, `bluesky-${ACCOUNT_UUID}`);
-  const mediaDirectory = path.join(directory, "media");
-  fs.mkdirSync(mediaDirectory, { recursive: true });
-
-  const database = new DatabaseSync(path.join(directory, "data.db"));
-  applyAccountMigrations(
-    {
-      getFirstSync: <T,>(sql: string) => database.prepare(sql).get() as T | null,
-      execSync: (sql: string) => database.exec(sql),
-      withTransactionSync: (run: () => void) => {
-        database.exec("BEGIN;");
-        try {
-          run();
-          database.exec("COMMIT;");
-        } catch (error) {
-          database.exec("ROLLBACK;");
-          throw error;
-        }
-      },
-    },
-    blueskyAccountMigrations,
-  );
-
-  return { directory, database, mediaDirectory };
-}
-
-function writeMedia(account: Account, name: string, contents: string): string {
-  const location = path.join(account.mediaDirectory, name);
-  fs.writeFileSync(location, contents);
-  // Devices record an absolute URI that does not exist on this machine, which
-  // is exactly what a pulled account directory looks like.
-  return `file:///data/user/0/systems.lockdown.cydmobile/files/accounts/bluesky-${ACCOUNT_UUID}/media/${name}`;
-}
-
-const PNG_HEADER = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-function writeMediaBytes(account: Account, name: string, bytes: Uint8Array): string {
-  fs.writeFileSync(path.join(account.mediaDirectory, name), bytes);
-  return `file:///data/user/0/systems.lockdown.cydmobile/files/accounts/bluesky-${ACCOUNT_UUID}/media/${name}`;
-}
-
-function run(database: DatabaseSync, sql: string, params: unknown[] = []): void {
-  database.prepare(sql).run(...(params as never[]));
-}
-
-function seedAccount(account: Account): void {
-  const { database } = account;
-
-  for (const [did, handle] of [
-    [ACCOUNT_DID, "alice.example"],
-    [OTHER_DID, "bob.example"],
-  ]) {
-    run(
-      database,
-      `INSERT INTO profile (did, handle, displayName, avatarUrl, savedAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?);`,
-      [did, handle, handle, "https://cdn.example/avatar", SAVED_AT, SAVED_AT],
-    );
-  }
-
-  run(
-    database,
-    `INSERT INTO post (uri, cid, authorDid, text, langs, isReply, isQuote, isRepost,
-                       likeCount, repostCount, replyCount, quoteCount,
-                       viewerLiked, viewerReposted, viewerBookmarked,
-                       createdAt, savedAt)
-     VALUES (?, ?, ?, ?, 'en', 0, 0, 0, 3, 1, 0, 0, 0, 0, 0, ?, ?);`,
-    [POST_URI, "bafypost", ACCOUNT_DID, "A post with pictures", "2026-08-30T09:00:00.000Z", SAVED_AT],
-  );
-  run(
-    database,
-    `INSERT INTO post (uri, cid, authorDid, text, isReply, isQuote, isRepost,
-                       likeCount, repostCount, replyCount, quoteCount,
-                       viewerLiked, likeUri, viewerReposted, viewerBookmarked,
-                       createdAt, savedAt)
-     VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 1, ?, 0, 1, ?, ?);`,
-    [
-      LIKED_URI,
-      "bafyliked",
-      OTHER_DID,
-      "Somebody else's post",
-      `at://${ACCOUNT_DID}/app.bsky.feed.like/one`,
-      "2026-08-20T09:00:00.000Z",
-      SAVED_AT,
-    ],
-  );
-
-  run(
-    database,
-    `INSERT INTO post_external (postUri, uri, title, description, thumbUrl, thumbLocalPath)
-     VALUES (?, 'https://example.com/story', 'A story', 'Something happened',
-             'https://cdn.example/thumb.png', ?);`,
-    [POST_URI, writeMediaBytes(account, "external-thumb", PNG_HEADER)],
-  );
-
-  run(
-    database,
-    `INSERT INTO bookmark (subjectUri, postAuthorDid, postAuthorHandle, postText,
-                           postCreatedAt, savedAt)
-     VALUES (?, ?, 'bob.example', ?, '2026-08-20T09:00:00.000Z', ?);`,
-    [LIKED_URI, OTHER_DID, "Somebody else's post", SAVED_AT],
-  );
-
-  run(
-    database,
-    `INSERT INTO follow (uri, cid, subjectDid, handle, createdAt, savedAt)
-     VALUES (?, 'bafyfollow', ?, 'bob.example', '2026-07-01T09:00:00.000Z', ?);`,
-    [`at://${ACCOUNT_DID}/app.bsky.graph.follow/bob`, OTHER_DID, SAVED_AT],
-  );
-
-  run(
-    database,
-    `INSERT INTO conversation (convoId, rev, memberDids, savedAt, updatedAt)
-     VALUES ('convo-1', 'rev-1', ?, ?, ?);`,
-    [JSON.stringify([ACCOUNT_DID, OTHER_DID]), SAVED_AT, SAVED_AT],
-  );
-  run(
-    database,
-    `INSERT INTO message (messageId, convoId, rev, senderDid, text, sentAt, savedAt)
-     VALUES ('message-1', 'convo-1', 'rev-1', ?, 'Hello there', '2026-08-31T09:00:00.000Z', ?);`,
-    [OTHER_DID, SAVED_AT],
-  );
-
-  // Things a Cyd Bluesky archive must never carry.
-  run(database, `INSERT INTO config (key, value) VALUES ('session', ?);`, [
-    "SUPERSECRETSESSION",
-  ]);
-  run(
-    database,
-    `INSERT INTO job (jobType, status, scheduledAt, progressJSON)
-     VALUES ('save', 'completed', ?, ?);`,
-    [SAVED_AT, '{"note":"SUPERSECRETJOB"}'],
-  );
-}
-
-function addMedia(
-  account: Account,
-  options: {
-    contentCid: string;
-    postUri: string;
-    position: number;
-    fileName: string;
-    contents: string;
-    downloadState?: string;
-    mediaType?: string;
-  },
-): void {
-  const localPath =
-    options.downloadState === "failed"
-      ? null
-      : writeMedia(account, options.fileName, options.contents);
-  run(
-    account.database,
-    `INSERT INTO media_asset (contentCid, mediaType, mimeType, byteLength, localPath,
-                              sourceUrl, sourceDid, downloadState, downloadedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-    [
-      options.contentCid,
-      options.mediaType ?? "image",
-      options.mediaType === "video" ? "video/mp4" : "image/jpeg",
-      options.contents.length,
-      localPath,
-      `https://cdn.example/${options.contentCid}`,
-      ACCOUNT_DID,
-      options.downloadState ?? "complete",
-      SAVED_AT,
-    ],
-  );
-  run(
-    account.database,
-    `INSERT INTO post_media (postUri, position, mediaType, blobCid, mimeType, alt,
-                             width, height, assetCid)
-     VALUES (?, ?, ?, ?, ?, 'Alt text', 800, 600, ?);`,
-    [
-      options.postUri,
-      options.position,
-      options.mediaType ?? "image",
-      options.contentCid,
-      options.mediaType === "video" ? "video/mp4" : "image/jpeg",
-      options.contentCid,
-    ],
-  );
-}
-
-type ExportedArchive = {
-  entries: Record<string, Uint8Array>;
-  database: DatabaseSync;
-  metadata: Record<string, unknown>;
-  manifest: { algorithm: string; payloads: { path: string; bytes: number; sha256: string }[] };
-  bytes: Uint8Array;
-};
-
-function openArchive(location: string, workspace: string): ExportedArchive {
-  const bytes = new Uint8Array(fs.readFileSync(location));
-  const entries = unzipSync(bytes);
-  const extracted = path.join(workspace, "extracted.db");
-  fs.writeFileSync(extracted, entries["data.db"]);
-  return {
-    entries,
-    bytes,
-    database: new DatabaseSync(extracted, { readOnly: true }),
-    metadata: JSON.parse(new TextDecoder().decode(entries["metadata.json"])),
-    manifest: JSON.parse(new TextDecoder().decode(entries["manifest.json"])),
-  };
-}
 
 async function exportAccount(
   account: Account,
@@ -471,6 +257,36 @@ describe("runBlueskyArchiveExport", () => {
     expect(text).not.toContain(account.mediaDirectory);
     expect(text).not.toContain("ENOENT");
     expect(text).not.toContain(os.tmpdir());
+  });
+
+  it("packages the archive's own entries and nothing else from staging", async () => {
+    addMedia(account, {
+      contentCid: "bafyimage",
+      postUri: POST_URI,
+      position: 0,
+      fileName: "bafyimage",
+      contents: "image bytes",
+    });
+
+    const { archive } = await exportAccount(account);
+
+    // Staging holds a copy of the account database and the export's own
+    // checkpoint alongside the archive being built. Both are working state:
+    // one is Mobile's private schema, the other names this installation's
+    // files. Neither is a thing a Cyd Bluesky archive can contain, and the
+    // manifest must not claim otherwise either.
+    const entries = Object.keys(archive.entries).sort();
+    expect(entries).toEqual([
+      "data.db",
+      "manifest.json",
+      // sha256 of the link preview's PNG header, and of the image's own bytes.
+      "media/sha256/4c/4c4b6a3be1314ab86138bef4314dde022e600960d8689a2c8f8631802d20dab6",
+      "media/sha256/de/de7030234493a8bea844dbe1d8676e68a2c1a4b014c721f0425a22b6df66faec",
+      "metadata.json",
+    ]);
+    expect(archive.manifest.payloads.map((payload) => payload.path).sort()).toEqual(
+      entries.filter((name) => name !== "manifest.json"),
+    );
   });
 
   it("describes one point in time even when saving resumes underneath it", async () => {

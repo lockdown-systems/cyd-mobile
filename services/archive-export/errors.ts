@@ -24,10 +24,38 @@ export type BlueskyArchiveExportErrorCode =
 
 export class BlueskyArchiveExportError extends Error {
   readonly code: BlueskyArchiveExportErrorCode;
+  /**
+   * The archive entry the failure is about, where there is one.
+   *
+   * `asset-changed` is the code an export can do something about: the entry
+   * names the file that moved underneath it, so the attempt that follows can
+   * call that one asset unavailable instead of giving up on the archive.
+   */
+  readonly entryPath: string | null;
 
-  constructor(code: BlueskyArchiveExportErrorCode, message: string) {
+  constructor(
+    code: BlueskyArchiveExportErrorCode,
+    message: string,
+    entryPath: string | null = null,
+  ) {
     super(message);
     this.name = "BlueskyArchiveExportError";
     this.code = code;
+    this.entryPath = entryPath;
+  }
+}
+
+/**
+ * Raised when somebody walks away from an export part-way through.
+ *
+ * Not a failure: nothing was wrong with the account or the device, so it never
+ * reports a reason. What it does mean is that the staged work is not coming
+ * back — cancelling takes the staging with it, unlike an interruption, which
+ * keeps it precisely so the next launch can carry on.
+ */
+export class BlueskyArchiveExportCancelled extends Error {
+  constructor() {
+    super("The archive export was cancelled");
+    this.name = "BlueskyArchiveExportCancelled";
   }
 }

@@ -1,10 +1,10 @@
-import { useCallback, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { PrimaryButton } from "@/components/account/shared-tab-components";
-import { withBlueskyController } from "@/controllers";
-import { getPortableBlueskySettings } from "@/database/accounts";
-import type { BlueskyArchiveExportProgress } from "@/services/archive-export";
+import {
+  useBlueskyArchiveExport,
+  type BlueskyArchiveExportRuntime,
+} from "@/hooks/use-bluesky-archive-export";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
 /**
@@ -16,79 +16,49 @@ import type { AccountTabPalette } from "@/types/account-tabs";
  * #100 proves an archive Mobile writes can be read back — by Mobile and by
  * Desktop. Hence `__DEV__`: this renders nothing at all in a release build.
  *
- * It is deliberately plain. The shippable export flow — resumable, with its
- * plaintext warning and a share sheet — is #99's, and none of it belongs here
- * yet.
+ * The flow behind the button is the shippable one, though: the plaintext
+ * warning, a resumable export, the share sheet, and staging cleared once the
+ * archive is somewhere else (#99). When #100 opens the gate, what changes is
+ * where this lives and what it is called, not what it does.
  */
-
-const PHASE_LABELS: Record<BlueskyArchiveExportProgress["phase"], string> = {
-  staging: "Pausing account work and copying the database…",
-  hashing: "Hashing preserved media…",
-  translating: "Translating into the interchange format…",
-  packaging: "Packaging the archive…",
-  done: "Finished",
-};
-
-type ExportState =
-  | { status: "idle" }
-  | { status: "running"; progress: BlueskyArchiveExportProgress }
-  | {
-      status: "done";
-      location: string;
-      byteLength: number;
-      completeness: "complete" | "incomplete";
-      assets: { available: number; missing: number; unavailable: number };
-    }
-  | { status: "failed"; message: string };
 
 export type DevArchiveExportCardProps = {
   accountId: number;
   accountUUID: string;
   palette: AccountTabPalette;
+  /** Stands in for the phone in tests; the hook builds the real one. */
+  runtime?: BlueskyArchiveExportRuntime;
 };
 
 export function DevArchiveExportCard({
   accountId,
   accountUUID,
   palette,
+  runtime,
 }: DevArchiveExportCardProps) {
-  const [state, setState] = useState<ExportState>({ status: "idle" });
-
-  const exportArchive = useCallback(async () => {
-    setState({
-      status: "running",
-      progress: { phase: "staging", packagedPayloads: 0, totalPayloads: 0 },
-    });
-    try {
-      const portableSettings = await getPortableBlueskySettings(accountId);
-      const result = await withBlueskyController(
-        accountId,
-        accountUUID,
-        (controller) =>
-          controller.exportBlueskyArchive({
-            exportId: `dev-${Date.now()}`,
-            portableSettings,
-            onProgress: (progress) => setState({ status: "running", progress }),
-          }),
-      );
-      setState({
-        status: "done",
-        location: result.location,
-        byteLength: result.byteLength,
-        completeness: result.metadata.completeness,
-        assets: result.assets,
-      });
-    } catch (error) {
-      setState({
-        status: "failed",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }, [accountId, accountUUID]);
+  const archiveExport = useBlueskyArchiveExport({
+    accountId,
+    accountUUID,
+    runtime,
+  });
+  const { state } = archiveExport;
 
   if (!__DEV__) {
     return null;
   }
+
+  const action = (label: string, onPress: () => void) => (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.action,
+        { borderColor: palette.icon + "44", opacity: pressed ? 0.9 : 1 },
+      ]}
+    >
+      <Text style={[styles.actionText, { color: palette.text }]}>{label}</Text>
+    </Pressable>
+  );
 
   return (
     <View
@@ -101,46 +71,84 @@ export function DevArchiveExportCard({
         Export a Cyd Bluesky archive (development only)
       </Text>
       <Text style={[styles.body, { color: palette.icon }]}>
-        Writes a version 2 archive into export staging. Not available in
-        release builds until Bluesky archive import is proven.
+        Writes a version 2 archive and offers it to the share sheet. Not
+        available in release builds until Bluesky archive import is proven.
       </Text>
 
-      <PrimaryButton
-        label={state.status === "running" ? "Exporting…" : "Export archive"}
-        palette={palette}
-        onPress={exportArchive}
-        disabled={state.status === "running"}
-      />
+      {state.status === "idle" || state.status === "warning" ? (
+        <PrimaryButton
+          label="Export archive"
+          palette={palette}
+          onPress={() => void archiveExport.start()}
+          disabled={state.status === "warning"}
+        />
+      ) : null}
 
-      {state.status === "running" ? (
+      {state.status === "warning" ? (
+        <View style={styles.status}>
+          <Text style={[styles.warning, { color: palette.text }]}>
+            This archive is not encrypted.
+          </Text>
+          <Text style={[styles.body, { color: palette.icon }]}>
+            Your posts, chats and media go into it as plain text, and anyone who
+            opens the file can read them. Cyd protects your Bluesky connection,
+            not the archive — so put it somewhere you trust, like an encrypted
+            drive or a password manager&apos;s vault.
+          </Text>
+          {state.resuming ? (
+            <Text style={[styles.body, { color: palette.icon }]}>
+              Cyd will carry on the export it started earlier, from the moment
+              that export began.
+            </Text>
+          ) : null}
+          <View style={styles.actions}>
+            {action("Export anyway", () => void archiveExport.confirm())}
+            {/* Not cancelling: declining to export now is not asking Cyd to
+                throw away an export an earlier launch was interrupted in. */}
+            {action("Not now", archiveExport.dismiss)}
+          </View>
+        </View>
+      ) : null}
+
+      {state.status === "working" ? (
         <View style={styles.status}>
           <ActivityIndicator color={palette.tint} />
           <Text style={[styles.body, { color: palette.icon }]}>
-            {PHASE_LABELS[state.progress.phase]}
-            {state.progress.totalPayloads > 0
-              ? ` (${state.progress.packagedPayloads}/${state.progress.totalPayloads} media)`
+            {state.message}
+            {state.fraction !== null
+              ? ` ${Math.round(state.fraction * 100)}%`
               : ""}
           </Text>
+          {state.cancellable ? action("Cancel", archiveExport.cancel) : null}
         </View>
       ) : null}
 
       {state.status === "done" ? (
         <View style={styles.status}>
-          <Text style={[styles.body, { color: palette.text }]}>
-            {`${state.completeness} · ${(state.byteLength / 1024).toFixed(1)} KiB · ` +
-              `${state.assets.available} assets packaged, ` +
-              `${state.assets.missing + state.assets.unavailable} unavailable`}
+          <Text selectable style={[styles.path, { color: palette.text }]}>
+            {state.fileName}
           </Text>
-          <Text selectable style={[styles.path, { color: palette.icon }]}>
-            {state.location}
-          </Text>
+          {state.lines.map((line) => (
+            <Text key={line} style={[styles.body, { color: palette.icon }]}>
+              {line}
+            </Text>
+          ))}
+          {action("Done", archiveExport.dismiss)}
         </View>
       ) : null}
 
       {state.status === "failed" ? (
-        <Text style={[styles.body, { color: palette.tint }]}>
-          {state.message}
-        </Text>
+        <View style={styles.status}>
+          <Text style={[styles.body, { color: palette.tint }]}>
+            {state.message}
+          </Text>
+          {/* Whatever it staged before failing is still there, so trying again
+              carries on from it rather than starting the export over. */}
+          <View style={styles.actions}>
+            {action("Try again", () => void archiveExport.confirm())}
+            {action("Close", archiveExport.dismiss)}
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -163,11 +171,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  warning: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
   path: {
     fontSize: 11,
     fontFamily: "monospace",
   },
   status: {
     gap: 6,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  action: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: "flex-start",
+  },
+  actionText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

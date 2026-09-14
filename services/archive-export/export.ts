@@ -10,10 +10,24 @@ import {
   type BlueskyArchiveManifestPayload,
 } from "@/services/archive-import/manifest";
 
-import { resolveStagedAssets } from "./assets";
+import {
+  assetChangedWhilePrepared,
+  resolveStagedAssets,
+  type ResolvedAsset,
+} from "./assets";
+import {
+  checkpointMatches,
+  readExportCheckpoint,
+  writeExportCheckpoint,
+  type BlueskyArchiveExportCheckpoint,
+  type BlueskyArchiveExportPhase,
+} from "./checkpoint";
 import { writeBlueskyInterchangeDatabase } from "./database-writer";
 import { compressStagedFile } from "./deflate";
-import { BlueskyArchiveExportError } from "./errors";
+import {
+  BlueskyArchiveExportCancelled,
+  BlueskyArchiveExportError,
+} from "./errors";
 import {
   translateBlueskyAccountToInterchange,
   type AssetRow,
@@ -44,26 +58,41 @@ import { BlueskyArchiveZipWriter } from "./zip-writer";
  * Nothing here reads the live account after step 1, so however long steps 2–4
  * take, the archive stays internally consistent.
  *
+ * Steps 1 and 2 are checkpointed, because they are the two an export cannot
+ * afford to repeat: step 1 fixes the moment the archive describes, and step 2
+ * reads every preserved byte on the device. An export the operating system
+ * kills is therefore picked up where it stopped rather than started over, and
+ * it comes back as the same export — same moment, same digests (ADR 0006).
+ * Steps 3 and 4 are rebuilt from the staged snapshot each attempt, which is
+ * cheap and leaves no half-written archive to mistake for a finished one.
+ *
+ * Staging is thrown away the moment it stops being useful: by the caller once
+ * the archive has been handed over, and here when somebody cancels or when a
+ * failure is one that will happen again. What survives is only what a later
+ * launch can carry on from.
+ *
  * Building this writer is not the same as offering it to people: until #100
  * proves conformance both ways, export stays behind a development-only
- * affordance (ADR 0004). Resumability, staging cleanup, and the plaintext
- * warning belong to #99.
+ * affordance (ADR 0004).
  */
 
 const BLUESKY_INTERCHANGE_PATH = "data.db";
+
+/** How many hashed files to settle before writing the checkpoint again. */
+const ASSETS_PER_CHECKPOINT = 25;
 const COMPRESSED_INTERCHANGE_PATH = "data.db.deflate";
 
-export type BlueskyArchiveExportPhase =
-  | "staging"
-  | "hashing"
-  | "translating"
-  | "packaging"
-  | "done";
+export type { BlueskyArchiveExportPhase };
 
 export type BlueskyArchiveExportProgress = {
   phase: BlueskyArchiveExportPhase;
   packagedPayloads: number;
   totalPayloads: number;
+  /** Preserved files read and hashed, of the ones the snapshot inventoried. */
+  hashedAssets: number;
+  totalAssets: number;
+  /** Whether this run picked up work an interrupted one had already done. */
+  resumed: boolean;
 };
 
 export type BlueskyArchiveExportRequest = {
@@ -82,6 +111,11 @@ export type BlueskyArchiveExportRequest = {
   portableSettings: PortableSettings;
   /** Suggested filename. The format never treats a filename as authoritative. */
   fileName?: string;
+  /**
+   * Asked between files, so walking away stops the reading rather than only
+   * what it reports. A cancelled export takes its staging with it.
+   */
+  shouldCancel?: () => boolean;
   onProgress?: (progress: BlueskyArchiveExportProgress) => void;
 };
 
@@ -100,7 +134,15 @@ export type BlueskyArchiveExportResult = {
   byteLength: number;
   metadata: BlueskyArchiveMetadata;
   assets: BlueskyArchiveAssetSummary;
-  /** The staging area holding the archive, for the caller to clean up. */
+  /**
+   * The staging area holding the archive.
+   *
+   * The archive is still in staging when this returns, because the caller has
+   * not handed it over yet, and only the caller knows when it has. Discarding
+   * it is therefore the caller's last step — see `discardBlueskyArchiveExport`.
+   * The other two endings are taken here: a cancelled export and a failure Cyd
+   * can name both clear their own staging on the way out.
+   */
   staging: ExportStagingArea;
 };
 
@@ -116,75 +158,282 @@ export async function runBlueskyArchiveExport(
   environment: BlueskyArchiveExportEnvironment,
   request: BlueskyArchiveExportRequest,
 ): Promise<BlueskyArchiveExportResult> {
-  const staging = environment.openStaging(request.exportId);
+  let staging = environment.openStaging(request.exportId);
+  let checkpoint = readExportCheckpoint(staging);
+  if (checkpoint && !checkpointMatches(checkpoint, staging, request)) {
+    // Staging that cannot be handed to this export is debris that happens to
+    // share an id, and its snapshot describes somebody else's moment.
+    staging.destroy();
+    staging = environment.openStaging(request.exportId);
+    checkpoint = null;
+  }
+  const resumed = checkpoint !== null;
+
   const report = (
     phase: BlueskyArchiveExportPhase,
-    packaged = 0,
-    total = 0,
-  ): void => request.onProgress?.({ phase, packagedPayloads: packaged, totalPayloads: total });
-
-  try {
-    report("staging");
-    const staged = await stageBlueskyAccountSnapshot(environment, staging);
-
-    report("hashing");
-    const assets = await resolveStagedAssets(environment, staged.inventory);
-
-    report("translating");
-    const snapshotDatabase = environment.openSnapshot(staging, staged.snapshotPath);
-    let content: BlueskyInterchangeContent;
-    try {
-      content = translateBlueskyAccountToInterchange(
-        readMobileAccountSnapshot(snapshotDatabase),
-        {
-          accountDid: request.accountDid,
-          accountUuid: request.accountUuid,
-          createdAt: staged.takenAt,
-          assets,
-          portableSettings: request.portableSettings,
-        },
-      );
-    } finally {
-      snapshotDatabase.close();
-    }
-
-    const interchange = environment.createBlueskyInterchangeDatabase(
-      staging,
-      BLUESKY_INTERCHANGE_PATH,
-    );
-    try {
-      writeBlueskyInterchangeDatabase(interchange, content);
-    } finally {
-      interchange.close();
-    }
-
-    const fileName = request.fileName ?? suggestFileName(request, staged.takenAt);
-    report("packaging", 0, content.payloads.length);
-    const byteLength = await packageArchive(environment, staging, {
-      archivePath: fileName,
-      content,
-      createdAt: staged.takenAt,
-      onPayloadPackaged: (packaged) =>
-        report("packaging", packaged, content.payloads.length),
+    counts: {
+      packagedPayloads?: number;
+      totalPayloads?: number;
+      hashed?: number;
+      totalAssets?: number;
+    } = {},
+  ): void =>
+    request.onProgress?.({
+      phase,
+      packagedPayloads: counts.packagedPayloads ?? 0,
+      totalPayloads: counts.totalPayloads ?? 0,
+      hashedAssets: counts.hashed ?? 0,
+      totalAssets: counts.totalAssets ?? 0,
+      resumed,
     });
 
-    report("done", content.payloads.length, content.payloads.length);
-    return {
-      exportId: request.exportId,
-      location: staging.locate(fileName),
-      fileName,
-      byteLength,
-      metadata: buildMetadata(content),
-      assets: summarizeAssets(content),
-      staging,
+  try {
+    let staged =
+      checkpoint ??
+      (await (async () => {
+        report("staging");
+        const taken = await stageBlueskyAccountSnapshot(environment, staging);
+        return writeExportCheckpoint(staging, environment, {
+          accountUuid: request.accountUuid,
+          accountDid: request.accountDid,
+          accountHandle: request.accountHandle ?? null,
+          phase: "hashing",
+          takenAt: taken.takenAt.toISOString(),
+          snapshotPath: taken.snapshotPath,
+          inventory: taken.inventory,
+          resolved: [],
+          changed: [],
+          fileName: request.fileName ?? null,
+          result: null,
+        });
+      })());
+
+    /** Record where the export has got to, keeping everything it already had. */
+    const save = (
+      fields: Partial<
+        Omit<BlueskyArchiveExportCheckpoint, "version" | "updatedAt">
+      >,
+    ): BlueskyArchiveExportCheckpoint => {
+      staged = writeExportCheckpoint(staging, environment, {
+        ...staged,
+        ...fields,
+      });
+      return staged;
     };
+
+    const takenAt = new Date(staged.takenAt);
+    const inventory = staged.inventory;
+
+    // An export killed between packaging and handing over has the whole
+    // archive sitting in staging. Rebuilding it would produce the same bytes
+    // from the same snapshot, so the finished one is offered again instead.
+    if (staged.phase === "done" && staged.result) {
+      const finished = staged.result;
+      if (staging.fileExists(finished.fileName)) {
+        report("done", {
+          hashed: staged.resolved.length,
+          totalAssets: inventory.length,
+        });
+        return {
+          exportId: request.exportId,
+          location: staging.locate(finished.fileName),
+          fileName: finished.fileName,
+          byteLength: finished.byteLength,
+          metadata: finished.metadata,
+          assets: finished.assets,
+          staging,
+        };
+      }
+    }
+
+    report("hashing", {
+      hashed: staged.resolved.length,
+      totalAssets: inventory.length,
+    });
+    let sinceCheckpoint = 0;
+    const assets = await resolveStagedAssets(environment, inventory, {
+      resolved: new Map(staged.resolved),
+      changed: new Set(staged.changed),
+      shouldCancel: request.shouldCancel,
+      onResolved: (resolved) => {
+        // The checkpoint carries every digest so far, so writing one per file
+        // would rewrite the whole pass once per file — on an account with
+        // thousands of preserved files, more bytes written than hashed. A
+        // batch is the trade: an export killed mid-pass rereads at most this
+        // many files, which is nothing beside rereading all of them.
+        sinceCheckpoint += 1;
+        if (
+          sinceCheckpoint >= ASSETS_PER_CHECKPOINT ||
+          resolved.size === inventory.length
+        ) {
+          sinceCheckpoint = 0;
+          save({ phase: "hashing", resolved: [...resolved] });
+        }
+        report("hashing", {
+          hashed: resolved.size,
+          totalAssets: inventory.length,
+        });
+      },
+    });
+
+    const fileName =
+      request.fileName ?? staged.fileName ?? suggestFileName(request, takenAt);
+    save({ phase: "translating", fileName });
+
+    // Translate and package in one loop, because packaging is the only pass
+    // that can still find an asset hashing thought it had: a file that moved
+    // since is demoted to unavailable and the archive is built again around
+    // that, rather than an export failing over one file it can describe
+    // honestly instead. Each attempt demotes at least one asset, so this ends.
+    for (;;) {
+      report("translating", { totalAssets: inventory.length, hashed: assets.size });
+      const content = translateSnapshot(environment, staging, request, {
+        snapshotPath: staged.snapshotPath,
+        takenAt,
+        assets,
+      });
+
+      save({ phase: "packaging" });
+      report("packaging", { totalPayloads: content.payloads.length });
+      try {
+        const byteLength = await packageArchive(environment, staging, {
+          archivePath: fileName,
+          content,
+          createdAt: takenAt,
+          shouldCancel: request.shouldCancel,
+          onPayloadPackaged: (packagedPayloads) =>
+            report("packaging", {
+              packagedPayloads,
+              totalPayloads: content.payloads.length,
+            }),
+        });
+
+        const finished = {
+          fileName,
+          byteLength,
+          metadata: buildMetadata(content),
+          assets: summarizeAssets(content),
+        };
+        save({ phase: "done", result: finished });
+        report("done", {
+          packagedPayloads: content.payloads.length,
+          totalPayloads: content.payloads.length,
+          hashed: assets.size,
+          totalAssets: inventory.length,
+        });
+        return {
+          exportId: request.exportId,
+          location: staging.locate(fileName),
+          ...finished,
+          staging,
+        };
+      } catch (error) {
+        const changed = changedAssetKeys(error, content, assets);
+        if (changed.length === 0) {
+          throw error;
+        }
+        for (const key of changed) {
+          assets.set(key, assetChangedWhilePrepared(key));
+        }
+        save({
+          changed: [...new Set([...staged.changed, ...changed])],
+          resolved: [...assets],
+        });
+      }
+    }
   } catch (error) {
-    // An export that failed leaves nothing worth keeping: the archive is
-    // half-written and the account it came from is untouched. #99 replaces this
-    // with checkpoints an interrupted export can resume from.
-    staging.destroy();
+    if (error instanceof BlueskyArchiveExportCancelled) {
+      staging.destroy();
+      throw error;
+    }
+    // A failure Cyd can name is one that would happen again, so there is
+    // nothing worth keeping. Anything else — storage, memory, the system
+    // taking the app away mid-write — leaves the checkpoint alone, and the
+    // next launch carries on from it (ADR 0006).
+    if (error instanceof BlueskyArchiveExportError) {
+      staging.destroy();
+    }
     throw error;
   }
+}
+
+/**
+ * Build the interchange model and `data.db` from the staged snapshot.
+ *
+ * Deterministic in everything it reads: the snapshot cannot change, and the
+ * assets are whatever hashing concluded. That is what makes it safe to run
+ * again on a later launch, or again after a demoted asset.
+ */
+function translateSnapshot(
+  environment: BlueskyArchiveExportEnvironment,
+  staging: ExportStagingArea,
+  request: BlueskyArchiveExportRequest,
+  staged: {
+    snapshotPath: string;
+    takenAt: Date;
+    assets: Map<string, ResolvedAsset>;
+  },
+): BlueskyInterchangeContent {
+  const snapshotDatabase = environment.openSnapshot(staging, staged.snapshotPath);
+  let content: BlueskyInterchangeContent;
+  try {
+    content = translateBlueskyAccountToInterchange(
+      readMobileAccountSnapshot(snapshotDatabase),
+      {
+        accountDid: request.accountDid,
+        accountUuid: request.accountUuid,
+        createdAt: staged.takenAt,
+        assets: staged.assets,
+        portableSettings: request.portableSettings,
+      },
+    );
+  } finally {
+    snapshotDatabase.close();
+  }
+
+  const interchange = environment.createBlueskyInterchangeDatabase(
+    staging,
+    BLUESKY_INTERCHANGE_PATH,
+  );
+  try {
+    writeBlueskyInterchangeDatabase(interchange, content);
+  } finally {
+    interchange.close();
+  }
+  return content;
+}
+
+/**
+ * Which assets a packaging failure blames, if it blames any.
+ *
+ * The archive path names one content digest, and several records can share it,
+ * so every asset key that hashed to it is demoted together — they are the same
+ * file, and it moved.
+ */
+function changedAssetKeys(
+  error: unknown,
+  content: BlueskyInterchangeContent,
+  assets: Map<string, ResolvedAsset>,
+): string[] {
+  if (
+    !(error instanceof BlueskyArchiveExportError) ||
+    error.code !== "asset-changed" ||
+    !error.entryPath
+  ) {
+    return [];
+  }
+  const payload = content.payloads.find(
+    (candidate) => candidate.archivePath === error.entryPath,
+  );
+  if (!payload) {
+    return [];
+  }
+  return [...assets]
+    .filter(
+      ([, asset]) =>
+        asset.availability === "available" && asset.sha256 === payload.sha256,
+    )
+    .map(([key]) => key);
 }
 
 function buildMetadata(content: BlueskyInterchangeContent): BlueskyArchiveMetadata {
@@ -234,6 +483,7 @@ async function packageArchive(
     archivePath: string;
     content: BlueskyInterchangeContent;
     createdAt: Date;
+    shouldCancel?: () => boolean;
     onPayloadPackaged: (packaged: number) => void;
   },
 ): Promise<number> {
@@ -247,6 +497,9 @@ async function packageArchive(
   );
   let packaged = 0;
   for (const payload of payloads) {
+    if (options.shouldCancel?.()) {
+      throw new BlueskyArchiveExportCancelled();
+    }
     await writer.addStoredEntry(
       payload.archivePath,
       { byteLength: payload.byteCount, crc32: payload.crc32 },

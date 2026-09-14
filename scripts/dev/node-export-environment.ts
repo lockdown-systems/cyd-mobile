@@ -58,6 +58,21 @@ class DirectoryStagingArea implements ExportStagingArea {
     return path.join(this.root, relativePath);
   }
 
+  fileExists(relativePath: string): boolean {
+    return fs.existsSync(this.locate(relativePath));
+  }
+
+  readText(relativePath: string): string | null {
+    const location = this.locate(relativePath);
+    return fs.existsSync(location) ? fs.readFileSync(location, "utf8") : null;
+  }
+
+  writeText(relativePath: string, contents: string): void {
+    const location = this.locate(relativePath);
+    fs.mkdirSync(path.dirname(location), { recursive: true });
+    fs.writeFileSync(location, contents);
+  }
+
   destroy(): void {
     fs.rmSync(this.root, { recursive: true, force: true });
   }
@@ -108,6 +123,14 @@ export function createNodeBlueskyArchiveExportEnvironment(
   return {
     openStaging: (exportId) =>
       new DirectoryStagingArea(path.join(options.stagingRoot, exportId)),
+
+    listStagingIds: () =>
+      fs.existsSync(options.stagingRoot)
+        ? fs
+            .readdirSync(options.stagingRoot, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name)
+        : [],
 
     async withAccountWorkPaused(work) {
       const result = await work();
