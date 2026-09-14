@@ -24,14 +24,13 @@ groups at all, so these fixtures exercise less of the contract than
 | `assets` kind `thumbnail` | a video's own thumbnail is a URL, never preserved; link preview thumbnails *are* packaged, as `preview` |
 | `record_assets` owner `profile`, `message` | written only from post persistence |
 | `records.created_at` of a like or repost | Mobile stores the relationship's URI but never its creation time, so this is the observation time |
-| `selections` for bookmarks | Mobile has no bookmark record URI, so the selection names the bookmarked post and there is no `record_subjects` row |
+| the bookmark record, its `selections` subject, its `record_subjects` row | Mobile has no bookmark record URI, so the selection names the bookmarked post and no bookmark record is written |
 | a bookmark removed at source | with no bookmark record, there is nowhere to carry its deletion state |
 | a like removed at source whose URI Cyd never saw | the selection names the post, and there is no like record to carry the deletion state |
 | a link preview Cyd never downloaded | no asset row at all; the URL stays in the record's external context, and it does not make the archive incomplete |
 | context for a record Cyd never saved | `record_context` keeps the author the AT URI names; `context_record_uri` stays `NULL` and the URI itself survives in `records.payload_json` |
 | `portable_settings.save_reposts` | Mobile has no separate switch: reposts are saved with posts |
 | a like's own CID | `post.likeUri` has no CID column beside it, unlike `post.repostCid` |
-| a bookmark record | Mobile stores a bookmark as the post it points at, so a round trip writes the selection and no bookmark record |
 
 `check_account_readiness.py` reprints this list, so it stays visible at the
 moment it matters rather than only here.

@@ -8,6 +8,11 @@ import {
   View,
 } from "react-native";
 
+import {
+  ArchiveModalAction,
+  archiveModalStyles as shared,
+  breakableHandle,
+} from "@/components/archive-modal-shared";
 import { getThemePalette } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import type {
@@ -59,22 +64,13 @@ export function BlueskyArchiveExportModal({
     onPress: () => void,
     emphasis: "primary" | "quiet" = "quiet",
   ) => (
-    <Pressable
+    <ArchiveModalAction
       key={label}
+      label={label}
       onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.action,
-        {
-          borderColor: palette.icon + "22",
-          backgroundColor:
-            emphasis === "primary" ? palette.tint + "22" : palette.background,
-          opacity: pressed ? 0.9 : 1,
-        },
-      ]}
-    >
-      <Text style={[styles.actionText, { color: palette.text }]}>{label}</Text>
-    </Pressable>
+      palette={palette}
+      emphasis={emphasis}
+    />
   );
 
   /**
@@ -108,14 +104,14 @@ export function BlueskyArchiveExportModal({
       statusBarTranslucent
       onRequestClose={handleRequestClose}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.sheet, { backgroundColor: palette.background }]}>
+      <View style={shared.overlay}>
+        <View style={[shared.sheet, { backgroundColor: palette.background }]}>
           {state.status === "choosing" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 Which account?
               </Text>
-              <ScrollView style={styles.scroll}>
+              <ScrollView style={shared.scroll}>
                 {state.accounts.map((account) => (
                   <Pressable
                     key={account.uuid}
@@ -141,20 +137,20 @@ export function BlueskyArchiveExportModal({
 
           {state.status === "warning" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 This archive is not encrypted
               </Text>
-              <Text style={[styles.handle, { color: palette.text }]}>
+              <Text style={[shared.handle, { color: palette.text }]}>
                 {breakableHandle(state.handle)}
               </Text>
-              <Text style={[styles.body, { color: palette.icon }]}>
+              <Text style={[shared.body, { color: palette.icon }]}>
                 Your posts, chats and media go into it as plain text, and anyone
                 who opens the file can read them. Cyd protects your Bluesky
                 connection, not the archive — so put it somewhere you trust,
                 like an encrypted drive or a password manager&apos;s vault.
               </Text>
               {state.resuming ? (
-                <Text style={[styles.body, { color: palette.icon }]}>
+                <Text style={[shared.body, { color: palette.icon }]}>
                   Cyd will carry on the export it started earlier, from the
                   moment that export began.
                 </Text>
@@ -169,11 +165,11 @@ export function BlueskyArchiveExportModal({
           {state.status === "working" ? (
             <>
               <ActivityIndicator size="large" color={palette.tint} />
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 {state.message}
               </Text>
               {state.fraction !== null ? (
-                <Text style={[styles.body, { color: palette.icon }]}>
+                <Text style={[shared.body, { color: palette.icon }]}>
                   {Math.round(state.fraction * 100)}%
                 </Text>
               ) : null}
@@ -183,18 +179,18 @@ export function BlueskyArchiveExportModal({
 
           {state.status === "ready" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 Your archive is ready
               </Text>
               <Text selectable style={[styles.path, { color: palette.text }]}>
                 {state.fileName}
               </Text>
               {state.lines.map((line) => (
-                <Text key={line} style={[styles.body, { color: palette.icon }]}>
+                <Text key={line} style={[shared.body, { color: palette.icon }]}>
                   {line}
                 </Text>
               ))}
-              <Text style={[styles.body, { color: palette.icon }]}>
+              <Text style={[shared.body, { color: palette.icon }]}>
                 Save it to a folder on this device, or hand it to another app.
                 Cyd keeps it until you do one of those.
               </Text>
@@ -212,14 +208,14 @@ export function BlueskyArchiveExportModal({
 
           {state.status === "done" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 Exported
               </Text>
               <Text selectable style={[styles.path, { color: palette.text }]}>
                 {state.fileName}
               </Text>
               {state.lines.map((line) => (
-                <Text key={line} style={[styles.body, { color: palette.icon }]}>
+                <Text key={line} style={[shared.body, { color: palette.icon }]}>
                   {line}
                 </Text>
               ))}
@@ -229,10 +225,10 @@ export function BlueskyArchiveExportModal({
 
           {state.status === "failed" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 Export failed
               </Text>
-              <Text style={[styles.body, { color: palette.icon }]}>
+              <Text style={[shared.body, { color: palette.icon }]}>
                 {state.message}
               </Text>
               {/* Whatever it staged before failing is still there, so trying
@@ -247,54 +243,12 @@ export function BlueskyArchiveExportModal({
   );
 }
 
-/**
- * A handle written so a line box breaks it where a reader would.
- *
- * The same treatment the import modal gives one, and for the same reason: a
- * handle is one unbroken token, and a heading splits it wherever it happens to
- * run out of room unless it is offered somewhere better.
- */
-function breakableHandle(handle: string): string {
-  return `@${handle.replace(/^@/, "")}`.replace(/\./g, "​.");
-}
-
+/** Only what export needs beyond the shared sheet: a filename and a picker. */
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  sheet: {
-    width: "100%",
-    maxHeight: "85%",
-    borderRadius: 16,
-    padding: 24,
-    gap: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  handle: {
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: -4,
-  },
-  body: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
   path: {
     fontSize: 12,
     fontFamily: "monospace",
     textAlign: "center",
-  },
-  scroll: {
-    maxHeight: 280,
   },
   choiceButton: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -305,16 +259,5 @@ const styles = StyleSheet.create({
   choiceTitle: {
     fontSize: 15,
     fontWeight: "600",
-  },
-  action: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  actionText: {
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
   },
 });

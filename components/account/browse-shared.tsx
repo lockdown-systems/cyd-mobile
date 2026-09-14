@@ -221,25 +221,42 @@ export async function fetchMediaForPosts(
     return new Map();
   }
 
-  const placeholders = postUris.map(() => "?").join(",");
   const mediaRows = await db.getAllAsync<MediaRow>(
-    `SELECT pm.postUri, pm.position, pm.mediaType, pm.alt, pm.width, pm.height,
+    buildMediaForPostsQuery(postUris.length),
+    postUris,
+  );
+  return groupMediaByPost(mediaRows);
+}
+
+/**
+ * The query Browse runs to find a saved post's media.
+ *
+ * Split out for the same reason `buildFirstPageQuery` is: something other than
+ * a phone needs to run the query Browse actually runs. The Cyd Bluesky archive
+ * conformance matrix asks this one whether restored media is renderable
+ * offline, and asking a copy of it would only prove the copy works.
+ */
+export function buildMediaForPostsQuery(postCount: number): string {
+  const placeholders = Array.from({ length: postCount }, () => "?").join(",");
+  return `SELECT pm.postUri, pm.position, pm.mediaType, pm.alt, pm.width, pm.height,
             pm.thumbUrl, pm.fullsizeUrl, pm.playlistUrl,
             ma.contentCid, ma.localPath, ma.downloadState, ma.lastError
      FROM post_media pm
      LEFT JOIN media_asset ma ON ma.contentCid = pm.assetCid
      WHERE pm.postUri IN (${placeholders})
-     ORDER BY pm.postUri, pm.position;`,
-    postUris,
-  );
+     ORDER BY pm.postUri, pm.position;`;
+}
 
+/** The rows that query returns, as Browse holds them: attachments per post. */
+export function groupMediaByPost(
+  mediaRows: MediaRow[],
+): Map<string, MediaAttachment[]> {
   const mediaMap = new Map<string, MediaAttachment[]>();
   for (const row of mediaRows) {
     const existing = mediaMap.get(row.postUri) ?? [];
     existing.push(mapMediaRowToAttachment(row));
     mediaMap.set(row.postUri, existing);
   }
-
   return mediaMap;
 }
 

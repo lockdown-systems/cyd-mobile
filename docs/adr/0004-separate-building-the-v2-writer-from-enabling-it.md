@@ -4,4 +4,10 @@ Cyd Mobile builds and tests its Bluesky version 2 writer as soon as the work is 
 
 Issue #100 has now passed that gate, and export is a user-facing capability offered from the app-wide menu beside import. What replaced `__DEV__` is not a date or a judgement call but a runnable one: `npm run test:archive-matrix` names every conformance row the writer's release depends on, ties each to the tests that prove it, and fails both when a row goes red and when the test behind one has been renamed or deleted. It runs in CI on every push. A row that loses its evidence un-enables the writer in exactly the way a broken row does.
 
-The reader-before-writer ordering itself is unchanged and still binds the next version: ship and verify readers for a Cyd Bluesky archive version before enabling the writer for it (ADR 0008, ADR 0016).
+## Readers and the writer ship in the same release
+
+"Ship and verify readers before enabling the writer" is the rule, and Mobile satisfies its intent by shipping both in one version rather than in two. Mobile's readers — streaming intake, restore, merge and the import flow — are on `main` but have never been in a tagged release; the writer would therefore reach people in the first version that carries a reader either way. Two releases would only matter if somebody could obtain a Cyd Bluesky archive from a Mobile that could not read one, and nobody can: exporting requires the version that added export, and that version reads archives.
+
+What the rule actually guards is the case where an archive exists and nothing can consume it. That case is now a check rather than a promise, because a prose rule is one a future release can break in silence. The matrix's `readers-released` row walks every tag and the working tree and fails any that offers export without `archive-import`, `archive-restore` and `archive-merge` present. It is written against modules rather than commits, so a rebase cannot retire it and the next Cyd Bluesky archive version inherits it unchanged.
+
+Cross-client ordering is a different question and is not Mobile's release order to solve. A Cyd Bluesky archive Mobile writes is read by whatever Desktop version somebody happens to run, so what protects that exchange is the pinned canonical contract and the conformance checker the matrix runs over Mobile's own output (ADR 0008), not when Mobile tags a build.
