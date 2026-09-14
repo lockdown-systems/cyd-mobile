@@ -45,6 +45,19 @@ import test_bundle
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+#: What makes a tree a *reader* of Cyd Bluesky archives: the modules that read
+#: one. Named by capability rather than by commit, so a rebase cannot quietly
+#: retire the check below.
+READER_MODULES = (
+    "services/archive-import/intake.ts",
+    "services/archive-restore/restore.ts",
+    "services/archive-merge/merge.ts",
+)
+
+#: What makes a tree a *writer* people can reach: an export somebody can press.
+#: The writer itself has been buildable for far longer (ADR 0004).
+WRITER_AFFORDANCE = "components/BlueskyArchiveExportModal.tsx"
+
 COMMITTED_FIXTURES = (
     REPOSITORY_ROOT / "testUtils/fixtures/bluesky-archive/complete.cyd",
     REPOSITORY_ROOT / "testUtils/fixtures/bluesky-archive/incomplete.cyd",
@@ -53,10 +66,19 @@ COMMITTED_FIXTURES = (
 
 @dataclass(frozen=True)
 class Jest:
-    """One or more Jest tests, named by the file and part of the test name."""
+    """One or more Jest tests, named by the file and part of the test name.
+
+    `least` is how many must match. Substring matching against a describe block
+    is convenient and, on its own, weak: `"rejects"` covers a dozen tests, so
+    deleting the one that carries the row's claim leaves the row green — the
+    exact rot this file exists to catch. A count pins the size of the evidence,
+    so removing a test fails the matrix and whoever removed it has to say so
+    here.
+    """
 
     file: str
     name: str
+    least: int = 1
 
 
 @dataclass(frozen=True)
@@ -86,25 +108,30 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
         (
             Row(
                 "desktop-to-mobile",
-                "A canonical Desktop archive becomes a browseable local account",
+                "A canonical Desktop archive becomes a browseable Bluesky local account",
                 (
-                    Jest("archive-contract-bundle", "normalizes"),
-                    Jest("archive-contract-bundle", "streaming intake"),
-                    Jest("archive-contract-exchange", "restored by Mobile"),
+                    Jest("archive-contract-bundle", "normalizes", least=2),
+                    Jest("archive-contract-bundle", "streaming intake", least=2),
+                    Jest("archive-contract-exchange", "restored by Mobile", least=9),
                 ),
             ),
             Row(
                 "mobile-to-desktop",
                 "What Mobile writes still says what Desktop wrote, and conforms",
                 (
-                    Jest("archive-contract-exchange", "rewritten by Mobile"),
+                    Jest("archive-contract-exchange", "rewritten by Mobile", least=24),
                     Check("mobile-writer-conformance"),
                 ),
             ),
             Row(
                 "declared-losses",
                 "Every loss a Mobile round trip causes is a declared loss",
-                (Jest("archive-contract-exchange", "loses, on purpose"),),
+                (Jest("archive-contract-exchange", "loses, on purpose", least=8),),
+            ),
+            Row(
+                "readers-released",
+                "No version offers export without the readers that consume it",
+                (Check("readers-ship-with-the-writer"),),
             ),
             Row(
                 "pinned-schema",
@@ -120,13 +147,13 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 "record-categories",
                 "Posts, replies, quotes, reposts, likes, bookmarks, chats, follows",
                 (
-                    Jest("archive-export/__tests__/interchange", "repost"),
+                    Jest("archive-export/__tests__/interchange", "repost", least=2),
                     Jest("archive-export/__tests__/interchange", "like"),
-                    Jest("archive-export/__tests__/interchange", "bookmark"),
+                    Jest("archive-export/__tests__/interchange", "bookmark", least=2),
                     Jest("archive-export/__tests__/interchange", "conversation"),
                     Jest("archive-export/__tests__/interchange", "follows"),
                     Jest("archive-export/__tests__/interchange", "reply parent"),
-                    Jest("archive-restore/__tests__/mobile-rows", "restores"),
+                    Jest("archive-restore/__tests__/mobile-rows", "restores", least=10),
                     Jest("archive-contract-exchange", "every category"),
                 ),
             ),
@@ -134,9 +161,14 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 "identity-mapping",
                 "DID matching, handle changes, UUID preservation and remapping",
                 (
-                    Jest("archive-merge/__tests__/destination", "DID"),
-                    Jest("archive-restore/__tests__/identity", "UUID"),
+                    Jest("archive-merge/__tests__/destination", "DID", least=3),
+                    Jest("archive-restore/__tests__/identity", "UUID", least=3),
                     Jest("archive-contract-exchange", "renamed handle"),
+                    # The epic asks for duplicate-DID reconciliation. Mobile
+                    # cannot reach that state — `bsky_account.did` has been
+                    # unique since the migration that added it — so ADR 0011 is
+                    # superseded here and refusing is the whole behaviour.
+                    Jest("archive-merge/__tests__/destination", "refuses rather than guess"),
                 ),
             ),
             Row(
@@ -153,7 +185,7 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 (
                     Jest("archive-merge/__tests__/merge-plan", "newer observation"),
                     Jest("archive-merge/__tests__/merge-plan", "quieter archive"),
-                    Jest("archive-merge/__tests__/merge-plan", "says nothing about"),
+                    Jest("archive-merge/__tests__/merge-plan", "says nothing about", least=2),
                     Jest("archive-contract-exchange", "could not carry"),
                 ),
             ),
@@ -163,7 +195,7 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 (
                     Jest("archive-merge/__tests__/merge", "own identifier, settings"),
                     Jest("archive-restore/__tests__/restore", "defaults"),
-                    Jest("archive-contract-exchange", "save and delete defaults"),
+                    Jest("archive-contract-exchange", "save and delete defaults", least=2),
                 ),
             ),
             Row(
@@ -186,11 +218,16 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
             ),
             Row(
                 "completeness",
-                "A structurally valid archive is not the same as a complete backup",
+                "An archive Cyd can read is not yet a complete Bluesky backup",
                 (
                     Jest("archive-export/__tests__/export", "never finished downloading"),
                     Jest("archive-restore/__tests__/restore", "missing asset explicit"),
-                    Jest("archive-contract-exchange", "backup is complete"),
+                    Jest("archive-contract-exchange", "backup is complete", least=2),
+                    Jest(
+                        "archive-contract-exchange",
+                        "incomplete Desktop archive, rewritten",
+                        least=4,
+                    ),
                 ),
             ),
         ),
@@ -202,10 +239,10 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 "integrity",
                 "Traversal, symlinks, forged manifests, bad digests, entry limits",
                 (
-                    Jest("archive-import/__tests__/intake", "not safe to unpack"),
-                    Jest("archive-import/__tests__/zip-reader", "rejects"),
-                    Jest("archive-import/__tests__/entry-paths", "rejects"),
-                    Jest("archive-import/__tests__/intake", "resource limits"),
+                    Jest("archive-import/__tests__/intake", "not safe to unpack", least=12),
+                    Jest("archive-import/__tests__/zip-reader", "rejects", least=12),
+                    Jest("archive-import/__tests__/entry-paths", "rejects", least=6),
+                    Jest("archive-import/__tests__/intake", "resource limits", least=4),
                     Check("checker-self-test"),
                 ),
             ),
@@ -213,7 +250,7 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 "unsupported-version",
                 "The prototype, a newer version, and another platform are refused",
                 (
-                    Jest("archive-metadata", "rejects"),
+                    Jest("archive-metadata", "rejects", least=10),
                     Jest("archive-contract-bundle", "version rejection"),
                 ),
             ),
@@ -221,7 +258,7 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 "termination-restart",
                 "Import and export resume from their checkpoints on next launch",
                 (
-                    Jest("archive-import/__tests__/intake", "surviving termination"),
+                    Jest("archive-import/__tests__/intake", "surviving termination", least=4),
                     Jest("archive-export/__tests__/export-resume", "interrupted run staged"),
                     Jest("hooks/__tests__/use-bluesky-archive-export", "earlier launch left"),
                 ),
@@ -230,9 +267,9 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 "cleanup",
                 "Cancellation, failure and delivery all leave no staging behind",
                 (
-                    Jest("archive-import/__tests__/intake", "cancellation"),
+                    Jest("archive-import/__tests__/intake", "cancellation", least=3),
                     Jest("archive-export/__tests__/export-resume", "walks away"),
-                    Jest("hooks/__tests__/use-bluesky-archive-export", "keeps nothing staged"),
+                    Jest("hooks/__tests__/use-bluesky-archive-export", "keeps nothing staged", least=2),
                     Jest("hooks/__tests__/use-bluesky-archive-import", "nothing on screen or in staging"),
                     Jest("archive-restore/__tests__/restore", "no trace"),
                 ),
@@ -251,7 +288,7 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 (
                     Jest("archive-export/__tests__/export", "no credentials"),
                     Jest("archive-export/__tests__/interchange", "private storage"),
-                    Jest("archive-contract-exchange", "no credentials"),
+                    Jest("archive-contract-exchange", "no credentials", least=2),
                     Jest("archive-restore/__tests__/restore", "no credentials"),
                 ),
             ),
@@ -259,9 +296,9 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 "device-backup",
                 "Committed account data is backup-eligible; staging is excluded",
                 (
-                    Jest("device-storage", "backup"),
-                    Jest("android-backup-rules", "staging out of every backup"),
-                    Jest("app-config", "backup"),
+                    Jest("device-storage", "backup", least=5),
+                    Jest("android-backup-rules", "staging out of every backup", least=2),
+                    Jest("app-config", "backup", least=4),
                 ),
             ),
             Row(
@@ -270,7 +307,7 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                 (
                     Jest("BlueskyArchiveExportModal", "no Cyd account signed in"),
                     Jest("use-bluesky-archive-import", "no Cyd account signed in"),
-                    Jest("archive-entitlement", "never asks"),
+                    Jest("archive-entitlement", "never asks", least=5),
                 ),
             ),
         ),
@@ -330,11 +367,19 @@ def check_mobile_writer_conformance(
 
 
 def check_checker_self_test(schema_sql: str, work: Path) -> Outcome:
-    """The conformance checker still rejects every archive it should."""
+    """The conformance checker accepts the canonical fixtures, rejects the rest."""
     import zipfile
 
     outcome = Outcome()
     source = work / "fixtures" / "complete.cyd"
+
+    # A checker that rejected everything would pass the mutations below too.
+    for name in ("complete.cyd", "incomplete.cyd"):
+        failures = conformance.check_archive(work / "fixtures" / name, schema_sql)
+        if failures:
+            outcome.problems.append(f"canonical {name} should conform: {failures[0]}")
+        else:
+            outcome.passed += 1
     with zipfile.ZipFile(source) as archive:
         original = {
             info.filename: archive.read(info)
@@ -353,6 +398,53 @@ def check_checker_self_test(schema_sql: str, work: Path) -> Outcome:
     return outcome
 
 
+def tree_has(ref: str, path: str) -> bool:
+    return (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{ref}:{path}"],
+            cwd=REPOSITORY_ROOT,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+
+
+def check_readers_ship_with_the_writer() -> Outcome:
+    """No release may offer export without the readers that consume it.
+
+    ADR 0004's standing rule, made checkable. What it guards against is a Cyd
+    Bluesky archive existing before anything can read one, so it binds per
+    release rather than per commit: a version offering export has to carry the
+    readers too. Shipping both in one version satisfies that, because nobody
+    can export before installing the version that added export.
+
+    Checked over every tag and the working tree, by module rather than by
+    commit, so the next Cyd Bluesky archive version inherits the rule for free.
+    """
+    outcome = Outcome()
+    tags = subprocess.run(
+        ["git", "tag"],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+
+    for ref in [*tags, "HEAD"]:
+        if not tree_has(ref, WRITER_AFFORDANCE):
+            # No export to reach, so the rule has nothing to say about this one.
+            outcome.passed += 1
+            continue
+        missing = [module for module in READER_MODULES if not tree_has(ref, module)]
+        if missing:
+            outcome.problems.append(
+                f"{ref} offers export without {', '.join(missing)}"
+            )
+        else:
+            outcome.passed += 1
+    return outcome
+
+
 def evaluate(row: Row, results: list[tuple[str, str, str]], checks: dict[str, Outcome]) -> Outcome:
     outcome = Outcome()
     for evidence in row.evidence:
@@ -367,9 +459,10 @@ def evaluate(row: Row, results: list[tuple[str, str, str]], checks: dict[str, Ou
             for path, name, status in results
             if evidence.file in path and evidence.name in name
         ]
-        if not matched:
+        if len(matched) < evidence.least:
             outcome.problems.append(
-                f"no test in *{evidence.file}* named like {evidence.name!r}"
+                f"*{evidence.file}* has {len(matched)} tests named like "
+                f"{evidence.name!r}; the row is proven by {evidence.least}"
             )
             continue
         for name, status in matched:
@@ -410,6 +503,7 @@ def main() -> int:
                 schema_sql, round_trip_output
             ),
             "checker-self-test": check_checker_self_test(schema_sql, contract_root),
+            "readers-ship-with-the-writer": check_readers_ship_with_the_writer(),
         }
 
     failed = 0

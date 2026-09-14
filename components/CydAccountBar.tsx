@@ -150,6 +150,25 @@ export function CydAccountBar({
    * the progress and the questions on screen rather than leaving the import
    * running invisibly.
    */
+  const importModal = (
+    <BlueskyArchiveImportModal
+      state={archiveImport.state}
+      onConfirmLargeArchive={() => void archiveImport.confirmLargeArchive()}
+      onConfirmMerge={() => void archiveImport.confirmMerge()}
+      onSignIn={handleSignIn}
+      onCancel={archiveImport.cancel}
+      onDismiss={archiveImport.dismiss}
+    />
+  );
+
+  /**
+   * The export, which outlives the bar the same way, and for its own reason.
+   *
+   * Hashing a gigabyte of preserved video takes as long as it takes, and the
+   * bar hides itself the moment somebody opens an account. An export that
+   * disappeared with it would still be running, still holding staging, with
+   * nothing on screen to cancel it or say where the archive went.
+   */
   const exportModal = (
     <BlueskyArchiveExportModal
       state={archiveExport.state}
@@ -159,17 +178,6 @@ export function CydAccountBar({
       onShare={() => void archiveExport.share()}
       onCancel={archiveExport.cancel}
       onDismiss={archiveExport.dismiss}
-    />
-  );
-
-  const importModal = (
-    <BlueskyArchiveImportModal
-      state={archiveImport.state}
-      onConfirmLargeArchive={() => void archiveImport.confirmLargeArchive()}
-      onConfirmMerge={() => void archiveImport.confirmMerge()}
-      onSignIn={handleSignIn}
-      onCancel={archiveImport.cancel}
-      onDismiss={archiveImport.dismiss}
     />
   );
 

@@ -15,10 +15,12 @@ import path from "node:path";
  * now would be a one-line change nobody noticed. So the absence is asserted
  * directly, over the whole surface it has to hold across.
  *
- * The behavioural half lives beside the flows it belongs to: the export card
- * and the import hook are both driven with no `CydAccountProvider` above them,
- * and `useCydAccount` throws outside one, so an entitlement check anywhere in
- * either would fail those tests rather than this one.
+ * The behavioural half lives beside the flows it belongs to:
+ * `components/__tests__/BlueskyArchiveExportModal.test.tsx` and
+ * `hooks/__tests__/use-bluesky-archive-import.test.ts` both drive a whole flow
+ * with no `CydAccountProvider` above it, and `useCydAccount` throws outside
+ * one — so an entitlement check anywhere in either would fail there rather
+ * than here.
  */
 
 const REPOSITORY_ROOT = path.join(__dirname, "../..");

@@ -6,10 +6,13 @@ import type { DatabaseSync } from "node:sqlite";
 
 import {
   buildFirstPageQuery,
+  buildMediaForPostsQuery,
   buildTotalCountQuery,
   getFirstPageParams,
   getTotalCountParams,
+  groupMediaByPost,
   type BrowseType,
+  type MediaRow,
 } from "@/components/account/browse-shared";
 import { ACCOUNT_AUTH_STATUS, ACCOUNT_CONFIG_KEYS } from "@/controllers/config";
 import {
@@ -150,7 +153,7 @@ async function intake(
  * two fields added afterwards. Nothing is being widened here that was ever
  * narrow.
  */
-const rows = (value: unknown): Record<string, unknown>[] =>
+const castRows = (value: unknown): Record<string, unknown>[] =>
   value as Record<string, unknown>[];
 
 function browseCount(database: DatabaseSync, type: BrowseType): number {
@@ -263,17 +266,34 @@ contractDescribe("a canonical Desktop archive, restored by Mobile", () => {
     expect(digests).toContain(VIDEO_DIGEST);
   });
 
-  it("points saved media at local files, so it renders with no network", () => {
-    const assets = database
-      .prepare(
-        "SELECT localPath, downloadState FROM media_asset WHERE localPath IS NOT NULL;",
-      )
-      .all() as { localPath: string; downloadState: string }[];
-    expect(assets.length).toBeGreaterThan(0);
-    for (const asset of assets) {
-      expect(asset.localPath.startsWith("file://")).toBe(true);
-      expect(fs.existsSync(asset.localPath.slice("file://".length))).toBe(true);
+  /**
+   * Offline browsing, asked through the query Browse itself runs.
+   *
+   * Asserting `media_asset` rows would only prove restore wrote something. What
+   * has to be true is that the attachments Browse builds for a saved post point
+   * at bytes on this device, so a post renders with the Bluesky CDN
+   * unreachable — which is the whole promise of a Cyd Bluesky archive.
+   */
+  it("gives Browse local files for every attachment, so posts render with no network", () => {
+    const attachments = groupMediaByPost(
+      database
+        .prepare(buildMediaForPostsQuery(1))
+        .all(OWN_POST) as MediaRow[],
+    ).get(OWN_POST);
+
+    expect(attachments?.length).toBeGreaterThan(0);
+    for (const attachment of attachments ?? []) {
+      expect(attachment.downloadState).toBe("complete");
+      expect(attachment.localUri?.startsWith("file://")).toBe(true);
+      expect(
+        fs.existsSync((attachment.localUri as string).slice("file://".length)),
+      ).toBe(true);
     }
+    // Both the image and the full video, not a thumbnail standing in for one.
+    expect(attachments?.map((attachment) => attachment.type).sort()).toEqual([
+      "image",
+      "video",
+    ]);
   });
 
   it("records that the restored backup is complete", () => {
@@ -441,83 +461,109 @@ contractDescribe("merging a richer canonical archive into an older one", () => {
   });
 });
 
+/** What a canonical archive looks like after Mobile has read and rewritten it. */
+type RoundTrip = {
+  installation: Installation;
+  canonical: ReturnType<typeof normalizeBlueskyArchiveSemantics>;
+  rewritten: ReturnType<typeof normalizeBlueskyArchiveSemantics>;
+  entries: Record<string, Uint8Array>;
+};
+
+/**
+ * Restore a canonical archive, then export the account it became.
+ *
+ * The whole Mobile-to-Desktop direction in one function: what comes out was
+ * written by Mobile's own writer, from data Desktop wrote, so comparing the
+ * two ends says whether an archive survives the trip through Mobile's private
+ * storage and back (#100).
+ */
+async function roundTrip(label: string, fixtureName: string): Promise<RoundTrip> {
+  const installation = createInstallation(label);
+  const prepared = await intake(installation, fixtureName);
+  const account = await restoreBlueskyArchiveAccount(installation.environment, {
+    archive: { intakeId: prepared.intakeId, stagingRoot: prepared.stagingRoot },
+  });
+
+  const settings = installation.environment.mainDatabase
+    .prepare(
+      `SELECT b.settingSavePosts, b.settingSaveLikes, b.settingSaveBookmarks,
+              b.settingSaveChats, b.settingDeletePosts, b.settingDeleteReposts,
+              b.settingDeleteLikes, b.settingDeleteBookmarks,
+              b.settingDeleteChats, b.settingDeleteUnfollowEveryone
+       FROM account a INNER JOIN bsky_account b ON b.id = a.bskyAccountID
+       WHERE a.uuid = ?;`,
+    )
+    .get(account.accountUuid) as Record<string, number>;
+  const portableSettings = Object.fromEntries(
+    Object.entries({
+      save_posts: settings.settingSavePosts,
+      save_likes: settings.settingSaveLikes,
+      save_bookmarks: settings.settingSaveBookmarks,
+      save_chats: settings.settingSaveChats,
+      delete_posts: settings.settingDeletePosts,
+      delete_reposts: settings.settingDeleteReposts,
+      delete_likes: settings.settingDeleteLikes,
+      delete_bookmarks: settings.settingDeleteBookmarks,
+      delete_chats: settings.settingDeleteChats,
+      delete_follows: settings.settingDeleteUnfollowEveryone,
+    }).map(([key, value]) => [key, value !== 0]),
+  ) as PortableSettings;
+
+  const result = await runBlueskyArchiveExport(
+    createNodeBlueskyArchiveExportEnvironment({
+      accountDirectory: installation.environment.accountDirectory(
+        account.accountUuid,
+      ),
+      stagingRoot: path.join(installation.root, "export"),
+      now: () => new Date("2026-02-01T00:00:00.000Z"),
+    }),
+    {
+      exportId: `round-trip-${label}`,
+      accountUuid: account.accountUuid,
+      accountDid: account.accountDid,
+      accountHandle: account.handle,
+      portableSettings,
+    },
+  );
+
+  const bytes = new Uint8Array(fs.readFileSync(result.location));
+  if (roundTripOutput) {
+    // The pinned contract's own checker is Python, and it is the only thing
+    // that can say an archive Mobile produced conforms rather than merely
+    // round-trips through Mobile. `matrix.py` collects whatever lands here.
+    fs.mkdirSync(roundTripOutput, { recursive: true });
+    fs.writeFileSync(
+      path.join(roundTripOutput, `mobile-round-trip-${label}.cyd`),
+      bytes,
+    );
+  }
+
+  const entries = unzipArchive(bytes);
+  return {
+    installation,
+    entries,
+    rewritten: normalizeBlueskyArchiveSemantics(
+      readArchiveTables(entries["data.db"]),
+    ),
+    canonical: normalizeBlueskyArchiveSemantics(
+      readArchiveTables(unzipArchive(canonicalArchive(fixtureName))["data.db"]),
+    ),
+  };
+}
+
 contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
   let installation: Installation;
-  let canonical: ReturnType<typeof normalizeBlueskyArchiveSemantics>;
-  let rewritten: ReturnType<typeof normalizeBlueskyArchiveSemantics>;
+  let canonical: RoundTrip["canonical"];
+  let rewritten: RoundTrip["rewritten"];
   let rewrittenEntries: Record<string, Uint8Array>;
 
   beforeAll(async () => {
-    installation = createInstallation("mobile-to-desktop");
-    const prepared = await intake(installation, "complete.cyd");
-    const account = await restoreBlueskyArchiveAccount(
-      installation.environment,
-      {
-        archive: {
-          intakeId: prepared.intakeId,
-          stagingRoot: prepared.stagingRoot,
-        },
-      },
-    );
-
-    const settings = installation.environment.mainDatabase
-      .prepare(
-        `SELECT b.settingSavePosts, b.settingSaveLikes, b.settingSaveBookmarks,
-                b.settingSaveChats, b.settingDeletePosts, b.settingDeleteReposts,
-                b.settingDeleteLikes, b.settingDeleteBookmarks,
-                b.settingDeleteChats, b.settingDeleteUnfollowEveryone
-         FROM account a INNER JOIN bsky_account b ON b.id = a.bskyAccountID
-         WHERE a.uuid = ?;`,
-      )
-      .get(account.accountUuid) as Record<string, number>;
-    const portableSettings = Object.fromEntries(
-      Object.entries({
-        save_posts: settings.settingSavePosts,
-        save_likes: settings.settingSaveLikes,
-        save_bookmarks: settings.settingSaveBookmarks,
-        save_chats: settings.settingSaveChats,
-        delete_posts: settings.settingDeletePosts,
-        delete_reposts: settings.settingDeleteReposts,
-        delete_likes: settings.settingDeleteLikes,
-        delete_bookmarks: settings.settingDeleteBookmarks,
-        delete_chats: settings.settingDeleteChats,
-        delete_follows: settings.settingDeleteUnfollowEveryone,
-      }).map(([key, value]) => [key, value !== 0]),
-    ) as PortableSettings;
-
-    const result = await runBlueskyArchiveExport(
-      createNodeBlueskyArchiveExportEnvironment({
-        accountDirectory: installation.environment.accountDirectory(
-          account.accountUuid,
-        ),
-        stagingRoot: path.join(installation.root, "export"),
-        now: () => new Date("2026-02-01T00:00:00.000Z"),
-      }),
-      {
-        exportId: "round-trip",
-        accountUuid: account.accountUuid,
-        accountDid: account.accountDid,
-        accountHandle: account.handle,
-        portableSettings,
-      },
-    );
-
-    const bytes = new Uint8Array(fs.readFileSync(result.location));
-    if (roundTripOutput) {
-      fs.mkdirSync(roundTripOutput, { recursive: true });
-      fs.writeFileSync(
-        path.join(roundTripOutput, "mobile-round-trip.cyd"),
-        bytes,
-      );
-    }
-
-    rewrittenEntries = unzipArchive(bytes);
-    rewritten = normalizeBlueskyArchiveSemantics(
-      readArchiveTables(rewrittenEntries["data.db"]),
-    );
-    canonical = normalizeBlueskyArchiveSemantics(
-      readArchiveTables(unzipArchive(canonicalArchive("complete.cyd"))["data.db"]),
-    );
+    ({
+      installation,
+      canonical,
+      rewritten,
+      entries: rewrittenEntries,
+    } = await roundTrip("complete", "complete.cyd"));
   });
 
   afterAll(() => installation.close());
@@ -536,7 +582,7 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
     });
   });
 
-  it("still names the Bluesky identity and local account Desktop named", () => {
+  it("still names the Bluesky identity and Bluesky local account Desktop named", () => {
     expect(rewritten.commonSemantics.archive).toMatchObject({
       accountDid: ACCOUNT_DID,
       accountUuid: ACCOUNT_UUID,
@@ -556,8 +602,8 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
         .map((row) => row.uri as string)
         .filter((uri) => uri !== BOOKMARK_RECORD)
         .sort();
-    expect(uris(rows(rewritten.commonSemantics.records))).toEqual(
-      uris(rows(canonical.commonSemantics.records)),
+    expect(uris(castRows(rewritten.commonSemantics.records))).toEqual(
+      uris(castRows(canonical.commonSemantics.records)),
     );
   });
 
@@ -577,8 +623,8 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
             },
           ]),
       );
-    expect(byUri(rows(rewritten.commonSemantics.records))).toEqual(
-      byUri(rows(canonical.commonSemantics.records)),
+    expect(byUri(castRows(rewritten.commonSemantics.records))).toEqual(
+      byUri(castRows(canonical.commonSemantics.records)),
     );
   });
 
@@ -612,13 +658,13 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
   });
 
   it("carries back the conversation and what was said in it", () => {
-    expect(rows(rewritten.commonSemantics.conversations).map((row) => row.id)).toEqual(
-      rows(canonical.commonSemantics.conversations).map((row) => row.id),
+    expect(castRows(rewritten.commonSemantics.conversations).map((row) => row.id)).toEqual(
+      castRows(canonical.commonSemantics.conversations).map((row) => row.id),
     );
     expect(
-      rows(rewritten.commonSemantics.messages).map((row) => [row.id, row.text]),
+      castRows(rewritten.commonSemantics.messages).map((row) => [row.id, row.text]),
     ).toEqual(
-      rows(canonical.commonSemantics.messages).map((row) => [row.id, row.text]),
+      castRows(canonical.commonSemantics.messages).map((row) => [row.id, row.text]),
     );
   });
 
@@ -720,7 +766,7 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
 
     it("says nothing about when Bluesky indexed a record", () => {
       expect(
-        rows(rewritten.commonSemantics.records).every(
+        castRows(rewritten.commonSemantics.records).every(
           (row) => row.indexedAt === null,
         ),
       ).toBe(true);
@@ -728,7 +774,7 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
 
     it("has one observation time, so first and latest are the same", () => {
       expect(
-        rows(rewritten.commonSemantics.records).every(
+        castRows(rewritten.commonSemantics.records).every(
           (row) => row.firstObservedAt === row.observedAt,
         ),
       ).toBe(true);
@@ -739,10 +785,10 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
       // bookmark record to write back — the selection names the post instead,
       // and there is no `record_subjects` row for it.
       expect(
-        rows(canonical.commonSemantics.records).map((row) => row.uri),
+        castRows(canonical.commonSemantics.records).map((row) => row.uri),
       ).toContain(BOOKMARK_RECORD);
       expect(
-        rows(rewritten.commonSemantics.records).map((row) => row.uri),
+        castRows(rewritten.commonSemantics.records).map((row) => row.uri),
       ).not.toContain(BOOKMARK_RECORD);
       expect(
         rewritten.commonSemantics.selections.find(
@@ -759,12 +805,12 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
     it("says nothing about a like's own CID, which Mobile does not store", () => {
       // `post.likeUri` has no CID beside it, unlike `post.repostCid`.
       expect(
-        rows(canonical.commonSemantics.records).find(
+        castRows(canonical.commonSemantics.records).find(
           (row) => row.uri === LIKE_RECORD,
         ),
       ).toMatchObject({ cid: "bafy-like" });
       expect(
-        rows(rewritten.commonSemantics.records).find(
+        castRows(rewritten.commonSemantics.records).find(
           (row) => row.uri === LIKE_RECORD,
         ),
       ).toMatchObject({ cid: null });
@@ -775,5 +821,72 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
         rewritten.commonSemantics.portableSettings.map((row) => row.key),
       ).not.toContain("save_reposts");
     });
+  });
+});
+
+/**
+ * An honestly incomplete Cyd Bluesky archive, all the way round.
+ *
+ * A structurally sound archive and a complete Bluesky backup are different
+ * claims, and the difference has to survive a trip through Mobile in both
+ * directions (#91): a missing asset that quietly disappeared on the way out
+ * would turn an honest incomplete archive into a complete-looking lie, which
+ * is worse than the missing file.
+ */
+contractDescribe("a canonical incomplete Desktop archive, rewritten by Mobile", () => {
+  let trip: RoundTrip;
+
+  beforeAll(async () => {
+    trip = await roundTrip("incomplete", "incomplete.cyd");
+  });
+
+  afterAll(() => trip.installation.close());
+
+  it("still says the backup is incomplete", () => {
+    expect(trip.canonical.completeness).toBe("incomplete");
+    expect(trip.rewritten.completeness).toBe("incomplete");
+    expect(
+      JSON.parse(Buffer.from(trip.entries["metadata.json"]).toString("utf8")),
+    ).toMatchObject({ completeness: "incomplete" });
+  });
+
+  it("keeps the unavailable asset named, rather than dropping it", () => {
+    const unavailable = trip.rewritten.assets.filter(
+      (asset) => asset.availability !== "available",
+    );
+    expect(unavailable).toHaveLength(1);
+    expect(unavailable[0]).toMatchObject({
+      kind: "video",
+      sha256: null,
+      archivePath: null,
+    });
+    // Why it is missing is the part somebody can act on, so it survives too.
+    expect(unavailable[0].unavailableReason).toEqual(expect.any(String));
+  });
+
+  it("carries back every record the incomplete archive still held", () => {
+    const uris = (rows: Record<string, unknown>[]) =>
+      rows
+        .map((row) => row.uri as string)
+        .filter((uri) => uri !== BOOKMARK_RECORD)
+        .sort();
+    expect(uris(castRows(trip.rewritten.commonSemantics.records))).toEqual(
+      uris(castRows(trip.canonical.commonSemantics.records)),
+    );
+  });
+
+  it("packages the assets it does have, with their bytes intact", () => {
+    const available = trip.rewritten.assets.filter(
+      (asset) => asset.availability === "available",
+    );
+    expect(available.length).toBeGreaterThan(0);
+    for (const asset of available) {
+      const payload = trip.entries[asset.archivePath as string];
+      expect(payload).toBeDefined();
+      expect(crypto.createHash("sha256").update(payload).digest("hex")).toBe(
+        asset.sha256,
+      );
+    }
+    expect(available.map((asset) => asset.sha256)).not.toContain(VIDEO_DIGEST);
   });
 });

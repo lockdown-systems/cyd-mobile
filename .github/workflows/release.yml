@@ -32,16 +32,15 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Run canonical Bluesky archive contract tests
-        run: npm run test:archive-contract
-
-      - name: Verify the archive conformance checker still rejects bad archives
-        run: npm run test:archive-conformance
-
       - name: Run the Cyd Bluesky archive v2 conformance matrix
         # The release gate for Mobile's version 2 writer (#100, ADR 0004). It
         # fails both when a matrix row goes red and when the test proving one
         # has been renamed or deleted out from under it.
+        #
+        # It subsumes `test:archive-contract` and `test:archive-conformance`:
+        # it downloads the same pinned bundle, runs the same contract-gated
+        # suites, and runs the same checker mutations. Those two stay as npm
+        # scripts because they are the quick ones to reach for locally.
         run: npm run test:archive-matrix
 
       - name: Check for a newer canonical Bluesky archive bundle
