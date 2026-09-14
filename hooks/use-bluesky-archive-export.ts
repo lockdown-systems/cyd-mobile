@@ -1,4 +1,5 @@
 import * as Crypto from "expo-crypto";
+import { Directory, File } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
 
@@ -33,9 +34,19 @@ import { BlueskyArchiveExportCancelled } from "@/services/archive-export";
  * The third is delivery, which is also when staging stops being useful: the
  * archive lives in staging until it has been handed over, and is thrown away
  * immediately afterwards. Staging holds the archive *and* a copy of the
- * account database, so it is not a thing to leave lying around — but a share
- * that never happened leaves it alone, because the archive in there is the
- * only copy and trying again is meant to find it.
+ * account database, so it is not a thing to leave lying around — but a
+ * delivery that never happened leaves it alone, because the archive in there
+ * is the only copy and trying again is meant to find it.
+ *
+ * Delivery is two things, not one, and Android is why. A share sheet is
+ * `ACTION_SEND`, which enumerates applications that *receive* content — cloud
+ * drives, mail, messengers — and never the device's own storage, because
+ * saving to a folder is `ACTION_OPEN_DOCUMENT_TREE` and a different intent
+ * entirely. Offering only the sheet would mean the one instruction this flow
+ * gives ("put it somewhere you trust, like an encrypted drive") is the one
+ * thing an Android user cannot do, and getting your data out of Cyd would
+ * require handing it to somebody else first. So saving to the device is its
+ * own affordance, on both platforms.
  *
  * The fourth is nothing at all: no Cyd account, no entitlement check, no
  * network. Getting your own data out of Cyd is not a premium feature
@@ -57,6 +68,19 @@ export type BlueskyArchiveExportState =
       cancellable: boolean;
     }
   | {
+      /**
+       * The archive exists, and is waiting to be put somewhere.
+       *
+       * It is still in staging, which is the only copy of it. Nothing here
+       * decides where it goes: saving it to the device and handing it to
+       * another application are both offered, and backing out of either
+       * returns to this rather than throwing the archive away.
+       */
+      status: "ready";
+      fileName: string;
+      lines: string[];
+    }
+  | {
       status: "done";
       fileName: string;
       lines: string[];
@@ -74,8 +98,34 @@ export type BlueskyArchiveExportRuntime = {
   }): Promise<BlueskyArchiveExportResult>;
   staging: BlueskyArchiveExportStaging;
   share(archive: { location: string; fileName: string }): Promise<void>;
+  /**
+   * Copy the archive to a folder the person picks on this device.
+   *
+   * Resolves with the folder's name, or `null` if they backed out of the
+   * picker without choosing one — which is not a failure, and must leave the
+   * staged archive where it is.
+   */
+  saveToDevice(archive: {
+    location: string;
+    fileName: string;
+  }): Promise<string | null>;
   newExportId(): string;
 };
+
+/**
+ * Whether a file-picker rejection is somebody closing it rather than a fault.
+ *
+ * `expo-file-system` raises a coded exception for this, and the code is the
+ * only thing separating "no folder chosen" from "the copy failed" — one
+ * returns to the archive, the other is worth reporting.
+ */
+function isPickerCancelled(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  const message = error instanceof Error ? error.message : "";
+  return (
+    (typeof code === "string" && /cancel/i.test(code)) || /cancel/i.test(message)
+  );
+}
 
 function createDeviceRuntime(
   accountId: number,
@@ -101,6 +151,22 @@ function createDeviceRuntime(
         dialogTitle: "Save your Cyd Bluesky archive",
         UTI: "public.zip-archive",
       });
+    },
+    saveToDevice: async ({ location }) => {
+      let folder: Directory;
+      try {
+        folder = await Directory.pickDirectoryAsync();
+      } catch (error) {
+        if (isPickerCancelled(error)) {
+          return null;
+        }
+        throw error;
+      }
+      // The copy is native and streamed, so an archive of preserved video
+      // costs the same here as an archive of one thumbnail. Reading it into
+      // JavaScript to write it back out would not survive a real account.
+      await new File(location).copy(folder);
+      return folder.name;
     },
     newExportId: () => Crypto.randomUUID(),
   };
@@ -185,6 +251,8 @@ export function useBlueskyArchiveExport(options: {
   });
   const runtimeRef = useRef<BlueskyArchiveExportRuntime | null>(runtime ?? null);
   const exportIdRef = useRef<string | null>(null);
+  /** The finished archive, held while somebody decides where to put it. */
+  const resultRef = useRef<BlueskyArchiveExportResult | null>(null);
   /**
    * Which export the person is actually in.
    *
@@ -233,7 +301,7 @@ export function useBlueskyArchiveExport(options: {
 
   const confirm = useCallback(async (): Promise<void> => {
     const generation = generationRef.current;
-    const { runExport, portableSettings, share, staging, newExportId } =
+    const { runExport, portableSettings, staging, newExportId } =
       exportRuntime();
     const exportId = exportIdRef.current ?? newExportId();
     exportIdRef.current = exportId;
@@ -266,21 +334,12 @@ export function useBlueskyArchiveExport(options: {
         return;
       }
 
+      // The archive exists and is staged; where it goes is the next decision,
+      // and it is not this function's to make. Staging is not cleared here
+      // precisely because nothing has been delivered yet.
+      resultRef.current = result;
       settle(generation, {
-        status: "working",
-        message: "Ready to share…",
-        fraction: null,
-        cancellable: false,
-      });
-      await share({ location: result.location, fileName: result.fileName });
-
-      // Only once it is somewhere else. A share that never happened leaves the
-      // archive staged, and the next export picks it up rather than rebuilding
-      // it from nothing.
-      discardBlueskyArchiveExport(staging, exportId);
-      exportIdRef.current = null;
-      settle(generation, {
-        status: "done",
+        status: "ready",
         fileName: result.fileName,
         lines: describeResult(result),
       });
@@ -295,6 +354,88 @@ export function useBlueskyArchiveExport(options: {
   }, [exportRuntime, settle]);
 
   /**
+   * Put the finished archive somewhere, and stop staging it once it is there.
+   *
+   * Both deliveries end the same way, so they share this: the archive leaves
+   * Cyd, and only then is the staged copy — archive plus a copy of the account
+   * database — thrown away. A delivery somebody backed out of returns to the
+   * archive instead, because what is in staging is still the only copy.
+   */
+  const deliver = useCallback(
+    async (
+      hand: (archive: {
+        location: string;
+        fileName: string;
+      }) => Promise<string | null>,
+    ): Promise<void> => {
+      const generation = generationRef.current;
+      const result = resultRef.current;
+      const exportId = exportIdRef.current;
+      if (!result || !exportId) {
+        return;
+      }
+      const { staging } = exportRuntime();
+      const archive = { location: result.location, fileName: result.fileName };
+
+      settle(generation, {
+        status: "working",
+        message: "Handing the archive over…",
+        fraction: null,
+        cancellable: false,
+      });
+      try {
+        const delivered = await hand(archive);
+        if (delivered === null) {
+          settle(generation, {
+            status: "ready",
+            fileName: result.fileName,
+            lines: describeResult(result),
+          });
+          return;
+        }
+        discardBlueskyArchiveExport(staging, exportId);
+        exportIdRef.current = null;
+        resultRef.current = null;
+        settle(generation, {
+          status: "done",
+          fileName: result.fileName,
+          lines: [...describeResult(result), delivered],
+        });
+      } catch (error) {
+        settle(generation, { status: "failed", message: messageFor(error) });
+      }
+    },
+    [exportRuntime, settle],
+  );
+
+  /** Copy the archive into a folder on this device. */
+  const saveToDevice = useCallback(
+    (): Promise<void> =>
+      deliver(async (archive) => {
+        const folder = await exportRuntime().saveToDevice(archive);
+        return folder === null ? null : `Saved to ${folder}.`;
+      }),
+    [deliver, exportRuntime],
+  );
+
+  /**
+   * Hand the archive to another application.
+   *
+   * Unlike saving, this cannot tell whether anything was actually kept: a
+   * share sheet reports that it closed, not what the application behind it
+   * did. Staging is cleared on the strength of that, because the alternative
+   * is keeping a copy of every account that ever opened one.
+   */
+  const share = useCallback(
+    (): Promise<void> =>
+      deliver(async (archive) => {
+        await exportRuntime().share(archive);
+        return "Handed to the share sheet.";
+      }),
+    [deliver, exportRuntime],
+  );
+
+  /**
    * Walk away from an export that is running.
    *
    * Moving the generation on is what makes this final: a hashing pass already
@@ -306,6 +447,7 @@ export function useBlueskyArchiveExport(options: {
   const cancel = useCallback((): void => {
     generationRef.current += 1;
     exportIdRef.current = null;
+    resultRef.current = null;
     setState({ status: "idle" });
   }, []);
 
@@ -319,8 +461,9 @@ export function useBlueskyArchiveExport(options: {
    */
   const dismiss = useCallback((): void => {
     generationRef.current += 1;
+    resultRef.current = null;
     setState({ status: "idle" });
   }, []);
 
-  return { state, start, confirm, cancel, dismiss };
+  return { state, start, confirm, saveToDevice, share, cancel, dismiss };
 }

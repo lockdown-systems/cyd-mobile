@@ -17,9 +17,9 @@ import type { AccountTabPalette } from "@/types/account-tabs";
  * Desktop. Hence `__DEV__`: this renders nothing at all in a release build.
  *
  * The flow behind the button is the shippable one, though: the plaintext
- * warning, a resumable export, the share sheet, and staging cleared once the
- * archive is somewhere else (#99). When #100 opens the gate, what changes is
- * where this lives and what it is called, not what it does.
+ * warning, a resumable export, a choice of where the archive goes, and staging
+ * cleared once it is somewhere else (#99). When #100 opens the gate, what
+ * changes is where this lives and what it is called, not what it does.
  */
 
 export type DevArchiveExportCardProps = {
@@ -71,8 +71,9 @@ export function DevArchiveExportCard({
         Export a Cyd Bluesky archive (development only)
       </Text>
       <Text style={[styles.body, { color: palette.icon }]}>
-        Writes a version 2 archive and offers it to the share sheet. Not
-        available in release builds until Bluesky archive import is proven.
+        Writes a version 2 archive you can save to this device or hand to
+        another app. Not available in release builds until Bluesky archive
+        import is proven.
       </Text>
 
       {state.status === "idle" || state.status === "warning" ? (
@@ -120,6 +121,34 @@ export function DevArchiveExportCard({
               : ""}
           </Text>
           {state.cancellable ? action("Cancel", archiveExport.cancel) : null}
+        </View>
+      ) : null}
+
+      {state.status === "ready" ? (
+        <View style={styles.status}>
+          <Text selectable style={[styles.path, { color: palette.text }]}>
+            {state.fileName}
+          </Text>
+          {state.lines.map((line) => (
+            <Text key={line} style={[styles.body, { color: palette.icon }]}>
+              {line}
+            </Text>
+          ))}
+          <Text style={[styles.body, { color: palette.icon }]}>
+            Save it to a folder on this device, or hand it to another app. Cyd
+            keeps it until you do one of those.
+          </Text>
+          <View style={styles.actions}>
+            {/* Saving is first because it is the one that keeps the archive on
+                a device you control. A share sheet on Android cannot offer
+                local storage at all, so without this there is no way to get
+                the file off Cyd except through somebody else's service. */}
+            {action("Save to device", () => void archiveExport.saveToDevice())}
+            {action("Share", () => void archiveExport.share())}
+            {/* Not cancelling: the archive stays staged and the next export
+                offers this same file rather than building it again. */}
+            {action("Not now", archiveExport.dismiss)}
+          </View>
         </View>
       ) : null}
 

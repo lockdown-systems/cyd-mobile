@@ -42,6 +42,9 @@ type Harness = {
   account: Account;
   runtime: BlueskyArchiveExportRuntime;
   shared: { location: string; fileName: string }[];
+  saved: { location: string; fileName: string }[];
+  /** Where the next folder picker lands, or null for somebody closing it. */
+  pickedFolder: string | null;
   exportIds: string[];
 };
 
@@ -63,13 +66,16 @@ function harnessFor(): Harness {
     stagingRoot,
   });
   const shared: { location: string; fileName: string }[] = [];
+  const saved: { location: string; fileName: string }[] = [];
   const exportIds: string[] = [];
 
-  return {
+  const harness: Harness = {
     root,
     stagingRoot,
     account,
     shared,
+    saved,
+    pickedFolder: "Documents",
     exportIds,
     runtime: {
       portableSettings: async () => ({ save_posts: true }),
@@ -84,6 +90,13 @@ function harnessFor(): Harness {
       share: async (archive) => {
         shared.push(archive);
       },
+      saveToDevice: async (archive) => {
+        if (harness.pickedFolder === null) {
+          return null;
+        }
+        saved.push(archive);
+        return harness.pickedFolder;
+      },
       newExportId: () => {
         const exportId = `export-${exportIds.length + 1}`;
         exportIds.push(exportId);
@@ -91,6 +104,8 @@ function harnessFor(): Harness {
       },
     },
   };
+
+  return harness;
 }
 
 function stagingDirectories(harness: Harness): string[] {
@@ -142,14 +157,99 @@ describe("exporting a Cyd Bluesky archive", () => {
     expect(harness.shared).toEqual([]);
   });
 
-  it("hands the archive over, and keeps nothing staged once it has", async () => {
-    const { result } = renderExport();
-
+  /** Build an archive and stop where somebody chooses what to do with it. */
+  async function exportUntilReady(
+    result: { current: ReturnType<typeof useBlueskyArchiveExport> },
+  ): Promise<void> {
     await act(async () => {
       await result.current.start();
     });
     await act(async () => {
       await result.current.confirm();
+    });
+    await waitFor(() => {
+      expect(result.current.state.status).toBe("ready");
+    });
+  }
+
+  /**
+   * An archive nobody has been given yet is not a finished export.
+   *
+   * The file exists, but it is still only in staging, so the export is not
+   * over and staging is not Cyd's to clear. Delivering is a separate act.
+   */
+  it("holds the archive until somebody says where it goes", async () => {
+    const { result } = renderExport();
+
+    await exportUntilReady(result);
+
+    expect(result.current.state).toMatchObject({
+      status: "ready",
+      fileName: expect.stringMatching(/^cyd-bluesky-alice\.example-.*\.cyd$/),
+    });
+    expect(harness.shared).toEqual([]);
+    expect(harness.saved).toEqual([]);
+    expect(stagingDirectories(harness)).toHaveLength(1);
+  });
+
+  /**
+   * Saving to the device is the delivery that needs nobody else.
+   *
+   * An Android share sheet is `ACTION_SEND` and lists only applications that
+   * receive content, so without this the sole way out of Cyd is through a
+   * cloud service — for a plaintext archive, and for a feature whose whole
+   * point is that the data is yours (ADR 0013, ADR 0015).
+   */
+  it("saves the archive to this device, and keeps nothing staged once it has", async () => {
+    const { result } = renderExport();
+
+    await exportUntilReady(result);
+    await act(async () => {
+      await result.current.saveToDevice();
+    });
+
+    await waitFor(() => {
+      expect(result.current.state.status).toBe("done");
+    });
+    expect(harness.saved).toEqual([
+      {
+        location: expect.stringContaining("cyd-bluesky-alice.example-"),
+        fileName: expect.stringMatching(/^cyd-bluesky-alice\.example-.*\.cyd$/),
+      },
+    ]);
+    expect(harness.shared).toEqual([]);
+    // An archive that has been delivered is not Cyd's to keep a second copy
+    // of: staging held the whole thing, plus a copy of the account database.
+    expect(stagingDirectories(harness)).toEqual([]);
+  });
+
+  /**
+   * Closing the folder picker chose nothing, and the staged archive is the
+   * only copy there is. Throwing it away over a dismissed dialog would mean
+   * rebuilding the whole export to offer the same file again.
+   */
+  it("keeps the archive when somebody closes the folder picker", async () => {
+    harness.pickedFolder = null;
+    const { result } = renderExport();
+
+    await exportUntilReady(result);
+    await act(async () => {
+      await result.current.saveToDevice();
+    });
+
+    await waitFor(() => {
+      expect(result.current.state.status).toBe("ready");
+    });
+    expect(harness.saved).toEqual([]);
+    expect(stagingDirectories(harness)).toHaveLength(1);
+  });
+
+  it("hands the archive over, and keeps nothing staged once it has", async () => {
+    const { result } = renderExport();
+
+    await exportUntilReady(result);
+    await act(async () => {
+      await result.current.share();
     });
 
     await waitFor(() => {
@@ -161,8 +261,6 @@ describe("exporting a Cyd Bluesky archive", () => {
         fileName: expect.stringMatching(/^cyd-bluesky-alice\.example-.*\.cyd$/),
       },
     ]);
-    // An archive that has been handed over is not Cyd's to keep a second copy
-    // of: staging held the whole thing, plus a copy of the account database.
     expect(stagingDirectories(harness)).toEqual([]);
   });
 
@@ -205,6 +303,12 @@ describe("exporting a Cyd Bluesky archive", () => {
     await act(async () => {
       await result.current.confirm();
     });
+    await waitFor(() => {
+      expect(result.current.state.status).toBe("ready");
+    });
+    await act(async () => {
+      await result.current.saveToDevice();
+    });
 
     await waitFor(() => {
       expect(result.current.state.status).toBe("done");
@@ -213,7 +317,7 @@ describe("exporting a Cyd Bluesky archive", () => {
     // the snapshot and the hashing an earlier launch paid for were not paid
     // for again.
     expect(harness.exportIds).toEqual([]);
-    expect(harness.shared).toHaveLength(1);
+    expect(harness.saved).toHaveLength(1);
     expect(stagingDirectories(harness)).toEqual([]);
   });
 
