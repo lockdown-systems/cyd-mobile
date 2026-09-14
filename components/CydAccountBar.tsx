@@ -13,11 +13,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getThemePalette } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
+import { useBlueskyArchiveExport } from "@/hooks/use-bluesky-archive-export";
 import { useBlueskyArchiveImport } from "@/hooks/use-bluesky-archive-import";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { emitLocalAccountsChanged } from "@/services/account-events";
 import { connectBlueskyAccount } from "@/services/bluesky-sign-in";
 
+import { BlueskyArchiveExportModal } from "./BlueskyArchiveExportModal";
 import { BlueskyArchiveImportModal } from "./BlueskyArchiveImportModal";
 import { CydSignInModal } from "./CydSignInModal";
 
@@ -41,6 +43,7 @@ export function CydAccountBar({
   const [menuVisible, setMenuVisible] = useState(false);
   const [signInModalVisible, setSignInModalVisible] = useState(false);
   const archiveImport = useBlueskyArchiveImport();
+  const archiveExport = useBlueskyArchiveExport();
 
   const handleMenuPress = useCallback(() => {
     setMenuVisible(true);
@@ -91,6 +94,22 @@ export function CydAccountBar({
   }, [archiveImport]);
 
   /**
+   * Export a Cyd Bluesky archive.
+   *
+   * The mirror of importing, and here rather than on an account screen for the
+   * same reason: the two halves of moving your data between Cyd installations
+   * belong side by side. Export is per-account and this menu is not, so the
+   * account is the export's own first question (#100).
+   *
+   * Like importing, it needs no Cyd account and no premium subscription
+   * (ADR 0015).
+   */
+  const handleExportArchive = useCallback(() => {
+    setMenuVisible(false);
+    void archiveExport.start();
+  }, [archiveExport]);
+
+  /**
    * Connect the Bluesky account an import just restored.
    *
    * A restored Bluesky local account holds somebody's data and no authorization
@@ -131,6 +150,18 @@ export function CydAccountBar({
    * the progress and the questions on screen rather than leaving the import
    * running invisibly.
    */
+  const exportModal = (
+    <BlueskyArchiveExportModal
+      state={archiveExport.state}
+      onChoose={(account) => void archiveExport.choose(account)}
+      onConfirm={() => void archiveExport.confirm()}
+      onSaveToDevice={() => void archiveExport.saveToDevice()}
+      onShare={() => void archiveExport.share()}
+      onCancel={archiveExport.cancel}
+      onDismiss={archiveExport.dismiss}
+    />
+  );
+
   const importModal = (
     <BlueskyArchiveImportModal
       state={archiveImport.state}
@@ -143,7 +174,12 @@ export function CydAccountBar({
   );
 
   if (state.isLoading || hidden) {
-    return importModal;
+    return (
+      <>
+        {importModal}
+        {exportModal}
+      </>
+    );
   }
 
   return (
@@ -301,6 +337,22 @@ export function CydAccountBar({
               </Text>
             </Pressable>
             <Pressable
+              onPress={handleExportArchive}
+              style={({ pressed }) => [
+                styles.sheetActionButton,
+                {
+                  borderColor: palette.icon + "22",
+                  backgroundColor: palette.background,
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.sheetActionText, { color: palette.text }]}>
+                Export Bluesky archive
+              </Text>
+            </Pressable>
+            <Pressable
               onPress={handleShowOnboarding}
               style={({ pressed }) => [
                 styles.sheetActionButton,
@@ -327,6 +379,7 @@ export function CydAccountBar({
       />
 
       {importModal}
+      {exportModal}
     </>
   );
 }

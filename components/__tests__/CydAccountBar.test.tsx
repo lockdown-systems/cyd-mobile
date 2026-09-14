@@ -276,6 +276,20 @@ describe("CydAccountBar", () => {
       expect(screen.getByText("Sign out of Cyd account")).toBeTruthy();
     });
 
+    /**
+     * Both halves of moving Bluesky data between Cyd installations, side by
+     * side, and offered whether or not there is a Cyd account signed in:
+     * recovery and portability are not premium features (ADR 0015, #100).
+     */
+    it("offers both archive import and archive export, signed out", () => {
+      render(<CydAccountBar />);
+
+      fireEvent.press(screen.getByText("☰"));
+
+      expect(screen.getByText("Import Bluesky archive")).toBeTruthy();
+      expect(screen.getByText("Export Bluesky archive")).toBeTruthy();
+    });
+
     it("should show different menu when signed out", () => {
       render(<CydAccountBar />);
 
