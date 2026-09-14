@@ -35,6 +35,7 @@ import type {
   BlueskyArchiveExportEnvironment,
   ExportStagingArea,
 } from "./ports";
+import { givesWayToTheScreen } from "./scheduling";
 import { stageBlueskyAccountSnapshot } from "./snapshot";
 import { BlueskyArchiveZipWriter } from "./zip-writer";
 
@@ -436,7 +437,9 @@ async function packageArchive(
     left.archivePath < right.archivePath ? -1 : 1,
   );
   let packaged = 0;
+  const giveWay = givesWayToTheScreen();
   for (const payload of payloads) {
+    await giveWay();
     if (options.shouldCancel?.()) {
       throw new BlueskyArchiveExportCancelled();
     }

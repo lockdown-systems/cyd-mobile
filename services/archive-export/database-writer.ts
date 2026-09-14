@@ -18,6 +18,26 @@ export function writeBlueskyInterchangeDatabase(
 ): void {
   database.exec(BLUESKY_ARCHIVE_V2_SCHEMA_SQL);
 
+  // One transaction around the lot, rather than one per row. Outside a
+  // transaction SQLite commits after every statement and waits for the storage
+  // to say so, which on a phone is most of a minute for an account's worth of
+  // records — the export is not thinking, it is waiting on fsync. Foreign keys
+  // are still checked as each row lands, so the reference order above is doing
+  // exactly what it did before.
+  database.exec("BEGIN");
+  try {
+    insertAll(database, content);
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function insertAll(
+  database: WritableDatabase,
+  content: BlueskyInterchangeContent,
+): void {
   insert(database, "assets", content.assets);
   insert(database, "profiles", content.profiles);
   insert(database, "records", content.records);
