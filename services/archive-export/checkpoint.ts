@@ -58,16 +58,6 @@ export type BlueskyArchiveExportCheckpoint = {
   inventory: StagedAsset[];
   /** Assets already read and hashed, by key. */
   resolved: [string, ResolvedAsset][];
-  /**
-   * Assets a packaging attempt caught changing underneath it.
-   *
-   * Hashing has already decided these are available, so without somewhere to
-   * record the disagreement a resumed export would read the same stale digest
-   * and fail the same way forever. Naming them here demotes them to
-   * unavailable on the next attempt, which is the honest outcome rather than
-   * an export that can never finish (#99, ADR 0010).
-   */
-  changed: string[];
   fileName: string | null;
   /**
    * What the finished archive turned out to be, once there is one.
