@@ -10,11 +10,7 @@ import {
   type BlueskyArchiveManifestPayload,
 } from "@/services/archive-import/manifest";
 
-import {
-  assetChangedWhilePrepared,
-  resolveStagedAssets,
-  type ResolvedAsset,
-} from "./assets";
+import { resolveStagedAssets, type ResolvedAsset } from "./assets";
 import {
   checkpointMatches,
   readExportCheckpoint,
@@ -202,7 +198,6 @@ export async function runBlueskyArchiveExport(
           snapshotPath: taken.snapshotPath,
           inventory: taken.inventory,
           resolved: [],
-          changed: [],
           fileName: request.fileName ?? null,
           result: null,
         });
@@ -253,7 +248,6 @@ export async function runBlueskyArchiveExport(
     let sinceCheckpoint = 0;
     const assets = await resolveStagedAssets(environment, inventory, {
       resolved: new Map(staged.resolved),
-      changed: new Set(staged.changed),
       shouldCancel: request.shouldCancel,
       onResolved: (resolved) => {
         // The checkpoint carries every digest so far, so writing one per file
@@ -280,67 +274,46 @@ export async function runBlueskyArchiveExport(
       request.fileName ?? staged.fileName ?? suggestFileName(request, takenAt);
     save({ phase: "translating", fileName });
 
-    // Translate and package in one loop, because packaging is the only pass
-    // that can still find an asset hashing thought it had: a file that moved
-    // since is demoted to unavailable and the archive is built again around
-    // that, rather than an export failing over one file it can describe
-    // honestly instead. Each attempt demotes at least one asset, so this ends.
-    for (;;) {
-      report("translating", { totalAssets: inventory.length, hashed: assets.size });
-      const content = translateSnapshot(environment, staging, request, {
-        snapshotPath: staged.snapshotPath,
-        takenAt,
-        assets,
-      });
+    report("translating", { totalAssets: inventory.length, hashed: assets.size });
+    const content = translateSnapshot(environment, staging, request, {
+      snapshotPath: staged.snapshotPath,
+      takenAt,
+      assets,
+    });
 
-      save({ phase: "packaging" });
-      report("packaging", { totalPayloads: content.payloads.length });
-      try {
-        const byteLength = await packageArchive(environment, staging, {
-          archivePath: fileName,
-          content,
-          createdAt: takenAt,
-          shouldCancel: request.shouldCancel,
-          onPayloadPackaged: (packagedPayloads) =>
-            report("packaging", {
-              packagedPayloads,
-              totalPayloads: content.payloads.length,
-            }),
-        });
-
-        const finished = {
-          fileName,
-          byteLength,
-          metadata: buildMetadata(content),
-          assets: summarizeAssets(content),
-        };
-        save({ phase: "done", result: finished });
-        report("done", {
-          packagedPayloads: content.payloads.length,
+    save({ phase: "packaging" });
+    report("packaging", { totalPayloads: content.payloads.length });
+    const byteLength = await packageArchive(environment, staging, {
+      archivePath: fileName,
+      content,
+      createdAt: takenAt,
+      shouldCancel: request.shouldCancel,
+      onPayloadPackaged: (packagedPayloads) =>
+        report("packaging", {
+          packagedPayloads,
           totalPayloads: content.payloads.length,
-          hashed: assets.size,
-          totalAssets: inventory.length,
-        });
-        return {
-          exportId: request.exportId,
-          location: staging.locate(fileName),
-          ...finished,
-          staging,
-        };
-      } catch (error) {
-        const changed = changedAssetKeys(error, content, assets);
-        if (changed.length === 0) {
-          throw error;
-        }
-        for (const key of changed) {
-          assets.set(key, assetChangedWhilePrepared(key));
-        }
-        save({
-          changed: [...new Set([...staged.changed, ...changed])],
-          resolved: [...assets],
-        });
-      }
-    }
+        }),
+    });
+
+    const finished = {
+      fileName,
+      byteLength,
+      metadata: buildMetadata(content),
+      assets: summarizeAssets(content),
+    };
+    save({ phase: "done", result: finished });
+    report("done", {
+      packagedPayloads: content.payloads.length,
+      totalPayloads: content.payloads.length,
+      hashed: assets.size,
+      totalAssets: inventory.length,
+    });
+    return {
+      exportId: request.exportId,
+      location: staging.locate(fileName),
+      ...finished,
+      staging,
+    };
   } catch (error) {
     if (error instanceof BlueskyArchiveExportCancelled) {
       staging.destroy();
@@ -362,7 +335,7 @@ export async function runBlueskyArchiveExport(
  *
  * Deterministic in everything it reads: the snapshot cannot change, and the
  * assets are whatever hashing concluded. That is what makes it safe to run
- * again on a later launch, or again after a demoted asset.
+ * again on a later launch.
  */
 function translateSnapshot(
   environment: BlueskyArchiveExportEnvironment,
@@ -401,39 +374,6 @@ function translateSnapshot(
     interchange.close();
   }
   return content;
-}
-
-/**
- * Which assets a packaging failure blames, if it blames any.
- *
- * The archive path names one content digest, and several records can share it,
- * so every asset key that hashed to it is demoted together — they are the same
- * file, and it moved.
- */
-function changedAssetKeys(
-  error: unknown,
-  content: BlueskyInterchangeContent,
-  assets: Map<string, ResolvedAsset>,
-): string[] {
-  if (
-    !(error instanceof BlueskyArchiveExportError) ||
-    error.code !== "asset-changed" ||
-    !error.entryPath
-  ) {
-    return [];
-  }
-  const payload = content.payloads.find(
-    (candidate) => candidate.archivePath === error.entryPath,
-  );
-  if (!payload) {
-    return [];
-  }
-  return [...assets]
-    .filter(
-      ([, asset]) =>
-        asset.availability === "available" && asset.sha256 === payload.sha256,
-    )
-    .map(([key]) => key);
 }
 
 function buildMetadata(content: BlueskyInterchangeContent): BlueskyArchiveMetadata {

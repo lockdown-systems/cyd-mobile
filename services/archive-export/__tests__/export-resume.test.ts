@@ -179,7 +179,18 @@ describe("resuming a Cyd Bluesky archive export", () => {
     );
   });
 
-  it("builds the archive around a file that moved while it was being packaged", async () => {
+  /**
+   * A file that changes between hashing and packaging fails the export, and
+   * the next attempt starts over rather than carrying the stale digest.
+   *
+   * Packaging deliberately does not try to salvage this. Rebuilding around the
+   * demoted asset would save the hashing pass, but it costs a full rebuild of
+   * the interchange database and the archive for every digest that moved, and
+   * a fresh export catches all of them at once by re-taking the inventory.
+   * Throwing the staging away is what makes that fresh export possible: the
+   * checkpoint holds a digest the file no longer has.
+   */
+  it("fails, and stages nothing, when a file moves while it is being packaged", async () => {
     // Hashing reads the image first, packaging second. Rewriting it in between
     // is a save job replacing a preserved file after the inventory saw it.
     const environment = createTestEnvironment({
@@ -196,31 +207,48 @@ describe("resuming a Cyd Bluesky archive export", () => {
       },
     });
 
+    await expect(
+      runBlueskyArchiveExport(environment, exportRequest()),
+    ).rejects.toThrow(/changed while it was being packaged|produced/);
+
+    expect(listResumableBlueskyArchiveExports(environment)).toEqual([]);
+  });
+
+  /**
+   * The same file moving *before* hashing reaches it is a different thing, and
+   * still produces an archive: the point-in-time inventory caught it, so the
+   * asset is honestly unavailable rather than a reason to fail.
+   */
+  it("packages an archive around a file that moved before it was hashed", async () => {
+    const environment = createTestEnvironment({
+      account,
+      stagingRoot,
+      now: "2026-09-10T00:00:00.000Z",
+      beforeRead: (name, reads) => {
+        if (name === "bafyimage" && reads === 1) {
+          fs.writeFileSync(
+            path.join(account.mediaDirectory, "bafyimage"),
+            "different bytes",
+          );
+        }
+      },
+    });
+
     const result = await runBlueskyArchiveExport(environment, exportRequest());
     const archive = openArchive(result.location, workspace);
 
-    // The export finishes, and says what happened to the file it could not
-    // package rather than failing over it.
     expect(archive.metadata.completeness).toBe("incomplete");
     expect(
       archive.database
-        .prepare("SELECT availability, unavailable_reason FROM assets WHERE id = 'bafyimage'")
+        .prepare(
+          "SELECT availability, unavailable_reason FROM assets WHERE id = 'bafyimage'",
+        )
         .get(),
     ).toEqual({
       availability: "unavailable",
       unavailable_reason:
         "The preserved file changed while the export was being prepared.",
     });
-    // Nothing of it is in the archive: no bytes, and nowhere claiming to hold
-    // them. The link preview beside it is packaged as usual.
-    expect(
-      archive.database
-        .prepare("SELECT archive_path FROM assets WHERE id = 'bafyimage'")
-        .get(),
-    ).toEqual({ archive_path: null });
-    expect(
-      Object.keys(archive.entries).filter((name) => name.startsWith("media/")),
-    ).toHaveLength(1);
     expect(result.assets).toEqual({
       total: 2,
       available: 1,

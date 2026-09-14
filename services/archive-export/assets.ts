@@ -74,11 +74,11 @@ function unresolved(
 }
 
 /**
- * The state of an asset that moved after Cyd read it.
+ * The state of an asset that moved between the inventory and the hashing pass.
  *
- * Hashing reaches this by comparing a file against the inventory; packaging
- * reaches it by finding bytes that no longer match the digest it was given.
- * Both are the same thing happening, so both say it the same way.
+ * Account work resumes the moment the snapshot is taken, so a file can change
+ * size before hashing reaches it. That disagreement is the point-in-time
+ * inventory earning its keep, and it is recorded rather than retried.
  */
 export function assetChangedWhilePrepared(key: string): ResolvedAsset {
   return unresolved(
@@ -118,11 +118,6 @@ export type ResolveStagedAssetsOptions = {
   /** Assets an earlier run of this export already read and hashed. */
   resolved?: Map<string, ResolvedAsset>;
   /**
-   * Keys a packaging attempt caught changing, which are unavailable whatever
-   * hashing made of them.
-   */
-  changed?: ReadonlySet<string>;
-  /**
    * Called with everything settled so far, each time one more is.
    *
    * The map is this function's to own; handing the whole of it back is what
@@ -150,11 +145,6 @@ export async function resolveStagedAssets(
   const resolved = new Map<string, ResolvedAsset>(options.resolved);
 
   for (const asset of inventory) {
-    if (options.changed?.has(asset.key)) {
-      resolved.set(asset.key, assetChangedWhilePrepared(asset.key));
-      options.onResolved?.(resolved);
-      continue;
-    }
     if (resolved.has(asset.key)) {
       continue;
     }

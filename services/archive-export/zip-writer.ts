@@ -185,7 +185,6 @@ export class BlueskyArchiveZipWriter {
         throw new BlueskyArchiveExportError(
           "asset-changed",
           `${safePath} declared ${compressedByteLength} bytes but produced more.`,
-          safePath,
         );
       }
       checksum.update(bytes);
@@ -196,14 +195,12 @@ export class BlueskyArchiveZipWriter {
       throw new BlueskyArchiveExportError(
         "asset-changed",
         `${safePath} declared ${compressedByteLength} bytes but produced ${written}.`,
-        safePath,
       );
     }
     if (verifyChecksum && checksum.value() !== declared.crc32 >>> 0) {
       throw new BlueskyArchiveExportError(
         "asset-changed",
         `${safePath} changed while it was being packaged.`,
-        safePath,
       );
     }
 

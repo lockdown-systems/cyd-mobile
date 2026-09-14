@@ -24,24 +24,11 @@ export type BlueskyArchiveExportErrorCode =
 
 export class BlueskyArchiveExportError extends Error {
   readonly code: BlueskyArchiveExportErrorCode;
-  /**
-   * The archive entry the failure is about, where there is one.
-   *
-   * `asset-changed` is the code an export can do something about: the entry
-   * names the file that moved underneath it, so the attempt that follows can
-   * call that one asset unavailable instead of giving up on the archive.
-   */
-  readonly entryPath: string | null;
 
-  constructor(
-    code: BlueskyArchiveExportErrorCode,
-    message: string,
-    entryPath: string | null = null,
-  ) {
+  constructor(code: BlueskyArchiveExportErrorCode, message: string) {
     super(message);
     this.name = "BlueskyArchiveExportError";
     this.code = code;
-    this.entryPath = entryPath;
   }
 }
 
