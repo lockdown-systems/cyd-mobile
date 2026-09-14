@@ -1,12 +1,10 @@
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Modal, Text, View } from "react-native";
 
+import {
+  ArchiveModalAction,
+  archiveModalStyles as shared,
+  breakableHandle,
+} from "@/components/archive-modal-shared";
 import { getThemePalette } from "@/constants/theme";
 import {
   totalMergeChanges,
@@ -54,21 +52,13 @@ export function BlueskyArchiveImportModal({
     onPress: () => void,
     emphasis: "primary" | "quiet" = "quiet",
   ) => (
-    <Pressable
+    <ArchiveModalAction
+      key={label}
+      label={label}
       onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.action,
-        {
-          borderColor: palette.icon + "22",
-          backgroundColor:
-            emphasis === "primary" ? palette.tint + "22" : palette.background,
-          opacity: pressed ? 0.9 : 1,
-        },
-      ]}
-    >
-      <Text style={[styles.actionText, { color: palette.text }]}>{label}</Text>
-    </Pressable>
+      palette={palette}
+      emphasis={emphasis}
+    />
   );
 
   /**
@@ -99,16 +89,16 @@ export function BlueskyArchiveImportModal({
       statusBarTranslucent
       onRequestClose={handleRequestClose}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.sheet, { backgroundColor: palette.background }]}>
+      <View style={shared.overlay}>
+        <View style={[shared.sheet, { backgroundColor: palette.background }]}>
           {state.status === "working" ? (
             <>
               <ActivityIndicator size="large" color={palette.tint} />
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 {state.message}
               </Text>
               {state.fraction !== null ? (
-                <Text style={[styles.body, { color: palette.icon }]}>
+                <Text style={[shared.body, { color: palette.icon }]}>
                   {Math.round(state.fraction * 100)}%
                 </Text>
               ) : null}
@@ -118,10 +108,10 @@ export function BlueskyArchiveImportModal({
 
           {state.status === "needs-confirmation" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 This is a big archive
               </Text>
-              <Text style={[styles.body, { color: palette.icon }]}>
+              <Text style={[shared.body, { color: palette.icon }]}>
                 {state.message}
               </Text>
               {action("Import it", onConfirmLargeArchive, "primary")}
@@ -131,14 +121,14 @@ export function BlueskyArchiveImportModal({
 
           {state.status === "reviewing" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 Merge into
               </Text>
-              <Text style={[styles.handle, { color: palette.text }]}>
+              <Text style={[shared.handle, { color: palette.text }]}>
                 {breakableHandle(state.handle)}
               </Text>
               {describeMerge(state.preview).map((line) => (
-                <Text key={line} style={[styles.body, { color: palette.icon }]}>
+                <Text key={line} style={[shared.body, { color: palette.icon }]}>
                   {line}
                 </Text>
               ))}
@@ -149,14 +139,14 @@ export function BlueskyArchiveImportModal({
 
           {state.status === "done" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 {state.title}
               </Text>
-              <Text style={[styles.handle, { color: palette.text }]}>
+              <Text style={[shared.handle, { color: palette.text }]}>
                 {breakableHandle(state.handle)}
               </Text>
               {state.lines.map((line) => (
-                <Text key={line} style={[styles.body, { color: palette.icon }]}>
+                <Text key={line} style={[shared.body, { color: palette.icon }]}>
                   {line}
                 </Text>
               ))}
@@ -177,10 +167,10 @@ export function BlueskyArchiveImportModal({
 
           {state.status === "failed" ? (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>
+              <Text style={[shared.title, { color: palette.text }]}>
                 Import failed
               </Text>
-              <Text style={[styles.body, { color: palette.icon }]}>
+              <Text style={[shared.body, { color: palette.icon }]}>
                 {state.message}
               </Text>
               {action("Close", onDismiss, "primary")}
@@ -192,20 +182,6 @@ export function BlueskyArchiveImportModal({
   );
 }
 
-
-/**
- * A handle written so a line box breaks it where a reader would.
- *
- * A handle is a single token with no spaces in it, so a heading wide enough
- * for most of one splits it wherever it happens to run out of room —
- * "@glittertop-cyd.bsky" above ".social". A zero-width space before each dot
- * offers the layout the same break points a person would choose, and leaves
- * nothing on screen. Nothing is truncated: a handle is how somebody knows
- * which account this is.
- */
-function breakableHandle(handle: string): string {
-  return `@${handle.replace(/^@/, "")}`.replace(/\./g, "\u200B.");
-}
 
 /** `2 posts`, and `1 post` rather than `1 posts`. */
 function count(total: number, noun: string): string {
@@ -267,67 +243,3 @@ function describeMerge(preview: BlueskyArchiveMergePreview): string[] {
   }
   return lines;
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  sheet: {
-    width: "100%",
-    maxHeight: "85%",
-    borderRadius: 16,
-    padding: 24,
-    gap: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  handle: {
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: -4,
-  },
-  body: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  scroll: {
-    maxHeight: 280,
-  },
-  choice: {
-    gap: 6,
-    marginBottom: 12,
-  },
-  choiceButton: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 12,
-    gap: 4,
-  },
-  choiceTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  settingsPick: {
-    fontSize: 13,
-    paddingHorizontal: 4,
-  },
-  action: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  actionText: {
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-});

@@ -13,11 +13,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getThemePalette } from "@/constants/theme";
 import { useCydAccount } from "@/contexts/CydAccountProvider";
+import { useBlueskyArchiveExport } from "@/hooks/use-bluesky-archive-export";
 import { useBlueskyArchiveImport } from "@/hooks/use-bluesky-archive-import";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { emitLocalAccountsChanged } from "@/services/account-events";
 import { connectBlueskyAccount } from "@/services/bluesky-sign-in";
 
+import { BlueskyArchiveExportModal } from "./BlueskyArchiveExportModal";
 import { BlueskyArchiveImportModal } from "./BlueskyArchiveImportModal";
 import { CydSignInModal } from "./CydSignInModal";
 
@@ -41,6 +43,7 @@ export function CydAccountBar({
   const [menuVisible, setMenuVisible] = useState(false);
   const [signInModalVisible, setSignInModalVisible] = useState(false);
   const archiveImport = useBlueskyArchiveImport();
+  const archiveExport = useBlueskyArchiveExport();
 
   const handleMenuPress = useCallback(() => {
     setMenuVisible(true);
@@ -89,6 +92,22 @@ export function CydAccountBar({
     setMenuVisible(false);
     void archiveImport.start();
   }, [archiveImport]);
+
+  /**
+   * Export a Cyd Bluesky archive.
+   *
+   * The mirror of importing, and here rather than on an account screen for the
+   * same reason: the two halves of moving your data between Cyd installations
+   * belong side by side. Export is per-account and this menu is not, so the
+   * account is the export's own first question (#100).
+   *
+   * Like importing, it needs no Cyd account and no premium subscription
+   * (ADR 0015).
+   */
+  const handleExportArchive = useCallback(() => {
+    setMenuVisible(false);
+    void archiveExport.start();
+  }, [archiveExport]);
 
   /**
    * Connect the Bluesky account an import just restored.
@@ -142,8 +161,33 @@ export function CydAccountBar({
     />
   );
 
+  /**
+   * The export, which outlives the bar the same way, and for its own reason.
+   *
+   * Hashing a gigabyte of preserved video takes as long as it takes, and the
+   * bar hides itself the moment somebody opens an account. An export that
+   * disappeared with it would still be running, still holding staging, with
+   * nothing on screen to cancel it or say where the archive went.
+   */
+  const exportModal = (
+    <BlueskyArchiveExportModal
+      state={archiveExport.state}
+      onChoose={(account) => void archiveExport.choose(account)}
+      onConfirm={() => void archiveExport.confirm()}
+      onSaveToDevice={() => void archiveExport.saveToDevice()}
+      onShare={() => void archiveExport.share()}
+      onCancel={archiveExport.cancel}
+      onDismiss={archiveExport.dismiss}
+    />
+  );
+
   if (state.isLoading || hidden) {
-    return importModal;
+    return (
+      <>
+        {importModal}
+        {exportModal}
+      </>
+    );
   }
 
   return (
@@ -301,6 +345,22 @@ export function CydAccountBar({
               </Text>
             </Pressable>
             <Pressable
+              onPress={handleExportArchive}
+              style={({ pressed }) => [
+                styles.sheetActionButton,
+                {
+                  borderColor: palette.icon + "22",
+                  backgroundColor: palette.background,
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.sheetActionText, { color: palette.text }]}>
+                Export Bluesky archive
+              </Text>
+            </Pressable>
+            <Pressable
               onPress={handleShowOnboarding}
               style={({ pressed }) => [
                 styles.sheetActionButton,
@@ -327,6 +387,7 @@ export function CydAccountBar({
       />
 
       {importModal}
+      {exportModal}
     </>
   );
 }

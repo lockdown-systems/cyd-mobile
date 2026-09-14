@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { runBlueskyArchiveExport } from "@/services/archive-export/export";
 import { portableSettingsFromAccountRow } from "@/services/archive-export/portable-settings";
 
-import { createNodeBlueskyArchiveExportEnvironment } from "./node-export-environment";
+import { createNodeBlueskyArchiveExportEnvironment } from "@/testUtils/nodeExportEnvironment";
 
 /**
  * Export a pulled Bluesky account directory as a Cyd Bluesky archive.

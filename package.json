@@ -19,6 +19,7 @@
     "test": "jest",
     "test:archive-contract": "python3 scripts/archive-contract/test_bundle.py",
     "test:archive-conformance": "python3 scripts/archive-contract/self_test.py",
+    "test:archive-matrix": "python3 scripts/archive-contract/matrix.py",
     "check:archive-conformance": "python3 scripts/archive-contract/conformance.py",
     "check:account-readiness": "python3 scripts/dev/check_account_readiness.py",
     "export:archive": "tsx scripts/dev/export-fixture.ts",
