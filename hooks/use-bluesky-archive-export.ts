@@ -123,7 +123,8 @@ function isPickerCancelled(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   const message = error instanceof Error ? error.message : "";
   return (
-    (typeof code === "string" && /cancel/i.test(code)) || /cancel/i.test(message)
+    (typeof code === "string" && /cancel/i.test(code)) ||
+    /cancel/i.test(message)
   );
 }
 
@@ -172,10 +173,7 @@ function createDeviceRuntime(
   };
 }
 
-const PHASE_MESSAGES: Record<
-  BlueskyArchiveExportProgress["phase"],
-  string
-> = {
+const PHASE_MESSAGES: Record<BlueskyArchiveExportProgress["phase"], string> = {
   staging: "Pausing this account's work and copying its data…",
   hashing: "Checking the preserved media…",
   translating: "Writing the archive's database…",
@@ -249,7 +247,9 @@ export function useBlueskyArchiveExport(options: {
   const [state, setState] = useState<BlueskyArchiveExportState>({
     status: "idle",
   });
-  const runtimeRef = useRef<BlueskyArchiveExportRuntime | null>(runtime ?? null);
+  const runtimeRef = useRef<BlueskyArchiveExportRuntime | null>(
+    runtime ?? null,
+  );
   const exportIdRef = useRef<string | null>(null);
   /** The finished archive, held while somebody decides where to put it. */
   const resultRef = useRef<BlueskyArchiveExportResult | null>(null);
@@ -262,6 +262,16 @@ export function useBlueskyArchiveExport(options: {
    * been left behind and says nothing.
    */
   const generationRef = useRef(0);
+  /**
+   * Whatever is touching staging right now, if anything.
+   *
+   * One export owns one staging directory, and owning it outlasts the screen:
+   * an export somebody walked away from is still hashing, and still has its
+   * own directory to clear, well after `cancel` has returned. Two things in
+   * there at once is two snapshots, two interchange databases, and two writers
+   * packaging into the same file.
+   */
+  const runningRef = useRef<Promise<void> | null>(null);
 
   const exportRuntime = useCallback((): BlueskyArchiveExportRuntime => {
     if (!runtimeRef.current) {
@@ -281,10 +291,54 @@ export function useBlueskyArchiveExport(options: {
     [],
   );
 
+  /**
+   * Do `work` as the only thing touching staging, or do nothing at all.
+   *
+   * Two taps landing before the screen has caught up are one instruction, not
+   * two exports. Nothing else enforces that: every step here is asynchronous,
+   * so both taps would otherwise pass the same checks and start two runs over
+   * one directory.
+   */
+  const exclusively = useCallback(
+    async (work: () => Promise<void>): Promise<void> => {
+      if (runningRef.current) {
+        return;
+      }
+      const running = work();
+      // What is held is *when* the run lets go of staging, never how it went:
+      // reporting a failure is `work`'s own job, and anything waiting here is
+      // waiting for the directory, not for the outcome.
+      const settled = running.then(
+        () => undefined,
+        () => undefined,
+      );
+      runningRef.current = settled;
+      void settled.then(() => {
+        if (runningRef.current === settled) {
+          runningRef.current = null;
+        }
+      });
+      await running;
+    },
+    [],
+  );
+
   /** Ask before anything is written, and say what will be written. */
   const start = useCallback(async (): Promise<void> => {
     const generation = (generationRef.current += 1);
     try {
+      // An export somebody walked away from clears its staging on the way out,
+      // and only reaches the boundary where it notices at its own pace. What
+      // is still on disk until then is a checkpoint that claiming would hand
+      // straight back — the dying run's directory, deleted out from under
+      // whatever resumed into it.
+      const leaving = runningRef.current;
+      if (leaving) {
+        await leaving;
+        if (generationRef.current !== generation) {
+          return;
+        }
+      }
       const staged = claimBlueskyArchiveExport(
         exportRuntime().staging,
         accountUUID,
@@ -299,59 +353,63 @@ export function useBlueskyArchiveExport(options: {
     }
   }, [accountUUID, exportRuntime, settle]);
 
-  const confirm = useCallback(async (): Promise<void> => {
-    const generation = generationRef.current;
-    const { runExport, portableSettings, staging, newExportId } =
-      exportRuntime();
-    const exportId = exportIdRef.current ?? newExportId();
-    exportIdRef.current = exportId;
+  const confirm = useCallback(
+    (): Promise<void> =>
+      exclusively(async () => {
+        const generation = generationRef.current;
+        const { runExport, portableSettings, staging, newExportId } =
+          exportRuntime();
+        const exportId = exportIdRef.current ?? newExportId();
+        exportIdRef.current = exportId;
 
-    settle(generation, {
-      status: "working",
-      message: PHASE_MESSAGES.staging,
-      fraction: null,
-      cancellable: true,
-    });
+        settle(generation, {
+          status: "working",
+          message: PHASE_MESSAGES.staging,
+          fraction: null,
+          cancellable: true,
+        });
 
-    try {
-      const result = await runExport({
-        exportId,
-        portableSettings: await portableSettings(),
-        shouldCancel: () => generationRef.current !== generation,
-        onProgress: (progress) =>
+        try {
+          const result = await runExport({
+            exportId,
+            portableSettings: await portableSettings(),
+            shouldCancel: () => generationRef.current !== generation,
+            onProgress: (progress) =>
+              settle(generation, {
+                status: "working",
+                message: PHASE_MESSAGES[progress.phase],
+                fraction: fractionOf(progress),
+                cancellable: progress.phase !== "done",
+              }),
+          });
+
+          if (generationRef.current !== generation) {
+            // Somebody walked away while the last of the archive was written. The
+            // export finished anyway, so its staging is this run's to clear.
+            discardBlueskyArchiveExport(staging, exportId);
+            return;
+          }
+
+          // The archive exists and is staged; where it goes is the next decision,
+          // and it is not this function's to make. Staging is not cleared here
+          // precisely because nothing has been delivered yet.
+          resultRef.current = result;
           settle(generation, {
-            status: "working",
-            message: PHASE_MESSAGES[progress.phase],
-            fraction: fractionOf(progress),
-            cancellable: progress.phase !== "done",
-          }),
-      });
-
-      if (generationRef.current !== generation) {
-        // Somebody walked away while the last of the archive was written. The
-        // export finished anyway, so its staging is this run's to clear.
-        discardBlueskyArchiveExport(staging, exportId);
-        return;
-      }
-
-      // The archive exists and is staged; where it goes is the next decision,
-      // and it is not this function's to make. Staging is not cleared here
-      // precisely because nothing has been delivered yet.
-      resultRef.current = result;
-      settle(generation, {
-        status: "ready",
-        fileName: result.fileName,
-        lines: describeResult(result),
-      });
-    } catch (error) {
-      if (error instanceof BlueskyArchiveExportCancelled) {
-        exportIdRef.current = null;
-        settle(generation, { status: "idle" });
-        return;
-      }
-      settle(generation, { status: "failed", message: messageFor(error) });
-    }
-  }, [exportRuntime, settle]);
+            status: "ready",
+            fileName: result.fileName,
+            lines: describeResult(result),
+          });
+        } catch (error) {
+          if (error instanceof BlueskyArchiveExportCancelled) {
+            exportIdRef.current = null;
+            settle(generation, { status: "idle" });
+            return;
+          }
+          settle(generation, { status: "failed", message: messageFor(error) });
+        }
+      }),
+    [exclusively, exportRuntime, settle],
+  );
 
   /**
    * Put the finished archive somewhere, and stop staging it once it is there.
@@ -367,45 +425,49 @@ export function useBlueskyArchiveExport(options: {
         location: string;
         fileName: string;
       }) => Promise<string | null>,
-    ): Promise<void> => {
-      const generation = generationRef.current;
-      const result = resultRef.current;
-      const exportId = exportIdRef.current;
-      if (!result || !exportId) {
-        return;
-      }
-      const { staging } = exportRuntime();
-      const archive = { location: result.location, fileName: result.fileName };
-
-      settle(generation, {
-        status: "working",
-        message: "Handing the archive over…",
-        fraction: null,
-        cancellable: false,
-      });
-      try {
-        const delivered = await hand(archive);
-        if (delivered === null) {
-          settle(generation, {
-            status: "ready",
-            fileName: result.fileName,
-            lines: describeResult(result),
-          });
+    ): Promise<void> =>
+      exclusively(async () => {
+        const generation = generationRef.current;
+        const result = resultRef.current;
+        const exportId = exportIdRef.current;
+        if (!result || !exportId) {
           return;
         }
-        discardBlueskyArchiveExport(staging, exportId);
-        exportIdRef.current = null;
-        resultRef.current = null;
-        settle(generation, {
-          status: "done",
+        const { staging } = exportRuntime();
+        const archive = {
+          location: result.location,
           fileName: result.fileName,
-          lines: [...describeResult(result), delivered],
+        };
+
+        settle(generation, {
+          status: "working",
+          message: "Handing the archive over…",
+          fraction: null,
+          cancellable: false,
         });
-      } catch (error) {
-        settle(generation, { status: "failed", message: messageFor(error) });
-      }
-    },
-    [exportRuntime, settle],
+        try {
+          const delivered = await hand(archive);
+          if (delivered === null) {
+            settle(generation, {
+              status: "ready",
+              fileName: result.fileName,
+              lines: describeResult(result),
+            });
+            return;
+          }
+          discardBlueskyArchiveExport(staging, exportId);
+          exportIdRef.current = null;
+          resultRef.current = null;
+          settle(generation, {
+            status: "done",
+            fileName: result.fileName,
+            lines: [...describeResult(result), delivered],
+          });
+        } catch (error) {
+          settle(generation, { status: "failed", message: messageFor(error) });
+        }
+      }),
+    [exclusively, exportRuntime, settle],
   );
 
   /** Copy the archive into a folder on this device. */

@@ -46,7 +46,21 @@ type Harness = {
   /** Where the next folder picker lands, or null for somebody closing it. */
   pickedFolder: string | null;
   exportIds: string[];
+  /** The staging directory each run was pointed at, in order. */
+  runCalls: string[];
+  /** Hold the next asset read, to park a run in the middle of hashing. */
+  holdHashing: boolean;
+  reachedHashing: Promise<void>;
+  releaseHashing: () => void;
 };
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
 
 function harnessFor(): Harness {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "cyd-export-hook-"));
@@ -68,6 +82,9 @@ function harnessFor(): Harness {
   const shared: { location: string; fileName: string }[] = [];
   const saved: { location: string; fileName: string }[] = [];
   const exportIds: string[] = [];
+  const runCalls: string[] = [];
+  const reachedHashing = deferred();
+  const releaseHashing = deferred();
 
   const harness: Harness = {
     root,
@@ -77,15 +94,21 @@ function harnessFor(): Harness {
     saved,
     pickedFolder: "Documents",
     exportIds,
+    runCalls,
+    holdHashing: false,
+    reachedHashing: reachedHashing.promise,
+    releaseHashing: releaseHashing.resolve,
     runtime: {
       portableSettings: async () => ({ save_posts: true }),
-      runExport: (request) =>
-        runBlueskyArchiveExport(environment, {
+      runExport: (request) => {
+        runCalls.push(request.exportId);
+        return runBlueskyArchiveExport(environment, {
           ...request,
           accountUuid: ACCOUNT_UUID,
           accountDid: ACCOUNT_DID,
           accountHandle: "alice.example",
-        }),
+        });
+      },
       staging: environment,
       share: async (archive) => {
         shared.push(archive);
@@ -103,6 +126,18 @@ function harnessFor(): Harness {
         return exportId;
       },
     },
+  };
+
+  // Hashing is where an export spends its time and where it asks whether it
+  // has been cancelled, so parking a run inside one asset read is what lets a
+  // test pin the interleaving instead of racing for it.
+  const readFile = environment.readFile.bind(environment);
+  environment.readFile = async (location, onBytes) => {
+    if (harness.holdHashing) {
+      reachedHashing.resolve();
+      await releaseHashing.promise;
+    }
+    return readFile(location, onBytes);
   };
 
   return harness;
@@ -362,6 +397,83 @@ describe("exporting a Cyd Bluesky archive", () => {
         (staged) => staged.exportId,
       ),
     ).toEqual(["newer-export"]);
+  });
+
+  /**
+   * Walking away does not stop an export where it stands.
+   *
+   * `cancel` moves the generation on and returns, but the run in flight only
+   * notices at its next boundary, and clearing its own staging is the last
+   * thing it does on the way out. Starting again inside that window used to
+   * hand the new export the dying one's directory — the same `exportId`, still
+   * checkpointed on disk — which was then deleted out from under it part-way
+   * through writing. What reached the person was a raw `unable to open
+   * database file`, for having pressed a button twice.
+   */
+  it("does not start the next export in staging the last one is still clearing", async () => {
+    addMedia(harness.account, {
+      contentCid: "bafysecond",
+      postUri: POST_URI,
+      position: 1,
+      fileName: "bafysecond",
+      contents: "more image bytes",
+    });
+    const { result } = renderExport();
+    harness.holdHashing = true;
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      const walkedAwayFrom = result.current.confirm();
+      await harness.reachedHashing;
+
+      // Somebody walks away while that run is hashing, and immediately asks
+      // for another. The first run is still alive, and its checkpoint is
+      // still on disk for the next export to find.
+      result.current.cancel();
+      harness.holdHashing = false;
+      const restarted = (async () => {
+        await result.current.start();
+        await result.current.confirm();
+      })();
+
+      harness.releaseHashing();
+      await Promise.all([walkedAwayFrom, restarted]);
+    });
+
+    // Two runs, never the same staging directory: whatever the first one
+    // deleted on its way out, it was not the second one's.
+    expect(harness.runCalls).toHaveLength(2);
+    expect(new Set(harness.runCalls).size).toBe(2);
+    await waitFor(() => {
+      expect(result.current.state.status).toBe("ready");
+    });
+  });
+
+  /**
+   * Two taps landing before the screen catches up are one instruction.
+   *
+   * Nothing between the button and the writer used to say so: `confirm` read
+   * the generation without moving it on, so both taps passed the same check
+   * and started two runs over one staging directory, each snapshotting and
+   * packaging into the other's files.
+   */
+  it("starts one export however many times the button is pressed", async () => {
+    const { result } = renderExport();
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await Promise.all([result.current.confirm(), result.current.confirm()]);
+    });
+
+    expect(harness.runCalls).toHaveLength(1);
+    await waitFor(() => {
+      expect(result.current.state.status).toBe("ready");
+    });
+    expect(stagingDirectories(harness)).toHaveLength(1);
   });
 
   it("leaves nothing on screen or in staging when somebody walks away", async () => {
