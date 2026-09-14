@@ -2,6 +2,7 @@ import { Crc32 } from "@/services/archive-import/crc32";
 
 import { BlueskyArchiveExportCancelled } from "./errors";
 import type { BlueskyArchiveExportEnvironment } from "./ports";
+import { givesWayToTheScreen } from "./scheduling";
 
 /**
  * Deciding what Cyd can honestly claim about each preserved asset.
@@ -143,11 +144,16 @@ export async function resolveStagedAssets(
   options: ResolveStagedAssetsOptions = {},
 ): Promise<Map<string, ResolvedAsset>> {
   const resolved = new Map<string, ResolvedAsset>(options.resolved);
+  const giveWay = givesWayToTheScreen();
 
   for (const asset of inventory) {
     if (resolved.has(asset.key)) {
       continue;
     }
+    // Before the check, not after it: this is the pass that decides whether
+    // cancelling works at all, and `shouldCancel` can only answer once the tap
+    // that changed the answer has been read.
+    await giveWay();
     if (options.shouldCancel?.()) {
       throw new BlueskyArchiveExportCancelled();
     }
