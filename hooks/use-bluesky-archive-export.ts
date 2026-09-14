@@ -4,7 +4,7 @@ import * as Sharing from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
 
 import { withBlueskyController } from "@/controllers";
-import { getPortableBlueskySettings } from "@/database/accounts";
+import { getPortableBlueskySettings, listAccounts } from "@/database/accounts";
 import {
   claimBlueskyArchiveExport,
   createBlueskyArchiveExportStaging,
@@ -19,7 +19,7 @@ import { BlueskyArchiveExportCancelled } from "@/services/archive-export";
 /**
  * Writing a Cyd Bluesky archive, from asking to handing it over.
  *
- * Four things happen here that the writer itself has no opinion about.
+ * Five things happen here that the writer itself has no opinion about.
  *
  * The first is the warning. A Cyd Bluesky archive is plaintext: Cyd protects
  * Bluesky connections in the operating system's own storage and leaves saved
@@ -48,15 +48,34 @@ import { BlueskyArchiveExportCancelled } from "@/services/archive-export";
  * require handing it to somebody else first. So saving to the device is its
  * own affordance, on both platforms.
  *
- * The fourth is nothing at all: no Cyd account, no entitlement check, no
+ * The fourth is which account. Export is offered from the app-wide menu
+ * beside import, so unlike everything else about an export there is no account
+ * in hand when it starts. One Bluesky local account is not a question worth
+ * asking, so it is not asked; more than one is.
+ *
+ * The fifth is nothing at all: no Cyd account, no entitlement check, no
  * network. Getting your own data out of Cyd is not a premium feature
  * (ADR 0015), and the absence of any such call here is the whole of that.
  */
 
+/** A Bluesky local account an export can be written from. */
+export type BlueskyArchiveExportAccount = {
+  id: number;
+  uuid: string;
+  handle: string;
+};
+
 export type BlueskyArchiveExportState =
   | { status: "idle" }
   | {
+      /** More than one Bluesky local account, so which one is a question. */
+      status: "choosing";
+      accounts: BlueskyArchiveExportAccount[];
+    }
+  | {
       status: "warning";
+      /** The account this archive would be written from. */
+      handle: string;
       /** Whether agreeing carries on an export rather than starting one. */
       resuming: boolean;
     }
@@ -89,8 +108,13 @@ export type BlueskyArchiveExportState =
 
 /** The device capabilities an export needs, gathered so tests can stand in. */
 export type BlueskyArchiveExportRuntime = {
-  portableSettings(): Promise<PortableSettings>;
+  /** Every Bluesky local account on this device, in the order Cyd lists them. */
+  listAccounts(): Promise<BlueskyArchiveExportAccount[]>;
+  portableSettings(
+    account: BlueskyArchiveExportAccount,
+  ): Promise<PortableSettings>;
   runExport(request: {
+    account: BlueskyArchiveExportAccount;
     exportId: string;
     portableSettings: PortableSettings;
     shouldCancel: () => boolean;
@@ -128,14 +152,17 @@ function isPickerCancelled(error: unknown): boolean {
   );
 }
 
-function createDeviceRuntime(
-  accountId: number,
-  accountUUID: string,
-): BlueskyArchiveExportRuntime {
+function createDeviceRuntime(): BlueskyArchiveExportRuntime {
   return {
-    portableSettings: () => getPortableBlueskySettings(accountId),
-    runExport: (request) =>
-      withBlueskyController(accountId, accountUUID, (controller) =>
+    listAccounts: async () =>
+      (await listAccounts()).map((account) => ({
+        id: account.id,
+        uuid: account.uuid,
+        handle: account.handle,
+      })),
+    portableSettings: (account) => getPortableBlueskySettings(account.id),
+    runExport: ({ account, ...request }) =>
+      withBlueskyController(account.id, account.uuid, (controller) =>
         controller.exportBlueskyArchive(request),
       ),
     staging: createBlueskyArchiveExportStaging(),
@@ -238,18 +265,18 @@ function messageFor(error: unknown): string {
     : "Cyd could not export that account.";
 }
 
-export function useBlueskyArchiveExport(options: {
-  accountId: number;
-  accountUUID: string;
-  runtime?: BlueskyArchiveExportRuntime;
-}) {
-  const { accountId, accountUUID, runtime } = options;
+export function useBlueskyArchiveExport(
+  options: { runtime?: BlueskyArchiveExportRuntime } = {},
+) {
+  const { runtime } = options;
   const [state, setState] = useState<BlueskyArchiveExportState>({
     status: "idle",
   });
   const runtimeRef = useRef<BlueskyArchiveExportRuntime | null>(
     runtime ?? null,
   );
+  /** The Bluesky local account this export is of, once one has been chosen. */
+  const accountRef = useRef<BlueskyArchiveExportAccount | null>(null);
   const exportIdRef = useRef<string | null>(null);
   /** The finished archive, held while somebody decides where to put it. */
   const resultRef = useRef<BlueskyArchiveExportResult | null>(null);
@@ -275,10 +302,10 @@ export function useBlueskyArchiveExport(options: {
 
   const exportRuntime = useCallback((): BlueskyArchiveExportRuntime => {
     if (!runtimeRef.current) {
-      runtimeRef.current = createDeviceRuntime(accountId, accountUUID);
+      runtimeRef.current = createDeviceRuntime();
     }
     return runtimeRef.current;
-  }, [accountId, accountUUID]);
+  }, []);
 
   const settle = useCallback(
     (generation: number, next: BlueskyArchiveExportState): boolean => {
@@ -323,10 +350,18 @@ export function useBlueskyArchiveExport(options: {
     [],
   );
 
-  /** Ask before anything is written, and say what will be written. */
-  const start = useCallback(async (): Promise<void> => {
-    const generation = (generationRef.current += 1);
-    try {
+  /**
+   * Take up an account, and warn before anything is written.
+   *
+   * Claiming is what makes resuming possible, and it is per account: staging
+   * an earlier launch left behind belongs to the account it was an export of,
+   * and is picked up only when that account is the one being exported again.
+   */
+  const openWarningFor = useCallback(
+    async (
+      account: BlueskyArchiveExportAccount,
+      generation: number,
+    ): Promise<void> => {
       // An export somebody walked away from clears its staging on the way out,
       // and only reaches the boundary where it notices at its own pace. What
       // is still on disk until then is a checkpoint that claiming would hand
@@ -339,24 +374,75 @@ export function useBlueskyArchiveExport(options: {
           return;
         }
       }
+      accountRef.current = account;
       const staged = claimBlueskyArchiveExport(
         exportRuntime().staging,
-        accountUUID,
+        account.uuid,
       );
       exportIdRef.current = staged?.exportId ?? null;
       settle(generation, {
         status: "warning",
+        handle: account.handle,
         resuming: staged !== null,
       });
+    },
+    [exportRuntime, settle],
+  );
+
+  /**
+   * Ask before anything is written, and say what will be written.
+   *
+   * Export is reached from the app-wide menu, so which account is a question
+   * this has to answer before any of the rest applies. It is only put to the
+   * person when it is a real question: with one Bluesky local account there is
+   * nothing to choose, and with none there is nothing to export.
+   */
+  const start = useCallback(async (): Promise<void> => {
+    const generation = (generationRef.current += 1);
+    try {
+      const accounts = await exportRuntime().listAccounts();
+      if (generationRef.current !== generation) {
+        return;
+      }
+      if (accounts.length === 0) {
+        settle(generation, {
+          status: "failed",
+          message:
+            "There is no Bluesky account on this device yet. Add one and save its data first.",
+        });
+        return;
+      }
+      if (accounts.length > 1) {
+        settle(generation, { status: "choosing", accounts });
+        return;
+      }
+      await openWarningFor(accounts[0], generation);
     } catch (error) {
       settle(generation, { status: "failed", message: messageFor(error) });
     }
-  }, [accountUUID, exportRuntime, settle]);
+  }, [exportRuntime, openWarningFor, settle]);
+
+  /** Answer the which-account question. */
+  const choose = useCallback(
+    async (account: BlueskyArchiveExportAccount): Promise<void> => {
+      const generation = generationRef.current;
+      try {
+        await openWarningFor(account, generation);
+      } catch (error) {
+        settle(generation, { status: "failed", message: messageFor(error) });
+      }
+    },
+    [openWarningFor, settle],
+  );
 
   const confirm = useCallback(
     (): Promise<void> =>
       exclusively(async () => {
         const generation = generationRef.current;
+        const account = accountRef.current;
+        if (!account) {
+          return;
+        }
         const { runExport, portableSettings, staging, newExportId } =
           exportRuntime();
         const exportId = exportIdRef.current ?? newExportId();
@@ -371,8 +457,9 @@ export function useBlueskyArchiveExport(options: {
 
         try {
           const result = await runExport({
+            account,
             exportId,
-            portableSettings: await portableSettings(),
+            portableSettings: await portableSettings(account),
             shouldCancel: () => generationRef.current !== generation,
             onProgress: (progress) =>
               settle(generation, {
@@ -508,6 +595,7 @@ export function useBlueskyArchiveExport(options: {
    */
   const cancel = useCallback((): void => {
     generationRef.current += 1;
+    accountRef.current = null;
     exportIdRef.current = null;
     resultRef.current = null;
     setState({ status: "idle" });
@@ -523,9 +611,19 @@ export function useBlueskyArchiveExport(options: {
    */
   const dismiss = useCallback((): void => {
     generationRef.current += 1;
+    accountRef.current = null;
     resultRef.current = null;
     setState({ status: "idle" });
   }, []);
 
-  return { state, start, confirm, saveToDevice, share, cancel, dismiss };
+  return {
+    state,
+    start,
+    choose,
+    confirm,
+    saveToDevice,
+    share,
+    cancel,
+    dismiss,
+  };
 }

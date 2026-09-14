@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { createNodeBlueskyArchiveExportEnvironment } from "@/scripts/dev/node-export-environment";
+import { createNodeBlueskyArchiveExportEnvironment } from "@/testUtils/nodeExportEnvironment";
 import {
   ACCOUNT_DID,
   ACCOUNT_UUID,

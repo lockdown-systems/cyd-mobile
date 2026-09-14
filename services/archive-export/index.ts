@@ -3,8 +3,9 @@
  * self-contained, point-in-time version 2 archive.
  *
  * Export is the only component that can produce a Cyd Bluesky archive, which
- * is why it is built before the readers that consume it (ADR 0004). Offering
- * it to people is a separate decision, gated on #100.
+ * is why it was built before the readers that consume it (ADR 0004). Offering
+ * it to people was a separate decision, and the conformance matrix #100 asks
+ * for is what made it: `npm run test:archive-matrix`.
  */
 
 export { runBlueskyArchiveExport } from "./export";

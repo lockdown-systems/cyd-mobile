@@ -1760,9 +1760,9 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * which is how an export the operating system killed carries on from what it
    * had already staged (ADR 0006).
    *
-   * Building this is not the same as offering it: until #100 proves version 2
-   * conformance in both directions, the only thing that calls this is a
-   * development-only affordance (ADR 0004).
+   * What calls this is "Export Bluesky archive" in the app-wide menu, which is
+   * offered because the conformance matrix passes in both directions (#100,
+   * ADR 0004) rather than because somebody decided the writer looked ready.
    */
   async exportBlueskyArchive(options: {
     exportId: string;

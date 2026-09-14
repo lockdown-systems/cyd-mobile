@@ -38,6 +38,12 @@ jobs:
       - name: Verify the archive conformance checker still rejects bad archives
         run: npm run test:archive-conformance
 
+      - name: Run the Cyd Bluesky archive v2 conformance matrix
+        # The release gate for Mobile's version 2 writer (#100, ADR 0004). It
+        # fails both when a matrix row goes red and when the test proving one
+        # has been renamed or deleted out from under it.
+        run: npm run test:archive-matrix
+
       - name: Check for a newer canonical Bluesky archive bundle
         env:
           GITHUB_TOKEN: ${{ github.token }}

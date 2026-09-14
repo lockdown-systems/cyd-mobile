@@ -68,9 +68,9 @@ import { BlueskyArchiveZipWriter } from "./zip-writer";
  * failure is one that will happen again. What survives is only what a later
  * launch can carry on from.
  *
- * Building this writer is not the same as offering it to people: until #100
- * proves conformance both ways, export stays behind a development-only
- * affordance (ADR 0004).
+ * Building this writer was not the same as offering it to people. What opened
+ * that gate is the conformance matrix (#100, ADR 0004): every row of
+ * `npm run test:archive-matrix` passing, in both directions, on every push.
  */
 
 const BLUESKY_INTERCHANGE_PATH = "data.db";

@@ -30,6 +30,8 @@ groups at all, so these fixtures exercise less of the contract than
 | a link preview Cyd never downloaded | no asset row at all; the URL stays in the record's external context, and it does not make the archive incomplete |
 | context for a record Cyd never saved | `record_context` keeps the author the AT URI names; `context_record_uri` stays `NULL` and the URI itself survives in `records.payload_json` |
 | `portable_settings.save_reposts` | Mobile has no separate switch: reposts are saved with posts |
+| a like's own CID | `post.likeUri` has no CID column beside it, unlike `post.repostCid` |
+| a bookmark record | Mobile stores a bookmark as the post it points at, so a round trip writes the selection and no bookmark record |
 
 `check_account_readiness.py` reprints this list, so it stays visible at the
 moment it matters rather than only here.
@@ -115,7 +117,9 @@ restore reads both committed fixtures back into a browseable Bluesky local
 account in `services/archive-restore/__tests__/restore.test.ts`, but that
 proves the two halves agree with each other, not with the contract. The
 conformance checker is still what stands between a broken writer and a fixture
-that enshrines its bugs.
+that enshrines its bugs — and since #100 it runs over these fixtures on every
+push, as one row of `npm run test:archive-matrix`
+(`bluesky-archive-conformance-matrix.md`).
 
 ## 5. Produce the incomplete variant
 
@@ -151,8 +155,7 @@ goes.
 
 ## Exporting from the app instead
 
-The dashboard carries a development-only export card in `__DEV__` builds
-(ADR 0004). It writes the same archive through the same writer, into
-`<documents>/archive-export/<exportId>/`, and prints the path. Pulling that
-file works too — but every fix then costs a device round trip, which is why the
-fixtures are made from a pulled copy instead.
+Since #100, "Export Bluesky archive" in the app-wide menu writes the same
+archive through the same writer, and hands it to a folder on the device or to
+another app. Pulling that file works too — but every fix then costs a device
+round trip, which is why the fixtures are made from a pulled copy instead.

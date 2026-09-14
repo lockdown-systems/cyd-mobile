@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { createNodeBlueskyArchiveExportEnvironment } from "@/scripts/dev/node-export-environment";
+import { createNodeBlueskyArchiveExportEnvironment } from "@/testUtils/nodeExportEnvironment";
 import {
   listResumableBlueskyArchiveExports,
   runBlueskyArchiveExport,
@@ -54,6 +54,13 @@ type Harness = {
   releaseHashing: () => void;
 };
 
+/** The one Bluesky local account these tests export, as the menu sees it. */
+const EXPORT_ACCOUNT = {
+  id: 1,
+  uuid: ACCOUNT_UUID,
+  handle: "alice.example",
+};
+
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
   const promise = new Promise<void>((settle) => {
@@ -99,14 +106,15 @@ function harnessFor(): Harness {
     reachedHashing: reachedHashing.promise,
     releaseHashing: releaseHashing.resolve,
     runtime: {
+      listAccounts: async () => [EXPORT_ACCOUNT],
       portableSettings: async () => ({ save_posts: true }),
-      runExport: (request) => {
+      runExport: ({ account, ...request }) => {
         runCalls.push(request.exportId);
         return runBlueskyArchiveExport(environment, {
           ...request,
-          accountUuid: ACCOUNT_UUID,
+          accountUuid: account.uuid,
           accountDid: ACCOUNT_DID,
-          accountHandle: "alice.example",
+          accountHandle: account.handle,
         });
       },
       staging: environment,
@@ -163,13 +171,110 @@ describe("exporting a Cyd Bluesky archive", () => {
 
   function renderExport() {
     return renderHook(() =>
+      useBlueskyArchiveExport({ runtime: harness.runtime }),
+    );
+  }
+
+  /** Render an export over a device holding these Bluesky local accounts. */
+  function renderExportOver(
+    accounts: { id: number; uuid: string; handle: string }[],
+  ) {
+    return renderHook(() =>
       useBlueskyArchiveExport({
-        accountId: 1,
-        accountUUID: ACCOUNT_UUID,
-        runtime: harness.runtime,
+        runtime: { ...harness.runtime, listAccounts: async () => accounts },
       }),
     );
   }
+
+  /**
+   * Which account is a question only when it is one.
+   *
+   * Export is reached from the app-wide menu now, so it has no account in hand
+   * the way a screen inside an account would (#100). Asking anyway would put a
+   * list of one in front of everybody with one Bluesky account, which is most
+   * people.
+   */
+  describe("choosing which account to export", () => {
+    const second = {
+      id: 2,
+      uuid: "6f1a0f56-5f52-4a44-9c6e-2d5b0c9f7a31",
+      handle: "bob.example",
+    };
+
+    it("asks when this device holds more than one Bluesky account", async () => {
+      const { result } = renderExportOver([EXPORT_ACCOUNT, second]);
+
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(result.current.state).toEqual({
+        status: "choosing",
+        accounts: [EXPORT_ACCOUNT, second],
+      });
+      expect(stagingDirectories(harness)).toEqual([]);
+
+      await act(async () => {
+        await result.current.choose(EXPORT_ACCOUNT);
+      });
+
+      expect(result.current.state).toMatchObject({
+        status: "warning",
+        handle: "alice.example",
+      });
+    });
+
+    it("does not ask when there is only one", async () => {
+      const { result } = renderExport();
+
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(result.current.state).toMatchObject({
+        status: "warning",
+        handle: "alice.example",
+      });
+    });
+
+    it("says there is nothing to export when there is no Bluesky account", async () => {
+      const { result } = renderExportOver([]);
+
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(result.current.state).toMatchObject({
+        status: "failed",
+        message: expect.stringContaining("no Bluesky account"),
+      });
+    });
+
+    /**
+     * Resuming is per account, and the menu is where two accounts can be
+     * exported one after the other. Offering one account's half-finished
+     * export to another would hand somebody a snapshot of the wrong account's
+     * database, under their own handle.
+     */
+    it("leaves another account's staged export where it is", async () => {
+      await interruptAnExport("someone-elses-export", second.uuid);
+
+      const { result } = renderExport();
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(result.current.state).toMatchObject({
+        status: "warning",
+        resuming: false,
+      });
+      expect(
+        listResumableBlueskyArchiveExports(harness.runtime.staging).map(
+          (staged) => staged.exportId,
+        ),
+      ).toEqual(["someone-elses-export"]);
+    });
+  });
 
   /**
    * A Cyd Bluesky archive is not encrypted, and the posts, chats and media in
@@ -303,7 +408,10 @@ describe("exporting a Cyd Bluesky archive", () => {
    * Leave an export staged the way the operating system would: killed after
    * the snapshot and the hashing, before there is an archive.
    */
-  async function interruptAnExport(exportId: string): Promise<void> {
+  async function interruptAnExport(
+    exportId: string,
+    accountUuid: string = ACCOUNT_UUID,
+  ): Promise<void> {
     const broken = createNodeBlueskyArchiveExportEnvironment({
       accountDirectory: harness.account.directory,
       stagingRoot: harness.stagingRoot,
@@ -314,7 +422,7 @@ describe("exporting a Cyd Bluesky archive", () => {
     await expect(
       runBlueskyArchiveExport(broken, {
         exportId,
-        accountUuid: ACCOUNT_UUID,
+        accountUuid,
         accountDid: ACCOUNT_DID,
         accountHandle: "alice.example",
         portableSettings: { save_posts: true },
