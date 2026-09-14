@@ -264,6 +264,11 @@ jest.mock("expo-file-system", () => {
     delete = jest.fn();
 
     list = jest.fn(() => []);
+
+    // The device's own folder picker. Only the export's device runtime reaches
+    // for this, and its tests stand in for the whole runtime, so the default
+    // here is a picker nobody opened rather than a folder nobody chose.
+    static pickDirectoryAsync = jest.fn();
   }
 
   class File {

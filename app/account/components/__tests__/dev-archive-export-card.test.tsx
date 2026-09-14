@@ -29,14 +29,17 @@ type Doubles = {
   runtime: BlueskyArchiveExportRuntime;
   runExport: jest.Mock;
   share: jest.Mock;
+  saveToDevice: jest.Mock;
 };
 
 function testDoubles(): Doubles {
   const runExport = jest.fn().mockResolvedValue(ARCHIVE);
   const share = jest.fn().mockResolvedValue(undefined);
+  const saveToDevice = jest.fn().mockResolvedValue("Documents");
   return {
     runExport,
     share,
+    saveToDevice,
     runtime: {
       portableSettings: jest.fn().mockResolvedValue({ save_posts: true }),
       runExport,
@@ -45,6 +48,7 @@ function testDoubles(): Doubles {
         listStagingIds: jest.fn(() => []),
       },
       share,
+      saveToDevice,
       newExportId: jest.fn(() => "export-1"),
     } as unknown as BlueskyArchiveExportRuntime,
   };
@@ -113,7 +117,7 @@ describe("DevArchiveExportCard", () => {
   });
 
   it("reports what the export produced, including what it could not include", async () => {
-    const { share } = renderCard();
+    const { share, saveToDevice } = renderCard();
 
     fireEvent.press(screen.getByText("Export archive"));
     await waitFor(() => {
@@ -124,16 +128,47 @@ describe("DevArchiveExportCard", () => {
     await waitFor(() => {
       expect(screen.getByText(ARCHIVE.fileName)).toBeTruthy();
     });
-    expect(share).toHaveBeenCalledWith({
-      location: ARCHIVE.location,
-      fileName: ARCHIVE.fileName,
-    });
+    // Nothing has been delivered yet: the archive is built, and where it goes
+    // is still somebody's to choose.
+    expect(share).not.toHaveBeenCalled();
+    expect(saveToDevice).not.toHaveBeenCalled();
     expect(screen.getByText(/2 media files packaged/)).toBeTruthy();
     // Missing and unavailable are different things, and the report keeps them
     // apart: this archive is short one file Cyd never finished saving.
     expect(
       screen.getByText(/1 file Cyd never finished saving is named/),
     ).toBeTruthy();
+  });
+
+  /**
+   * An Android share sheet is `ACTION_SEND`: it lists applications that
+   * receive content and never the device's own storage. Without a save of its
+   * own, the only way out of Cyd would be a cloud service — which is not
+   * portability, and contradicts the warning this same card gives about
+   * keeping a plaintext archive somewhere you trust.
+   */
+  it("offers to save the archive to the device, not only to share it", async () => {
+    const { saveToDevice, share } = renderCard();
+
+    fireEvent.press(screen.getByText("Export archive"));
+    await waitFor(() => {
+      expect(screen.getByText("Export anyway")).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText("Export anyway"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Save to device")).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText("Save to device"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Saved to Documents/)).toBeTruthy();
+    });
+    expect(saveToDevice).toHaveBeenCalledWith({
+      location: ARCHIVE.location,
+      fileName: ARCHIVE.fileName,
+    });
+    expect(share).not.toHaveBeenCalled();
   });
 
   /**
@@ -150,6 +185,11 @@ describe("DevArchiveExportCard", () => {
       expect(screen.getByText("Export anyway")).toBeTruthy();
     });
     fireEvent.press(screen.getByText("Export anyway"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Share")).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText("Share"));
 
     await waitFor(() => {
       expect(share).toHaveBeenCalled();
