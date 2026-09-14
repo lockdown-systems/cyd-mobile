@@ -12,6 +12,7 @@ import {
   getArchiveExportStagingRoot,
 } from "@/services/device-storage";
 
+import type { BlueskyArchiveExportStaging } from "./checkpoint";
 import type {
   BlueskyArchiveExportEnvironment,
   ExportStagingArea,
@@ -79,6 +80,21 @@ class DeviceExportStagingArea implements ExportStagingArea {
         };
   }
 
+  fileExists(relativePath: string): boolean {
+    return new File(this.locate(relativePath)).exists;
+  }
+
+  readText(relativePath: string): string | null {
+    const file = new File(this.locate(relativePath));
+    return file.exists ? file.textSync() : null;
+  }
+
+  writeText(relativePath: string, contents: string): void {
+    const file = new File(this.locate(relativePath));
+    file.create({ intermediates: true, overwrite: true });
+    file.write(contents);
+  }
+
   destroy(): void {
     const directory = new Directory(this.root);
     if (directory.exists) {
@@ -127,6 +143,29 @@ export type DeviceExportEnvironmentOptions = {
   resumeAccountWork: () => void;
 };
 
+/**
+ * The staging half of the environment, which needs no account.
+ *
+ * Reporting what an interrupted export left behind, and throwing it away, are
+ * the two things Cyd does about exports outside an export.
+ */
+export function createBlueskyArchiveExportStaging(): BlueskyArchiveExportStaging {
+  return {
+    openStaging: (exportId) => new DeviceExportStagingArea(exportId),
+
+    listStagingIds: () => {
+      const root = new Directory(getArchiveExportStagingRoot());
+      if (!root.exists) {
+        return [];
+      }
+      return root
+        .list()
+        .filter((item): item is Directory => item instanceof Directory)
+        .map((item) => item.name);
+    },
+  };
+}
+
 export function createBlueskyArchiveExportEnvironment(
   options: DeviceExportEnvironmentOptions,
 ): BlueskyArchiveExportEnvironment {
@@ -141,7 +180,7 @@ export function createBlueskyArchiveExportEnvironment(
   };
 
   return {
-    openStaging: (exportId) => new DeviceExportStagingArea(exportId),
+    ...createBlueskyArchiveExportStaging(),
 
     async withAccountWorkPaused(work) {
       options.pauseAccountWork();

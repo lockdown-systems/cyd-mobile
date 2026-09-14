@@ -8,6 +8,17 @@
  */
 
 export { runBlueskyArchiveExport } from "./export";
+export {
+  claimBlueskyArchiveExport,
+  discardBlueskyArchiveExport,
+  listResumableBlueskyArchiveExports,
+} from "./checkpoint";
+export type {
+  BlueskyArchiveExportCheckpoint,
+  BlueskyArchiveExportStaging,
+  FinishedBlueskyArchive,
+  ResumableBlueskyArchiveExport,
+} from "./checkpoint";
 export type {
   BlueskyArchiveAssetSummary,
   BlueskyArchiveExportPhase,
@@ -15,9 +26,15 @@ export type {
   BlueskyArchiveExportRequest,
   BlueskyArchiveExportResult,
 } from "./export";
-export { BlueskyArchiveExportError } from "./errors";
+export {
+  BlueskyArchiveExportCancelled,
+  BlueskyArchiveExportError,
+} from "./errors";
 export type { BlueskyArchiveExportErrorCode } from "./errors";
-export { createBlueskyArchiveExportEnvironment } from "./environment";
+export {
+  createBlueskyArchiveExportEnvironment,
+  createBlueskyArchiveExportStaging,
+} from "./environment";
 export { PORTABLE_SETTING_KEYS, profileIdForDid } from "./interchange";
 export {
   portableSettingsFromAccountRow,

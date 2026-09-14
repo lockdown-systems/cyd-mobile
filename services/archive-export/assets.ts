@@ -1,5 +1,6 @@
 import { Crc32 } from "@/services/archive-import/crc32";
 
+import { BlueskyArchiveExportCancelled } from "./errors";
 import type { BlueskyArchiveExportEnvironment } from "./ports";
 
 /**
@@ -72,6 +73,21 @@ function unresolved(
   return { key, availability, reason };
 }
 
+/**
+ * The state of an asset that moved after Cyd read it.
+ *
+ * Hashing reaches this by comparing a file against the inventory; packaging
+ * reaches it by finding bytes that no longer match the digest it was given.
+ * Both are the same thing happening, so both say it the same way.
+ */
+export function assetChangedWhilePrepared(key: string): ResolvedAsset {
+  return unresolved(
+    key,
+    "unavailable",
+    "The preserved file changed while the export was being prepared.",
+  );
+}
+
 const MAGIC_NUMBERS: { prefix: number[]; mediaType: string }[] = [
   { prefix: [0xff, 0xd8, 0xff], mediaType: "image/jpeg" },
   { prefix: [0x89, 0x50, 0x4e, 0x47], mediaType: "image/png" },
@@ -98,20 +114,55 @@ export function sniffMediaType(head: Uint8Array): string | null {
   return null;
 }
 
+export type ResolveStagedAssetsOptions = {
+  /** Assets an earlier run of this export already read and hashed. */
+  resolved?: Map<string, ResolvedAsset>;
+  /**
+   * Keys a packaging attempt caught changing, which are unavailable whatever
+   * hashing made of them.
+   */
+  changed?: ReadonlySet<string>;
+  /**
+   * Called with everything settled so far, each time one more is.
+   *
+   * The map is this function's to own; handing the whole of it back is what
+   * lets a checkpoint record the pass without keeping a second copy of it.
+   */
+  onResolved?: (resolved: ReadonlyMap<string, ResolvedAsset>) => void;
+  shouldCancel?: () => boolean;
+};
+
 /**
  * Read and hash every inventoried asset, one at a time.
  *
  * One file is in memory at most: assets are streamed through the hasher, so a
- * long video costs the same as a thumbnail.
+ * long video costs the same as a thumbnail. It is also the longest pass an
+ * export makes — every preserved byte, once — which is why an asset settled
+ * here is reported straight away rather than at the end: an export killed
+ * part-way through resumes from the last file it finished, not the first
+ * (ADR 0006).
  */
 export async function resolveStagedAssets(
   environment: BlueskyArchiveExportEnvironment,
   inventory: StagedAsset[],
+  options: ResolveStagedAssetsOptions = {},
 ): Promise<Map<string, ResolvedAsset>> {
-  const resolved = new Map<string, ResolvedAsset>();
+  const resolved = new Map<string, ResolvedAsset>(options.resolved);
 
   for (const asset of inventory) {
+    if (options.changed?.has(asset.key)) {
+      resolved.set(asset.key, assetChangedWhilePrepared(asset.key));
+      options.onResolved?.(resolved);
+      continue;
+    }
+    if (resolved.has(asset.key)) {
+      continue;
+    }
+    if (options.shouldCancel?.()) {
+      throw new BlueskyArchiveExportCancelled();
+    }
     resolved.set(asset.key, await resolveOne(environment, asset));
+    options.onResolved?.(resolved);
   }
 
   return resolved;
@@ -167,11 +218,7 @@ async function resolveOne(
   }
 
   if (byteCount !== asset.stagedByteLength) {
-    return unresolved(
-      asset.key,
-      "unavailable",
-      "The preserved file changed while the export was being prepared.",
-    );
+    return assetChangedWhilePrepared(asset.key);
   }
 
   const sha256 = hasher.digestHex();

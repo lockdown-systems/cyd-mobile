@@ -23,6 +23,7 @@ module.exports = {
     "expo-clipboard": "<rootDir>/__mocks__/expo-clipboard.js",
     "expo-keep-awake": "<rootDir>/__mocks__/expo-keep-awake.js",
     "^expo-secure-store$": "<rootDir>/__mocks__/expo-secure-store.js",
+    "^expo-sharing$": "<rootDir>/__mocks__/expo-sharing.js",
     "^multiformats$": "<rootDir>/node_modules/multiformats/dist/src/index.js",
     "^multiformats/(.*)$": "<rootDir>/node_modules/multiformats/dist/src/$1.js",
     "^uint8arrays$": "<rootDir>/node_modules/uint8arrays/dist/src/index.js",

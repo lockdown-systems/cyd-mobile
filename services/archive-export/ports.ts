@@ -44,6 +44,10 @@ export type ExportStagingArea = {
   createFile(relativePath: string): StagedFileWriter;
   /** Absolute location of a staged file, for the file and SQLite ports. */
   locate(relativePath: string): string;
+  fileExists(relativePath: string): boolean;
+  /** Read a small staged file, or null when it is not there. */
+  readText(relativePath: string): string | null;
+  writeText(relativePath: string, contents: string): void;
   destroy(): void;
 };
 
@@ -51,6 +55,15 @@ export type FileStat = { byteLength: number };
 
 export type BlueskyArchiveExportEnvironment = {
   openStaging(exportId: string): ExportStagingArea;
+
+  /**
+   * Staging areas left behind by earlier runs, finished or not.
+   *
+   * An export that the operating system killed is only resumable if something
+   * can find it again, and its staging directory is the only trace it leaves
+   * (ADR 0006).
+   */
+  listStagingIds(): string[];
 
   /**
    * Hold account-mutating work still for the duration of `work`.

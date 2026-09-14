@@ -1756,6 +1756,10 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Needs no Bluesky connection: export reads only what Cyd already has, so it
    * works while disconnected, offline, and without premium (ADR 0015).
    *
+   * Reusing an `exportId` resumes that export rather than starting another,
+   * which is how an export the operating system killed carries on from what it
+   * had already staged (ADR 0006).
+   *
    * Building this is not the same as offering it: until #100 proves version 2
    * conformance in both directions, the only thing that calls this is a
    * development-only affordance (ADR 0004).
@@ -1763,6 +1767,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
   async exportBlueskyArchive(options: {
     exportId: string;
     portableSettings: PortableSettings;
+    shouldCancel?: () => boolean;
     onProgress?: (progress: BlueskyArchiveExportProgress) => void;
   }): Promise<BlueskyArchiveExportResult> {
     const identity = await this.resolveExportIdentity();
@@ -1794,6 +1799,7 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
       accountDid: identity.did,
       accountHandle: identity.handle,
       portableSettings: options.portableSettings,
+      shouldCancel: options.shouldCancel,
       onProgress: options.onProgress,
     });
   }
