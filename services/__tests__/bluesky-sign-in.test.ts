@@ -19,8 +19,6 @@ jest.mock("@/controllers", () => ({
   ),
 }));
 
-jest.mock("@/services/analytics", () => ({ trackEvent: jest.fn() }));
-
 import { withBlueskyController } from "@/controllers";
 import type { AccountListItem } from "@/database/accounts";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";

@@ -1,8 +1,5 @@
-import { trackEvent } from "@/services/analytics";
-import { PlausibleEvents } from "@/types/analytics";
-
 import type { BlueskyAccountController } from "../BlueskyAccountController";
-import type { BlueskyJobRecord, BlueskyJobType, JobEmit } from "./job-types";
+import type { BlueskyJobRecord, JobEmit } from "./job-types";
 import { runDeleteBookmarksJob } from "./jobs/delete-bookmarks";
 import { runDeleteLikesJob } from "./jobs/delete-likes";
 import { runDeleteMessagesJob } from "./jobs/delete-messages";
@@ -16,32 +13,11 @@ import { runSavePostsJob } from "./jobs/save-posts";
 import { runUnfollowUsersJob } from "./jobs/unfollow-users";
 import { runVerifyAuthorizationJob } from "./jobs/verify-authorization";
 
-/**
- * Map of job types to their corresponding Plausible event names
- */
-const JOB_TYPE_TO_EVENT: Partial<
-  Record<BlueskyJobType, (typeof PlausibleEvents)[keyof typeof PlausibleEvents]>
-> = {
-  verifyAuthorization: PlausibleEvents.BLUESKY_JOB_STARTED_VERIFY_AUTHORIZATION,
-  savePosts: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_POSTS,
-  saveLikes: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_LIKES,
-  saveBookmarks: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_BOOKMARKS,
-  saveChatConvos: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_CHAT_CONVOS,
-  saveChatMessages: PlausibleEvents.BLUESKY_JOB_STARTED_SAVE_CHAT_MESSAGES,
-  // Delete job events can be added later when analytics are set up for them
-};
-
 export async function runJob(
   controller: BlueskyAccountController,
   job: BlueskyJobRecord,
   emit: JobEmit
 ): Promise<void> {
-  // Track the job start event
-  const eventName = JOB_TYPE_TO_EVENT[job.jobType];
-  if (eventName) {
-    trackEvent(eventName);
-  }
-
   const handlers: Partial<
     Record<BlueskyJobRecord["jobType"], () => Promise<void>>
   > = {

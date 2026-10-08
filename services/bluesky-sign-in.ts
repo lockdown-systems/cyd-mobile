@@ -4,10 +4,8 @@ import {
   type AccountAuthStatusValue,
 } from "@/controllers";
 import type { AccountListItem } from "@/database/accounts";
-import { trackEvent } from "@/services/analytics";
 import { verifyBlueskyAccountAuthStatus } from "@/services/bluesky-account-auth-status";
 import { authenticateBlueskyAccount } from "@/services/bluesky-oauth";
-import { PlausibleEvents } from "@/types/analytics";
 
 /**
  * Establish a Bluesky connection and leave the account knowing it has one.
@@ -43,7 +41,6 @@ export async function connectBlueskyAccount(
   handle: string,
 ): Promise<BlueskySignIn> {
   const account = await authenticateBlueskyAccount(handle);
-  trackEvent(PlausibleEvents.BLUESKY_USER_SIGNED_IN);
 
   let status: AccountAuthStatusValue = ACCOUNT_AUTH_STATUS.signedOut;
   try {
