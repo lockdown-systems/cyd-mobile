@@ -7,7 +7,6 @@ import {
 } from "expo-router/react-navigation";
 import { Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 
@@ -19,8 +18,6 @@ import {
 import { CydAccountProvider } from "@/contexts/CydAccountProvider";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationHandler } from "@/hooks/use-notification-handler";
-import { trackEvent } from "@/services/analytics";
-import { PlausibleEvents } from "@/types/analytics";
 
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
@@ -33,11 +30,6 @@ function RootLayoutContent() {
 
   // Hide CydAccountBar when on the account detail screen
   const isAccountScreen = segments[0] === "account";
-
-  useEffect(() => {
-    // Track app opened event on initial load
-    trackEvent(PlausibleEvents.APP_OPENED);
-  }, []);
 
   // Wait for onboarding check to complete before rendering
   if (!hasChecked) {
