@@ -129,9 +129,8 @@ export type BlueskyArchiveRestoreEnvironment = {
 
   /**
    * Copy a staged payload into the account's own media storage.
-   *
-   * `fileName` is content-addressed, so restoring an archive that references
-   * the same bytes from several records writes one file (ADR 0007).
+   * `fileName` is content-addressed, so the same bytes referenced by several
+   * records write one file.
    */
   storeAccountMedia(
     accountUuid: string,

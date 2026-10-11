@@ -19,43 +19,9 @@ import { BlueskyArchiveExportCancelled } from "@/services/archive-export";
 /**
  * Writing a Cyd Bluesky archive, from asking to handing it over.
  *
- * Five things happen here that the writer itself has no opinion about.
- *
- * The first is the warning. A Cyd Bluesky archive is plaintext: Cyd protects
- * Bluesky connections in the operating system's own storage and leaves saved
- * posts, chats and media to the device's encryption (ADR 0013). Somebody about
- * to hand that file to whatever a share sheet reaches is owed that sentence
- * before the file exists, not once it is already in their downloads.
- *
- * The second is resuming. An export the operating system killed left a
- * checkpoint behind, and starting again picks it up rather than paying for the
- * snapshot and the hashing twice (ADR 0006).
- *
- * The third is delivery, which is also when staging stops being useful: the
- * archive lives in staging until it has been handed over, and is thrown away
- * immediately afterwards. Staging holds the archive *and* a copy of the
- * account database, so it is not a thing to leave lying around — but a
- * delivery that never happened leaves it alone, because the archive in there
- * is the only copy and trying again is meant to find it.
- *
- * Delivery is two things, not one, and Android is why. A share sheet is
- * `ACTION_SEND`, which enumerates applications that *receive* content — cloud
- * drives, mail, messengers — and never the device's own storage, because
- * saving to a folder is `ACTION_OPEN_DOCUMENT_TREE` and a different intent
- * entirely. Offering only the sheet would mean the one instruction this flow
- * gives ("put it somewhere you trust, like an encrypted drive") is the one
- * thing an Android user cannot do, and getting your data out of Cyd would
- * require handing it to somebody else first. So saving to the device is its
- * own affordance, on both platforms.
- *
- * The fourth is which account. Export is offered from the app-wide menu
- * beside import, so unlike everything else about an export there is no account
- * in hand when it starts. One Bluesky local account is not a question worth
- * asking, so it is not asked; more than one is.
- *
- * The fifth is nothing at all: no Cyd account, no entitlement check, no
- * network. Getting your own data out of Cyd is not a premium feature
- * (ADR 0015), and the absence of any such call here is the whole of that.
+ * Saving to the device is offered alongside the share sheet because Android's
+ * share sheet (`ACTION_SEND`) can only hand content to other apps, never to
+ * local storage.
  */
 
 /** A Bluesky local account an export can be written from. */
@@ -228,7 +194,7 @@ function plural(count: number, noun: string): string {
  *
  * An archive short of a file is still worth having, and saying so is the
  * difference between an honest incomplete Cyd Bluesky archive and one that
- * quietly claims to be complete (#91, ADR 0010). The two ways a file can be
+ * quietly claims to be complete (#91). The two ways a file can be
  * absent stay apart for the same reason: one is media Cyd never finished
  * preserving, and the other is media Cyd had and could not read at the moment
  * it packaged the archive.

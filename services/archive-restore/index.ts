@@ -1,25 +1,11 @@
 /**
- * Restoring a prepared Cyd Bluesky archive into a Bluesky local account.
+ * Restoring a prepared Cyd Bluesky archive into a Bluesky local account,
+ * browsable offline with no Bluesky connection and no premium subscription.
+ * Covers the case where the identity is new to this installation; merging into
+ * an existing account is a recovery union with its own reconciliation rules.
  *
- * This is the second half of a Bluesky archive import: intake ends with a
- * verified archive sitting in isolated staging (#95), and restore turns that
- * into an account somebody can browse offline, with no Bluesky connection and
- * no premium subscription.
- *
- * It covers the case where the identity is new to this installation. Merging
- * an archive into a Bluesky local account that already exists is a recovery
- * union with its own reconciliation rules (#97).
- *
- * What leaves this module is the entry point, the failures a caller has to
- * tell somebody about, and the ports an adapter has to implement. Everything
- * else — the translation and the row writer — is internal, and its tests reach
- * for it directly.
- *
- * The pieces a merge needs are the exception. Reading a version 2 interchange
- * database, translating it into Mobile's rows, and copying its media into an
- * account are the same work whichever half of the import is running, so they
- * are exported here and #97 consumes them rather than growing a second v2
- * adapter that can drift from this one.
+ * The v2 interchange reader, translator, and media copier are exported because
+ * merge needs the same pieces — not to grow a second adapter.
  */
 
 export { createBlueskyArchiveRestoreEnvironment } from "./environment";

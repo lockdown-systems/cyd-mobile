@@ -6,19 +6,15 @@ import { BlueskyArchiveExportError } from "./errors";
 /**
  * The ZIP half of a Cyd Bluesky archive writer.
  *
- * Every entry's header is complete before its first byte is written, so an
- * archive is produced in one sequential pass with no seeking and no data
- * descriptors. That is why callers declare each entry's size and CRC up front:
- * both come from an earlier pass over the same bytes, and re-checking them here
- * turns "the file changed underneath us" into an error instead of a corrupt
- * archive.
+ * Every entry's header is complete before its first byte is written: one
+ * sequential pass, no seeking, no data descriptors. Callers declare each
+ * entry's size and CRC up front, and re-checking them here turns "the file
+ * changed underneath us" into an error instead of a corrupt archive.
  *
- * Media is stored rather than deflated. JPEG and MP4 do not compress, and a
- * streaming deflate cannot know its compressed size until it finishes — which
- * on a phone packaging a multi-gigabyte video would mean buffering the whole
- * entry. Something already compressed into a staged file can be added with
- * {@link BlueskyArchiveZipWriter.addDeflatedEntry}, which is how `data.db` gets
- * in without paying for its empty SQLite pages.
+ * Media is stored rather than deflated — JPEG and MP4 do not compress, and a
+ * streaming deflate cannot know its compressed size until it finishes.
+ * Already-compressed staged files go in via
+ * {@link BlueskyArchiveZipWriter.addDeflatedEntry}.
  */
 
 const LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;

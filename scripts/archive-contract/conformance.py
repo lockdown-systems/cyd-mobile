@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Check any .cyd file against the pinned Cyd Bluesky archive v2 contract.
 
-Cyd Mobile builds its version 2 writer before the reader that consumes it
-(ADR 0004), so for a while nothing in the app can tell a correct archive from a
+Cyd Mobile builds its version 2 writer before the reader that consumes it,
+so for a while nothing in the app can tell a correct archive from a
 plausible one. This does, against the pinned canonical schema rather than
 against Mobile's own idea of the format.
 

@@ -4,7 +4,7 @@ import { readAssetInventory } from "./mobile-snapshot";
 import type { BlueskyArchiveExportEnvironment, ExportStagingArea } from "./ports";
 
 /**
- * Taking the one moment a Cyd Bluesky archive describes (ADR 0010).
+ * Taking the one moment a Cyd Bluesky archive describes.
  *
  * Everything an export claims comes from here: a SQLite copy of the account
  * database, and a list of where each preserved file was and how big it was at

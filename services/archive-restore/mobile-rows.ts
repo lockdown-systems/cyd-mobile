@@ -8,24 +8,12 @@ import type {
 /**
  * Turning the version 2 interchange model back into Mobile's private rows.
  *
- * This is the inverse of `services/archive-export/interchange.ts`, and it is
- * pure in the same way: in go the archive's rows and what the media-copying
- * pass managed to place on this device, out come the rows Mobile's own browse
- * screens read. No database, no filesystem, no clock.
- *
- * Two rules shape most of the decisions, and they are the export's rules read
- * backwards:
- *
- * 1. Nothing is invented. Where the contract holds something Mobile has no
- *    column for — a block, a message's media, a profile description — the data
- *    is reported as unrestorable rather than bent into a column that means
- *    something else. Where Mobile requires a value the archive does not carry,
- *    the fallback is a fact the archive already states, such as the DID behind
- *    a profile with no handle.
- * 2. What was selected stays selected. The interchange model records a like or
- *    a repost as a record of its own; Mobile records it as viewer state on the
- *    post. A restored account has to be browseable, so a selection always ends
- *    up as the flag the browse queries actually filter on.
+ * The inverse of `services/archive-export/interchange.ts`, pure in the same
+ * way: no database, no filesystem, no clock. Two rules shape the decisions:
+ * nothing is invented (what Mobile has no column for is reported unrestorable;
+ * required values fall back to facts the archive states), and what was selected
+ * stays selected (a like or repost record becomes the viewer-state flag the
+ * browse queries actually filter on).
  */
 
 const POST_TYPE = "app.bsky.feed.post";

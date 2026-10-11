@@ -2,25 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Recovery, portability and browsing are free (ADR 0015).
+ * Recovery, portability and browsing are free.
  *
- * Premium governs collection and automation — saving on a schedule, deleting
- * in bulk. It has never governed getting your own data back out, and #91 says
- * so explicitly: export, import and offline Bluesky browse bypass entitlement
- * entirely.
- *
- * That is a guarantee about an *absence*, which is the hardest kind to keep.
- * There is no premium check to assert the shape of; there is only the fact
- * that nothing in these files reaches for one, and a paywall added a year from
- * now would be a one-line change nobody noticed. So the absence is asserted
- * directly, over the whole surface it has to hold across.
- *
- * The behavioural half lives beside the flows it belongs to:
- * `components/__tests__/BlueskyArchiveExportModal.test.tsx` and
- * `hooks/__tests__/use-bluesky-archive-import.test.ts` both drive a whole flow
- * with no `CydAccountProvider` above it, and `useCydAccount` throws outside
- * one — so an entitlement check anywhere in either would fail there rather
- * than here.
+ * Premium governs collection and automation, never getting your own data back
+ * out: export, import and offline Bluesky browse bypass entitlement entirely.
+ * The absence is asserted directly over the whole surface it has to hold
+ * across.
  */
 
 const REPOSITORY_ROOT = path.join(__dirname, "../..");

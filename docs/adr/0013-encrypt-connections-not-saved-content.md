@@ -1,3 +1,0 @@
-# Encrypt Bluesky connections, not Bluesky saved data
-
-Cyd Mobile does not add application-level encryption for its private runtime databases, chats, or media in the initial Bluesky version 2 work; Bluesky saved data relies on the mobile operating system’s app sandbox, access controls, and device encryption. Bluesky connection material remains the protected-storage exception, while plaintext Cyd Bluesky archive version 2 export explicitly warns that a Cyd Bluesky archive may contain sensitive Bluesky saved data; Cyd Bluesky archive encryption requires a future Bluesky format and recovery design.

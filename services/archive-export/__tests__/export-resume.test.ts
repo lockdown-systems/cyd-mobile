@@ -26,11 +26,9 @@ import type { BlueskyArchiveExportEnvironment } from "../ports";
 /**
  * An export that the operating system interrupts, picked up on the next launch.
  *
- * The property worth protecting is not speed: it is that a resumed export is
- * still the export that was started. The moment an archive describes is taken
- * once (ADR 0010), so everything staged under that moment survives a restart,
- * and work that happened to the account in between stays out of the archive
- * however many launches it takes to finish.
+ * The property worth protecting is that a resumed export is still the export
+ * that was started: everything staged under the original moment survives a
+ * restart, and account work in between stays out of the archive.
  */
 
 const PORTABLE_SETTINGS = {

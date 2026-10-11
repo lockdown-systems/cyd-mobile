@@ -33,9 +33,7 @@ export type BlueskyArchiveMergeEnvironment = {
 
   /**
    * Copy a staged payload into the account's own media storage.
-   *
-   * Content-addressed, so a file the account already holds is written once
-   * (ADR 0007) and merging the same archive twice copies nothing new.
+   * Content-addressed, so merging the same archive twice copies nothing new.
    */
   storeAccountMedia(
     accountUuid: string,

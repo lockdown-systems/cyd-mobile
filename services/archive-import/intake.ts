@@ -36,7 +36,7 @@ import { readZipCentralDirectory, streamZipEntry, type ZipEntry } from "./zip-re
  * sitting in an isolated staging area, ready for a later transactional merge.
  * It deliberately knows nothing about Bluesky local accounts, which is what
  * makes "cancelling leaves live accounts untouched" a property of the code
- * rather than a promise. See ADR 0006 and ADR 0009.
+ * rather than a promise.
  */
 
 /** Where the checkpoint lives, kept out of `payload/` so no entry can forge it. */

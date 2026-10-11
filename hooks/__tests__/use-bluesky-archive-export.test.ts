@@ -278,9 +278,9 @@ describe("exporting a Cyd Bluesky archive", () => {
 
   /**
    * A Cyd Bluesky archive is not encrypted, and the posts, chats and media in
-   * it are as sensitive as whatever they were on Bluesky (ADR 0013). Somebody
-   * about to put that file wherever a share sheet can reach is owed that
-   * before it exists, not after.
+   * it are as sensitive as whatever they were on Bluesky. Somebody about to
+   * put that file wherever a share sheet can reach is owed that before it
+   * exists, not after.
    */
   it("says the archive is not encrypted before it writes one", async () => {
     const { result } = renderExport();
@@ -333,12 +333,10 @@ describe("exporting a Cyd Bluesky archive", () => {
   });
 
   /**
-   * Saving to the device is the delivery that needs nobody else.
-   *
-   * An Android share sheet is `ACTION_SEND` and lists only applications that
-   * receive content, so without this the sole way out of Cyd is through a
-   * cloud service — for a plaintext archive, and for a feature whose whole
-   * point is that the data is yours (ADR 0013, ADR 0015).
+   * Saving to the device is the delivery that needs nobody else. An Android
+   * share sheet is `ACTION_SEND` and lists only applications that receive
+   * content, so without this the sole way out of Cyd is through a cloud
+   * service — for a plaintext archive.
    */
   it("saves the archive to this device, and keeps nothing staged once it has", async () => {
     const { result } = renderExport();

@@ -23,12 +23,9 @@ export function requireUnknownIdentity(
 /**
  * Which local-account UUID the restored Bluesky local account gets.
  *
- * A Cyd Bluesky archive carries the UUID the exporting installation used, and
- * keeping it is what lets the same identity look like the same Bluesky local
- * account across clients. It is a preference rather than a guarantee: a UUID
- * already held by a *different* Bluesky identity must not be reused, because
- * the two accounts would then be one. In that case Cyd remaps and says so
- * (ADR 0011).
+ * Keeping the archive's UUID lets the same identity look like the same account
+ * across clients, but a UUID already held by a *different* Bluesky identity
+ * must not be reused — in that case Cyd remaps and says so.
  */
 
 export type LocalAccountIdentity = {
@@ -78,12 +75,9 @@ export function chooseRestoredAccountUuid(options: {
 /**
  * Which handle the restored Bluesky local account is listed under.
  *
- * Mobile requires a handle and keeps them unique, and Bluesky handles move
- * between identities: somebody who renamed and re-registered can hold an
- * archive whose handle another Bluesky local account is already listed under.
- * The DID is the identity either way (ADR 0011), so the restored account falls
- * back to it rather than failing, or quietly taking a name that belongs to
- * somebody else's Bluesky local account.
+ * Bluesky handles move between identities, so the archive's handle may already
+ * be taken. The DID is the identity either way, so the restored account falls
+ * back to it rather than failing.
  */
 export function chooseRestoredAccountHandle(options: {
   archiveHandle: string;

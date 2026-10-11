@@ -13,19 +13,12 @@ import type {
 } from "./rows";
 
 /**
- * Reading a Bluesky local account back out in the shape a restore writes it.
- *
- * This is the mirror of `services/archive-restore/account-writer.ts`, and it
- * exists so the merge compares like with like: the archive's side arrives as
- * Mobile rows through the translation, and this turns the account's own side
- * into the same rows. Columns Mobile fills in for itself — a row id, the
- * denormalized aspect ratio — are left out, because nothing in a union has an
- * opinion about them.
- *
- * `viewer*` columns are nullable in Mobile's schema and are read as flags
- * here. A null and a zero mean the same thing to browse, and normalizing them
- * is what keeps a second import of the same archive from writing rows back
- * unchanged.
+ * Reading a Bluesky local account back out in the shape a restore writes it,
+ * so the merge compares like with like. Columns Mobile fills in for itself —
+ * a row id, the denormalized aspect ratio — are left out. `viewer*` columns
+ * are nullable in Mobile's schema and read as flags here: a null and a zero
+ * mean the same thing to browse, and normalizing them keeps a second import
+ * of the same archive from writing rows back unchanged.
  */
 
 const flag = (value: number | null): number => (value === 1 ? 1 : 0);

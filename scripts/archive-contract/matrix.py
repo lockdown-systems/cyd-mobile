@@ -55,7 +55,7 @@ READER_MODULES = (
 )
 
 #: What makes a tree a *writer* people can reach: an export somebody can press.
-#: The writer itself has been buildable for far longer (ADR 0004).
+#: The writer itself has been buildable for far longer.
 WRITER_AFFORDANCE = "components/BlueskyArchiveExportModal.tsx"
 
 COMMITTED_FIXTURES = (
@@ -166,8 +166,8 @@ MATRIX: tuple[tuple[str, tuple[Row, ...]], ...] = (
                     Jest("archive-contract-exchange", "renamed handle"),
                     # The epic asks for duplicate-DID reconciliation. Mobile
                     # cannot reach that state — `bsky_account.did` has been
-                    # unique since the migration that added it — so ADR 0011 is
-                    # superseded here and refusing is the whole behaviour.
+                    # unique since the migration that added it, so refusing is
+                    # the whole behaviour here.
                     Jest("archive-merge/__tests__/destination", "refuses rather than guess"),
                 ),
             ),
@@ -412,7 +412,7 @@ def tree_has(ref: str, path: str) -> bool:
 def check_readers_ship_with_the_writer() -> Outcome:
     """No release may offer export without the readers that consume it.
 
-    ADR 0004's standing rule, made checkable. What it guards against is a Cyd
+    A standing rule, made checkable. What it guards against is a Cyd
     Bluesky archive existing before anything can read one, so it binds per
     release rather than per commit: a version offering export has to carry the
     readers too. Shipping both in one version satisfies that, because nobody

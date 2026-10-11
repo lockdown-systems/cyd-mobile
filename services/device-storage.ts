@@ -29,11 +29,9 @@ export const ARCHIVE_STAGING_DIRECTORY = "archive-intake";
 /**
  * Where an import unpacks an archive while it works.
  *
- * This is durable storage rather than the cache, because an import that the
- * system interrupts has to be resumable on the next launch (ADR 0006) and the
- * cache can be evicted underneath it. It is excluded from device backup
- * instead: staging is half-unpacked working state, not committed account data
- * (ADR 0014).
+ * Durable storage rather than the cache, so an interrupted import can resume
+ * on the next launch; excluded from device backup because staging is
+ * half-unpacked working state, not committed account data.
  */
 export function getArchiveStagingRoot(): string {
   return `${getDocumentRoot()}${ARCHIVE_STAGING_DIRECTORY}/`;
@@ -49,11 +47,9 @@ export const ARCHIVE_EXPORT_DIRECTORY = "archive-export";
 /**
  * Where an export assembles an archive while it works.
  *
- * Durable rather than cache storage for the same reason import staging is: an
- * export the system interrupts has to be resumable on the next launch (ADR
- * 0006), and the cache can be evicted underneath it. It is excluded from
- * device backup: a half-written archive is working state, and the Bluesky
- * saved data it was built from is backed up already (ADR 0014).
+ * Durable rather than cache storage for the same reason import staging is;
+ * excluded from device backup because a half-written archive is working state,
+ * and the saved data it was built from is backed up already.
  */
 export function getArchiveExportStagingRoot(): string {
   return `${getDocumentRoot()}${ARCHIVE_EXPORT_DIRECTORY}/`;

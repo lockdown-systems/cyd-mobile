@@ -4,13 +4,9 @@ import type { PreparedArchiveStore, StoredMediaFile } from "./ports";
 
 /**
  * Copying a Cyd Bluesky archive's packaged assets into a Bluesky local
- * account.
- *
- * Both halves of an import land here: a restore copies into the account it is
- * creating, and a merge copies into the account it is merging with (#97). The
- * rule is the same either way, which is why it is one file — an archive's
- * media is content-addressed, so the same bytes referenced by several records
- * are stored once (ADR 0007).
+ * account. Both restore and merge land here; either way an archive's media is
+ * content-addressed, so the same bytes referenced by several records are
+ * stored once.
  */
 
 /** Content-addressed name of a restored file inside the account's media store. */
@@ -46,11 +42,9 @@ function isPackaged(
 }
 
 /**
- * Where each packaged asset will end up, without moving a byte.
- *
- * Media is content-addressed, so its path is a fact about the file rather than
- * a result of copying it. That is what lets a merge plan the exact rows it
- * would write before anybody has agreed to the merge (ADR 0018).
+ * Where each packaged asset will end up, without moving a byte. Media is
+ * content-addressed, so its path is a fact about the file — which is what lets
+ * a merge plan the exact rows it would write before anybody has agreed to it.
  */
 export function predictArchivedMedia(
   assets: InterchangeAsset[],

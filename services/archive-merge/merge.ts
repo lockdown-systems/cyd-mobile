@@ -28,16 +28,10 @@ import type {
  * The commit half of a Bluesky archive import for an identity Cyd already
  * holds.
  *
- * It runs in two acts, and the split is the point. A **preview** reads the
- * prepared archive and works out exactly what merging it would do, touching
- * nothing; a **commit** takes that preview and carries it out. Somebody is
- * shown the preview first because a recovery merge can bring back records they
- * deleted from Cyd on purpose, and nobody should find that out afterwards.
- *
- * Everything else follows the restore's shape (#96): media is copied in before
- * rows are written, so a record's local file path is known when its row is
- * built, and an asset that will not copy becomes a failed download rather than
- * a failed import.
+ * Two acts, and the split is the point: a **preview** works out exactly what
+ * merging would do, touching nothing, and a **commit** carries it out. The
+ * preview is shown first because a recovery merge can bring back records
+ * somebody deleted on purpose. Otherwise it follows the restore's shape (#96).
  */
 
 export type BlueskyArchiveMergePhase =
@@ -97,10 +91,9 @@ export type BlueskyArchiveMergeResult = {
 /**
  * Work out what merging this archive would do, without doing any of it.
  *
- * Media is not copied yet, so the plan is built against where each file *will*
- * live: the paths are content-addressed, so they are known before the bytes
- * move (ADR 0007). A file that then refuses to copy is downgraded at commit
- * time, which can only ever turn a restored asset into a failed download.
+ * Media paths are content-addressed, so they are known before the bytes move.
+ * A file that then refuses to copy is downgraded at commit time, which can
+ * only ever turn a restored asset into a failed download.
  */
 export async function previewBlueskyArchiveMerge(
   environment: BlueskyArchiveMergeEnvironment,
@@ -237,11 +230,9 @@ async function planAgainstAccount(
 }
 
 /**
- * Refuse an archive that belongs to somebody else.
- *
- * The DID is the identity (ADR 0011), so this is the only check worth making:
- * a handle that matches proves nothing, and a handle that does not is routine
- * for somebody who renamed.
+ * Refuse an archive that belongs to somebody else. The DID is the identity, so
+ * this is the only check worth making: a handle that matches proves nothing,
+ * and a handle that does not is routine for somebody who renamed.
  */
 function requireMatchingIdentity(
   archiveDid: string,

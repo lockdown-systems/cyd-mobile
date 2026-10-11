@@ -5,27 +5,13 @@ import type { BlueskyArchiveExportEnvironment } from "./ports";
 import { givesWayToTheScreen } from "./scheduling";
 
 /**
- * Deciding what Cyd can honestly claim about each preserved asset.
+ * Deciding what Cyd can honestly claim about each preserved asset: every
+ * referenced asset ends up `available`, `missing`, or `unavailable` — never
+ * left out. Hashing happens after account work resumes, so it can disagree
+ * with the inventory; that disagreement is recorded, not retried into silence.
  *
- * A Cyd Bluesky archive is allowed to be incomplete; it is not allowed to be
- * quietly wrong. So every asset the account references ends up in one of three
- * states, and none of them is "left out":
- *
- * - `available` — the bytes were read and hashed, and go in the archive.
- * - `missing` — Cyd never finished preserving it, so there is nothing to
- *   package. The record still references it, and the archive is incomplete.
- * - `unavailable` — Cyd had preserved it, but it was gone or a different size
- *   by the time the export read it. This is the case the point-in-time
- *   inventory exists to catch (ADR 0010).
- *
- * Hashing happens after account work resumes, which is exactly why it can
- * disagree with the inventory. That disagreement is information, so it is
- * recorded rather than retried into silence.
- *
- * The reasons are written for whoever opens the archive, and are fixed strings
- * on purpose: a storage error's own message names the file it failed on, and
- * device filesystem paths are one of the things the contract's privacy
- * boundary keeps out of a Cyd Bluesky archive.
+ * Unavailability reasons are fixed strings on purpose — device filesystem
+ * paths stay out of the archive.
  */
 
 /** Identifies a preserved file within one export, before it is hashed. */
@@ -131,12 +117,8 @@ export type ResolveStagedAssetsOptions = {
 /**
  * Read and hash every inventoried asset, one at a time.
  *
- * One file is in memory at most: assets are streamed through the hasher, so a
- * long video costs the same as a thumbnail. It is also the longest pass an
- * export makes — every preserved byte, once — which is why an asset settled
- * here is reported straight away rather than at the end: an export killed
- * part-way through resumes from the last file it finished, not the first
- * (ADR 0006).
+ * One file is in memory at most, and each settled asset is reported straight
+ * away so an interrupted export resumes from the last file it finished.
  */
 export async function resolveStagedAssets(
   environment: BlueskyArchiveExportEnvironment,

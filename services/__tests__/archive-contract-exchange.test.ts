@@ -44,27 +44,15 @@ import { classifyBlueskyArchiveMetadata } from "../archive-metadata";
 import { normalizeBlueskyArchiveSemantics } from "../archive-semantics";
 
 /**
- * The bidirectional half of the Cyd Bluesky archive v2 conformance matrix.
- *
- * `archive-contract-bundle.test.ts` proves Mobile *understands* the pinned
- * canonical fixtures: it normalizes them and takes them into staging. That is
- * not the same as interoperating with Desktop, which is what #100 gates the
- * writer on, and what this covers instead — both directions, end to end:
- *
- * - Desktop to Mobile: a canonical archive becomes a Bluesky local account
- *   somebody can browse offline, merges idempotently, and recovers a file an
- *   earlier archive could not carry.
- * - Mobile to Desktop: Mobile's own writer rewrites that restored account as a
- *   Cyd Bluesky archive, and what comes out still says what Desktop said.
+ * The bidirectional half of the Cyd Bluesky archive v2 conformance matrix:
+ * Desktop to Mobile (restore, browse offline, idempotent merge) and Mobile to
+ * Desktop (export that still says what Desktop said).
  *
  * Comparisons are semantic throughout (#91): normalized wire names, browse
  * queries, and media digests, never ZIP byte order or Mobile's private tables.
  *
- * The round trip is lossy in ways Mobile cannot help — `docs/
- * bluesky-archive-fixtures.md` lists them — so every loss is asserted here as
- * a loss rather than skipped. A new one fails these tests, which is the point:
- * the matrix is what stands between "Mobile wrote an archive" and "Desktop can
- * still read what was in it".
+ * Every lossy step of the round trip is asserted as a loss rather than
+ * skipped.
  */
 
 const contractRoot = process.env.CYD_BLUESKY_CONTRACT_ROOT;
@@ -257,9 +245,8 @@ contractDescribe("a canonical Desktop archive, restored by Mobile", () => {
   });
 
   it("stores each canonical asset once, content-addressably", () => {
-    // Four assets, and the image is referenced twice — once as the account's
-    // avatar and once inside the post. Per-account deduplication is what makes
-    // that one file rather than two (ADR 0007).
+    // Four assets, the image referenced twice (avatar and post); per-account
+    // deduplication makes that one file rather than two.
     const digests = storedMedia(installation, account.accountUuid);
     expect(new Set(digests).size).toBe(digests.length);
     expect(digests).toContain(IMAGE_DIGEST);
@@ -726,12 +713,9 @@ contractDescribe("a canonical Desktop archive, rewritten by Mobile", () => {
   });
 
   /**
-   * What Mobile cannot carry, asserted as absence rather than left unchecked.
-   *
-   * Each of these is a Mobile storage limitation listed in
-   * `docs/bluesky-archive-fixtures.md`, not a contract failure — but an
-   * unasserted loss is indistinguishable from a regression, so they are
-   * pinned here. Fixing one of them is meant to fail this test.
+   * What Mobile cannot carry, asserted as absence rather than left unchecked:
+   * these are Mobile storage limitations, not contract failures, but an
+   * unasserted loss is indistinguishable from a regression.
    */
   describe("what a Mobile round trip loses, on purpose", () => {
     it("drops the mute, which Mobile has nowhere to keep", () => {

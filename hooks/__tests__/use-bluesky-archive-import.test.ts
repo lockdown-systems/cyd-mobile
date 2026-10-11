@@ -165,12 +165,10 @@ describe("importing a Cyd Bluesky archive from the menu", () => {
   });
 
   /**
-   * Getting your own data back into Cyd is not a premium feature (ADR 0015).
-   *
-   * This hook is driven with no `CydAccountProvider` above it, and
-   * `useCydAccount` throws outside one — so an entitlement check anywhere
-   * between the picker and the restored account would fail this rather than
-   * quietly gate recovery on a subscription.
+   * Getting your own data back into Cyd is not a premium feature. This hook is
+   * driven with no `CydAccountProvider` above it, and `useCydAccount` throws
+   * outside one — so an entitlement check anywhere in this flow would fail
+   * this rather than quietly gate recovery on a subscription.
    */
   it("imports with no Cyd account signed in at all", async () => {
     const { result } = renderHook(() =>
@@ -189,10 +187,10 @@ describe("importing a Cyd Bluesky archive from the menu", () => {
   });
 
   /**
-   * Intake keeps a verified partial extraction so a killed import can be
-   * resumed (ADR 0006), and nothing in Mobile offers to resume one — so
-   * without this, every import the operating system interrupts leaves an
-   * archive-sized directory behind until the app is uninstalled.
+   * Intake keeps a verified partial extraction so a killed import could be
+   * resumed, and nothing in Mobile offers to resume one — so without this,
+   * every import the operating system interrupts leaves an archive-sized
+   * directory behind until the app is uninstalled.
    */
   it("clears staging an earlier launch abandoned", async () => {
     fs.mkdirSync(path.join(harness.stagingParent, "abandoned-with-nothing"), {

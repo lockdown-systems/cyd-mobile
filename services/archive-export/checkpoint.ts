@@ -7,18 +7,10 @@ import type {
 } from "./ports";
 
 /**
- * What an export has already done, written where a restart can find it.
- *
- * Cyd Mobile does not promise an export finishes in the background; it
- * promises that one the operating system kills is picked up where it stopped
- * rather than started over (ADR 0006). That promise is this file: the moment
- * the archive describes, the files that moment inventoried, and the digest of
- * every one already read.
- *
- * The checkpoint is what makes a resumed export the *same* export. Taking the
- * snapshot again would be easier, and it would quietly move the archive's
- * point in time forward past whatever the account saved or deleted in between
- * (ADR 0010). So the snapshot is taken once, and everything after it — hashing,
+ * What an export has already done, written where a restart can find it: the
+ * moment the archive describes, the files that moment inventoried, and the
+ * digest of every one already read. Retaking the snapshot would quietly move
+ * the archive's point in time forward, so everything after it — hashing,
  * translating, packaging — is work the checkpoint can hand back.
  */
 

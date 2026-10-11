@@ -25,10 +25,9 @@ import type {
 /**
  * The device-backed implementation of the export ports.
  *
- * Everything platform-specific about writing a Cyd Bluesky archive lives here:
- * SQLite handles, file handles, hashing, and pausing the account's own jobs.
- * The export logic itself never sees any of it, which is what lets the same
- * writer run under Node against a pulled account directory (ADR 0016).
+ * Everything platform-specific about writing a Cyd Bluesky archive lives here;
+ * the export logic itself never sees any of it, which is what lets the same
+ * writer run under Node against a pulled account directory.
  */
 
 /** How much of a file to read at a time while hashing or packaging. */
