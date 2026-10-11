@@ -99,10 +99,8 @@ export function CydAccountBar({
    * The mirror of importing, and here rather than on an account screen for the
    * same reason: the two halves of moving your data between Cyd installations
    * belong side by side. Export is per-account and this menu is not, so the
-   * account is the export's own first question (#100).
-   *
-   * Like importing, it needs no Cyd account and no premium subscription
-   * (ADR 0015).
+   * account is the export's own first question (#100). Like importing, it
+   * needs no Cyd account and no premium subscription.
    */
   const handleExportArchive = useCallback(() => {
     setMenuVisible(false);

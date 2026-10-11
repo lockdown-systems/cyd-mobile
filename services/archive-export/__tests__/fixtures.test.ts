@@ -11,17 +11,11 @@ import {
 } from "@/testUtils/archiveFixtures";
 
 /**
- * Guards on the committed real-data fixtures.
- *
- * These are archives Mobile's own writer produced from a curated test account
- * (ADR 0016), and `testUtils/fixtures/bluesky-archive/README.md` records where
- * they came from. Two things about them are easy to break silently and are
- * therefore checked here rather than described in prose: that Mobile can still
- * read them, and that regenerating them did not quietly inflate the
- * repository, since committed media persists in history forever.
- *
- * What they *mean* is not settled here. The pinned canonical bundle is the
- * semantic oracle (ADR 0008); `npm run test:archive-contract` is that check.
+ * Guards on the committed real-data fixtures, produced by Mobile's own writer
+ * from a curated test account — see `testUtils/fixtures/bluesky-archive/README.md`.
+ * Checks that Mobile can still read them and that regenerating them did not
+ * quietly inflate the repository. What they *mean* is settled by the pinned
+ * canonical bundle: `npm run test:archive-contract`.
  */
 
 const FIXTURE_DIRECTORY = path.join(

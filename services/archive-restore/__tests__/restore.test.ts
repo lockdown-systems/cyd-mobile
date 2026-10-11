@@ -265,7 +265,7 @@ describe("restoring a complete Cyd Bluesky archive", () => {
     const files = fs.readdirSync(mediaDirectory).sort();
 
     // Five assets, six references: the archive packages each file once, and so
-    // does the account it is restored into (ADR 0007).
+    // does the account it is restored into.
     expect(files).toHaveLength(5);
     expect(account.assets).toEqual({ total: 5, restored: 5, missing: 0 });
     expect(

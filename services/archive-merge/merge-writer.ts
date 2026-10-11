@@ -4,17 +4,10 @@ import type { MergeableAccountDatabase } from "./ports";
 /**
  * Writing a merged plan into a Bluesky local account.
  *
- * Almost the same statements as a restore's, with one difference that matters:
  * `INSERT OR REPLACE` deletes the stored row and inserts a new one, so every
  * column a live account fills in for itself has to be named here or a merge
- * would quietly clear it. Those columns — a preserved post, a downloader's
- * attempt count — come off the merged row, where the union rules already
- * carried the local value across.
- *
- * The order is the restore's order, for the same reason: Mobile's schema has
- * foreign keys on, so profiles precede the records that name them, media
- * assets precede the attachments that reference them, and conversations
- * precede their messages.
+ * would quietly clear it. The order is the restore's order: foreign keys are
+ * on, so parents precede the rows that reference them.
  */
 export async function writeMergedAccountRows(
   database: MergeableAccountDatabase,

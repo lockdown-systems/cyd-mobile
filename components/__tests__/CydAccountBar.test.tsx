@@ -279,7 +279,7 @@ describe("CydAccountBar", () => {
     /**
      * Both halves of moving Bluesky data between Cyd installations, side by
      * side, and offered whether or not there is a Cyd account signed in:
-     * recovery and portability are not premium features (ADR 0015, #100).
+     * recovery and portability are not premium features (#100).
      */
     it("offers both archive import and archive export, signed out", () => {
       render(<CydAccountBar />);

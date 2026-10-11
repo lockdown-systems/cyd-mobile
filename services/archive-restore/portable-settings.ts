@@ -6,14 +6,10 @@ import type { RestorableSettingColumn, RestoredAccountSettings } from "./ports";
 /**
  * Turning an archive's portable settings into a new account's defaults.
  *
- * This is the mirror of `services/archive-export/portable-settings.ts`, and it
- * carries the same boundary: save and delete *defaults* cross, schedules never
- * do. A portable setting is what the person chose to back up and what they
- * chose to delete, not authority to run deletion on this device (ADR 0015).
- *
- * They apply only to a Bluesky local account being created. An account that
- * already exists keeps its own settings, which is why nothing here is reachable
- * from the merge path (#97).
+ * The mirror of `services/archive-export/portable-settings.ts`, with the same
+ * boundary: save and delete *defaults* cross, schedules never do. They apply
+ * only to a Bluesky local account being created — an existing account keeps
+ * its own settings, so nothing here is reachable from the merge path (#97).
  */
 
 /**

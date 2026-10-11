@@ -132,16 +132,12 @@ function messageFor(error: unknown): string {
 /**
  * Clear staging that an earlier launch left behind.
  *
- * Intake keeps a verified partial extraction on purpose, so that an import
- * killed by the operating system can be picked up rather than started over
- * (ADR 0006). Nothing in Mobile offers to pick one up, so what that policy
- * actually produces is a directory per abandoned import, each the size of the
- * archive it was reading, kept until the app is uninstalled.
- *
- * Starting an import is the moment to sweep them: it is the only thing that
- * creates them, the person is right there, and anything still in flight
- * belongs to a generation this one has already moved past. The day something
- * offers to resume an import, this is what it replaces.
+ * Intake keeps a verified partial extraction on purpose, but nothing in Mobile
+ * offers to resume one — so what that policy actually produces is a directory
+ * per abandoned import, kept until the app is uninstalled. Starting an import
+ * is the moment to sweep them: it is the only thing that creates them, and
+ * anything still in flight belongs to a generation this one has already moved
+ * past.
  */
 function discardAbandonedStaging(
   intake: BlueskyArchiveIntakeEnvironment,

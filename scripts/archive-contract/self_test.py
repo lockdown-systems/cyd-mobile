@@ -3,7 +3,7 @@
 
 A checker that passes everything would let a broken version 2 writer look
 correct, which matters more than usual while Mobile builds its writer before
-the reader that would otherwise catch it (ADR 0004). Each case below mutates
+the reader that would otherwise catch it. Each case below mutates
 the pinned canonical fixture and must be caught.
 
 Cases are resealed with a recomputed manifest, because that is how a broken

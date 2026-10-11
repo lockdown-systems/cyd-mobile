@@ -1,17 +1,13 @@
 /**
  * The Cyd Bluesky archive version 2 interchange schema, verbatim.
  *
- * This is a copy of `schema.sql` from the pinned canonical contract bundle
- * (ADR 0008), because a writer running on a phone cannot fetch the contract at
- * export time. The contract requires `data.db` to implement it *exactly*, so
- * this text is not a paraphrase and must not be "improved" locally:
- * `npm run test:archive-contract` compares it against the pinned bundle and
- * fails if the two ever drift.
- *
- * It is deliberately separate from `database/account-db/bluesky-migrations.ts`.
- * That schema is Mobile's private runtime storage and evolves on Mobile's
- * schedule; this one is the shared interchange model and only ever changes
- * when the contract does (ADR 0002).
+ * A copy of `schema.sql` from the pinned canonical contract bundle, because a
+ * writer running on a phone cannot fetch the contract at export time. It must
+ * not be "improved" locally: `npm run test:archive-contract` compares it
+ * against the pinned bundle and fails if the two ever drift. It is
+ * deliberately separate from `database/account-db/bluesky-migrations.ts`:
+ * that schema is Mobile's private runtime storage, this one is the shared
+ * interchange model and only ever changes when the contract does.
  */
 export const BLUESKY_ARCHIVE_V2_SCHEMA_SQL = `PRAGMA application_id = 0x43594232;
 PRAGMA user_version = 2;

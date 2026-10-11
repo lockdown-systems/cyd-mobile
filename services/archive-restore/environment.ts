@@ -178,8 +178,7 @@ export function createBlueskyArchiveRestoreEnvironment(): BlueskyArchiveRestoreE
       });
 
       // Portable settings apply only to an account being created, so they are
-      // written here rather than through the settings screens' own updates,
-      // which exist to record a choice somebody just made (ADR 0015).
+      // written here rather than through the settings screens' own updates.
       const settings = Object.entries(request.settings) as [
         RestorableSettingColumn,
         0 | 1,

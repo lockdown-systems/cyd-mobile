@@ -9,17 +9,14 @@ import type {
 /**
  * Translating Bluesky saved data into the version 2 interchange model.
  *
- * This is the other half of the adapter ADR 0002 describes, and it is pure: in
- * go Mobile's rows and what the hashing pass learned about each asset, out come
- * interchange rows. No database, no filesystem, no clock.
+ * Pure: in go Mobile's rows and what the hashing pass learned about each
+ * asset, out come interchange rows. No database, no filesystem, no clock.
  *
  * Two rules shape most of the decisions here:
  *
  * 1. Nothing is invented. Where Mobile does not observe something the contract
- *    can hold — a like's creation time, a reply parent Cyd never saved — the
- *    export says so by leaving it out or by falling back to a fact it does
- *    have, such as the author DID that an AT URI already names. `docs/
- *    bluesky-archive-fixtures.md` lists what Mobile cannot populate.
+ *    can hold, the export says so by leaving it out or by falling back to a
+ *    fact it does have.
  * 2. Nothing private leaks. Only the columns the snapshot reader selected are
  *    visible here, so local paths, jobs, and UI state cannot reach an archive
  *    even by accident.
@@ -769,16 +766,12 @@ class InterchangeBuilder {
 
   /**
    * Every asset an exported record refers to, each unique file exactly once.
+   * Mobile stores one file per blob CID, and two files that hash the same
+   * collapse here, because the interchange model keys assets by digest.
    *
-   * Deduplication happens twice over: Mobile already stores one file per blob
-   * CID within an account (ADR 0007), and two files that turn out to hash the
-   * same collapse here, because the interchange model keys assets by digest.
-   *
-   * Record media and link preview thumbnails both land here, from different
-   * Mobile storage. A preview Cyd never managed to download is not an asset at
-   * all — its URL stays in the record's external context, and its absence does
-   * not make the archive incomplete, because Mobile never counted it as part of
-   * the Bluesky saved data either.
+   * A preview Cyd never managed to download is not an asset at all — its URL
+   * stays in the record's external context, and its absence does not make
+   * the archive incomplete.
    */
   private buildAssets(): {
     assets: AssetRow[];

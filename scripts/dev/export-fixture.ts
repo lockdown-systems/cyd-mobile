@@ -11,11 +11,8 @@ import { createNodeBlueskyArchiveExportEnvironment } from "@/testUtils/nodeExpor
 
 /**
  * Export a pulled Bluesky account directory as a Cyd Bluesky archive.
- *
- * This is how the committed real-data fixtures are made (ADR 0016). It runs
- * Mobile's own version 2 writer over a copy of a curated test account, so the
- * fixtures carry real facets, CIDs, media bytes, and identifiers rather than
- * anything generated. See `docs/bluesky-archive-fixtures.md`.
+ * This is how the committed real-data fixtures are made — see
+ * `testUtils/fixtures/bluesky-archive/README.md`.
  *
  * Usage:
  *   npm run export:archive -- <account-directory> --out <file.cyd> [options]
@@ -220,7 +217,7 @@ async function main(): Promise<number> {
       `${result.assets.missing} missing, ${result.assets.unavailable} unavailable`,
   );
   console.log("");
-  console.log("Provenance, for docs/bluesky-archive-fixtures.md:");
+  console.log("Provenance:");
   console.log(`  account       ${identity.handle ?? "(unknown handle)"} (${identity.did})`);
   console.log(`  uuid          ${identity.uuid}`);
   console.log(`  exported      ${result.metadata.createdAt}`);

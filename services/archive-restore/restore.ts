@@ -28,24 +28,11 @@ import { writeRestoredAccountRows } from "./account-writer";
 
 /**
  * Turning a prepared Cyd Bluesky archive into a Bluesky local account somebody
- * can browse on a plane.
- *
- * The order of the four steps is the design:
- *
- * 1. **Read** — pull the whole interchange database into memory and check it
- *    is a version 2 Bluesky archive at all. Nothing has been created yet.
- * 2. **Place media** — copy each packaged asset into the account's own media
- *    storage, once per file (ADR 0007). An asset that will not copy becomes a
- *    failed download rather than a failed restore.
- * 3. **Translate** — turn the interchange rows into Mobile's private ones,
- *    now that every asset's local path is known (ADR 0002).
- * 4. **Commit** — create the Bluesky local account and write its database in
- *    one transaction.
- *
- * The account is created disconnected and stays that way: no Bluesky
- * connection, no schedule, and nothing here needs the network or a premium
- * subscription. If any step fails, the half-restored account and its media are
- * removed, so an installation is either unchanged or holds a whole account.
+ * can browse offline: read the interchange database, place media (an asset
+ * that will not copy becomes a failed download, not a failed restore),
+ * translate rows, then commit the account in one transaction. Any failure
+ * removes the half-restored account, so an installation either holds a whole
+ * account or is unchanged.
  */
 
 export type BlueskyArchiveRestorePhase =
@@ -88,7 +75,7 @@ export type BlueskyArchiveRestoreResult = {
   accountUuid: string;
   accountDid: string;
   handle: string;
-  /** Set when the archive's own UUID was already taken (ADR 0011). */
+  /** Set when the archive's own UUID was already taken. */
   uuidRemapping: RestoredUuidRemapping | null;
   /** What the archive said about itself, preserved on the restored account. */
   completeness: "complete" | "incomplete";

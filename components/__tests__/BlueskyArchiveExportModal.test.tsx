@@ -11,15 +11,10 @@ import {
 /**
  * Export as somebody meets it: from the app-wide menu, with the hook behind it.
  *
- * The modal and the hook are driven together rather than apart, because what
- * matters about this flow is an ordering that spans both — the plaintext
- * warning arrives before the file exists (ADR 0013), the archive is held until
- * somebody says where it goes, and staging is cleared only once it is
- * somewhere else (#99).
- *
- * Nothing renders a `CydAccountProvider`, which is the point of the last test:
- * `useCydAccount` throws outside one, so an entitlement check anywhere in this
- * flow would fail rather than quietly paywall recovery (ADR 0015).
+ * The modal and the hook are driven together because what matters about this
+ * flow is an ordering that spans both — the plaintext warning arrives before
+ * the file exists, the archive is held until somebody says where it goes, and
+ * staging is cleared only once it is somewhere else (#99).
  */
 
 jest.mock("@/hooks/use-color-scheme", () => ({
@@ -192,8 +187,8 @@ describe("exporting a Cyd Bluesky archive from the menu", () => {
   });
 
   /**
-   * Getting your own data out of Cyd is not a premium feature (ADR 0015).
-   * Nothing in this flow may reach for a Cyd account, and rendering it with no
+   * Getting your own data out of Cyd is not a premium feature. Nothing in this
+   * flow may reach for a Cyd account, and rendering it with no
    * `CydAccountProvider` above it is what proves that: `useCydAccount` throws
    * outside one, so an entitlement check anywhere in here would fail this.
    */

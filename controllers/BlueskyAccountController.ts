@@ -1754,15 +1754,11 @@ export class BlueskyAccountController extends BaseAccountController<BlueskyProgr
    * Write this account's Bluesky saved data out as a Cyd Bluesky archive.
    *
    * Needs no Bluesky connection: export reads only what Cyd already has, so it
-   * works while disconnected, offline, and without premium (ADR 0015).
+   * works while disconnected, offline, and without premium.
    *
    * Reusing an `exportId` resumes that export rather than starting another,
    * which is how an export the operating system killed carries on from what it
-   * had already staged (ADR 0006).
-   *
-   * What calls this is "Export Bluesky archive" in the app-wide menu, which is
-   * offered because the conformance matrix passes in both directions (#100,
-   * ADR 0004) rather than because somebody decided the writer looked ready.
+   * had already staged.
    */
   async exportBlueskyArchive(options: {
     exportId: string;

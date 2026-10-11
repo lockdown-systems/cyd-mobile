@@ -27,11 +27,10 @@ import type {
  * both are reached from the same menu, and the two halves of getting your data
  * in and out of Cyd should not feel like two different applications.
  *
- * Three of its states are the person deciding rather than Cyd working. Which
- * account, when this device holds more than one. Whether to write a plaintext
- * file at all — asked before the file exists, because afterwards is too late
- * (ADR 0013). And where the finished archive goes, which is the only step that
- * lets Cyd throw the staged copy away.
+ * Three of its states are the person deciding rather than Cyd working: which
+ * account, whether to write a plaintext file at all (asked before the file
+ * exists, because afterwards is too late), and where the finished archive
+ * goes.
  */
 
 export type BlueskyArchiveExportModalProps = {

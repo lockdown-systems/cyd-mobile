@@ -42,35 +42,11 @@ import { BlueskyArchiveZipWriter } from "./zip-writer";
 /**
  * Writing one Bluesky local account out as a Cyd Bluesky archive.
  *
- * The order of the four steps is the whole design:
+ * Stage → hash → translate → package. Nothing reads the live account after
+ * the staging step, so the archive stays internally consistent.
  *
- * 1. **Stage** — pause account work, copy the database, inventory the media.
- *    This is the point in time the archive describes (ADR 0010).
- * 2. **Hash** — with saving running again, read every inventoried file. What
- *    disagrees with the inventory becomes an unavailable asset, not a lie.
- * 3. **Translate** — turn Mobile's private rows into the interchange model and
- *    build `data.db` in staging (ADR 0002).
- * 4. **Package** — stream media, database, metadata, and manifest into the ZIP.
- *
- * Nothing here reads the live account after step 1, so however long steps 2–4
- * take, the archive stays internally consistent.
- *
- * Steps 1 and 2 are checkpointed, because they are the two an export cannot
- * afford to repeat: step 1 fixes the moment the archive describes, and step 2
- * reads every preserved byte on the device. An export the operating system
- * kills is therefore picked up where it stopped rather than started over, and
- * it comes back as the same export — same moment, same digests (ADR 0006).
- * Steps 3 and 4 are rebuilt from the staged snapshot each attempt, which is
- * cheap and leaves no half-written archive to mistake for a finished one.
- *
- * Staging is thrown away the moment it stops being useful: by the caller once
- * the archive has been handed over, and here when somebody cancels or when a
- * failure is one that will happen again. What survives is only what a later
- * launch can carry on from.
- *
- * Building this writer was not the same as offering it to people. What opened
- * that gate is the conformance matrix (#100, ADR 0004): every row of
- * `npm run test:archive-matrix` passing, in both directions, on every push.
+ * The staging and hashing steps are checkpointed; translate and package are
+ * rebuilt from the staged snapshot on each attempt.
  */
 
 const BLUESKY_INTERCHANGE_PATH = "data.db";
@@ -320,10 +296,8 @@ export async function runBlueskyArchiveExport(
       staging.destroy();
       throw error;
     }
-    // A failure Cyd can name is one that would happen again, so there is
-    // nothing worth keeping. Anything else — storage, memory, the system
-    // taking the app away mid-write — leaves the checkpoint alone, and the
-    // next launch carries on from it (ADR 0006).
+    // Only failures that would happen again are worth discarding; anything
+    // else leaves the checkpoint alone so the next launch can carry on.
     if (error instanceof BlueskyArchiveExportError) {
       staging.destroy();
     }

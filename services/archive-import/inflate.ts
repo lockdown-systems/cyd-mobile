@@ -5,11 +5,9 @@ import type { CreateDecompressor, Decompressor } from "./ports";
 
 /**
  * Streaming raw-DEFLATE decompression, the only compression method a Cyd
- * Bluesky archive uses besides stored entries.
- *
- * This exists because the importer must see entry bytes as they arrive: an
- * extract-all API would write a zip bomb to disk before anyone could measure
- * it. See ADR 0009.
+ * Bluesky archive uses besides stored entries. Streams so entry bytes are
+ * seen as they arrive — an extract-all API would write a zip bomb to disk
+ * before anyone could measure it.
  */
 function isFlateError(error: unknown): error is Error & { code: number } {
   return (

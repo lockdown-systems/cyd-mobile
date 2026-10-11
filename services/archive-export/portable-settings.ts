@@ -3,15 +3,12 @@ import type { PortableSettings } from "./interchange";
 /**
  * Which Bluesky account settings are portable, and which stay on the device.
  *
- * A Cyd Bluesky archive carries save and delete *defaults* — what the person
- * chose to back up and what they chose to delete — because those make a
- * restored account useful immediately. It carries no schedule, because a
- * portable setting is a default and never authority to run deletion somewhere
- * else (ADR 0015, and the contract's privacy boundary).
+ * An archive carries save and delete *defaults* so a restored account is
+ * useful immediately, but no schedule: a portable setting is a default and
+ * never authority to run deletion somewhere else.
  *
- * Mobile has no separate "save reposts" switch: reposts come with posts. The
- * key is left out rather than guessed at, so an importer sees "Mobile did not
- * say" instead of a preference nobody set.
+ * Mobile has no separate "save reposts" switch: the key is left out rather
+ * than guessed at, so an importer sees "Mobile did not say".
  */
 
 export type BlueskyAccountSettingsRow = {

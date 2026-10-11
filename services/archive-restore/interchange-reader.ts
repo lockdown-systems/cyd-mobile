@@ -4,15 +4,11 @@ import type { ReadableInterchangeDatabase } from "./ports";
 /**
  * Reading a Cyd Bluesky archive's interchange database, and nothing else.
  *
- * This is the reading half of the version 2 adapter ADR 0002 describes, and it
- * is the mirror of `services/archive-export/mobile-snapshot.ts`: that one is
- * the only place that knows Mobile's private column names, and this one is the
- * only place that knows the contract's. Everything downstream works on these
- * row types, so a change to either schema lands in one file.
- *
- * Intake has already proved the package intact (#95). What it has not proved
- * is that `data.db` is a version 2 Bluesky interchange database at all, so
- * that is checked here before a single row is trusted.
+ * The mirror of `services/archive-export/mobile-snapshot.ts`: that one is the
+ * only place that knows Mobile's private column names, this one the only
+ * place that knows the contract's. Intake has already proved the package
+ * intact (#95); this checks `data.db` is a version 2 Bluesky interchange
+ * database before a single row is trusted.
  */
 
 export type InterchangeArchive = {

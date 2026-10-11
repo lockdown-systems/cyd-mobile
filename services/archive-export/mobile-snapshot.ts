@@ -4,14 +4,12 @@ import type { ReadableDatabase } from "./ports";
 /**
  * Reading Cyd Mobile's private per-account storage, and nothing else.
  *
- * This is one half of the version 2 adapter ADR 0002 calls for: the only place
- * that knows Mobile's runtime column names. Everything downstream works on
- * these row types, so a Mobile migration lands here and stops here instead of
- * reaching the interchange model.
- *
- * The queries are also the privacy boundary in practice. `config`, `job`, and
- * the local-only columns (`localPath`, `thumbLocalPath`, `preserve`) are not
- * selected at all, so no later step can leak what it never received.
+ * The only place that knows Mobile's runtime column names, so a Mobile
+ * migration lands here and stops here instead of reaching the interchange
+ * model. The queries are also the privacy boundary in practice: `config`,
+ * `job`, and the local-only columns (`localPath`, `thumbLocalPath`,
+ * `preserve`) are not selected at all, so no later step can leak what it
+ * never received.
  */
 
 export type MobileProfileRow = {
@@ -216,14 +214,11 @@ export function readMobileAccountSnapshot(
 /**
  * List where each preserved asset's bytes live, for the staging step alone.
  *
- * Taken from the same staged snapshot as everything else, so the inventory and
- * the database agree on one point in time even if saving resumes immediately
- * afterwards (ADR 0010).
- *
- * Two kinds of file are preserved on this device. Record media is
- * content-addressed in `media_asset` and tracks its own download state. A link
- * preview's thumbnail is not: `post_external` either has the file or it does
- * not, so having a path is the whole of "preserved" for one.
+ * Taken from the same staged snapshot as everything else, so the inventory
+ * and the database agree on one point in time. Record media is
+ * content-addressed in `media_asset` and tracks its own download state; a
+ * link preview's thumbnail is not — `post_external` either has the file or
+ * it does not, so having a path is the whole of "preserved" for one.
  */
 export function readAssetInventory(database: ReadableDatabase): MobileInventoryRow[] {
   const media = database

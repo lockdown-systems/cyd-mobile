@@ -11,17 +11,11 @@ import type {
 } from "@/services/archive-export";
 
 /**
- * The Cyd Bluesky archive export ports, backed by Node instead of a phone.
- *
- * ADR 0016 says Mobile's real-data fixtures are produced by exporting a
- * curated test account *through Mobile's own writer*. This is what makes that
- * possible without a device round trip for every fix: the writer, the
- * translation, and the packaging are the same code the app runs, and only the
- * four things a phone does differently — SQLite, files, hashing, and pausing
- * account work — are supplied from here.
- *
- * It works on a copy of an account directory pulled off a device, so there is
- * no live account to pause and no way for anything it does to reach one.
+ * The Cyd Bluesky archive export ports, backed by Node instead of a phone:
+ * the same writer, translation, and packaging code the app runs, with only the
+ * phone-specific parts (SQLite, files, hashing, pausing account work) supplied
+ * from here. Works on a pulled account directory copy, so nothing reaches a
+ * live account.
  */
 
 export type NodeExportEnvironmentOptions = {

@@ -3,12 +3,10 @@ import type { CreateHasher } from "@/services/archive-import/ports";
 /**
  * The platform capabilities a Cyd Bluesky archive export needs.
  *
- * Export is pure logic over these ports, the same way intake is: pausing
- * account work, snapshotting SQLite, reading preserved media, hashing, and
- * writing staged files. React Native supplies them from `expo-sqlite` and
- * `expo-file-system`; a Node adapter supplies them from `node:sqlite` and
- * `node:fs`, which is what lets a curated test account be exported into a
- * committed fixture without a device round trip (ADR 0016).
+ * Export is pure logic over these ports: pausing account work, snapshotting
+ * SQLite, reading preserved media, hashing, and writing staged files. React
+ * Native supplies them from `expo-sqlite` and `expo-file-system`; a Node
+ * adapter supplies them from `node:sqlite` and `node:fs`.
  */
 
 export type { CreateHasher, Hasher } from "@/services/archive-import/ports";
@@ -57,11 +55,9 @@ export type BlueskyArchiveExportEnvironment = {
   openStaging(exportId: string): ExportStagingArea;
 
   /**
-   * Staging areas left behind by earlier runs, finished or not.
-   *
-   * An export that the operating system killed is only resumable if something
-   * can find it again, and its staging directory is the only trace it leaves
-   * (ADR 0006).
+   * Staging areas left behind by earlier runs, finished or not. An export the
+   * operating system killed is only resumable if something can find it again,
+   * and its staging directory is the only trace it leaves.
    */
   listStagingIds(): string[];
 
@@ -69,8 +65,8 @@ export type BlueskyArchiveExportEnvironment = {
    * Hold account-mutating work still for the duration of `work`.
    *
    * The pause is what makes the snapshot and the media inventory describe one
-   * moment (ADR 0010), so it covers as little as possible: a SQLite copy and a
-   * stat of each preserved file, never hashing or packaging.
+   * moment, so it covers as little as possible: a SQLite copy and a stat of
+   * each preserved file, never hashing or packaging.
    */
   withAccountWorkPaused<T>(work: () => Promise<T>): Promise<T>;
 
