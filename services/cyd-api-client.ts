@@ -58,7 +58,7 @@ export type UserPremiumAPIResponse = {
   premium_business_price_cents: number;
   premium_access: boolean;
   has_individual_subscription: boolean;
-  individual_subscription_provider: "stripe" | "app_store" | "none";
+  individual_subscription_provider: "stripe" | "app_store" | "play_store" | "none";
   individual_subscription_status: string;
   individual_subscription_manage_mode: string;
   current_billing_period: "annual" | "monthly" | "none";
@@ -95,6 +95,33 @@ export type SyncAppStoreSubscriptionAPIRequest = {
 
 export type SyncAppStoreSubscriptionAPIResponse = {
   subscription: AppStoreSubscriptionAPIResponse | null;
+  premium: UserPremiumAPIResponse;
+};
+
+// API models for /user/google-play/subscription
+export type PlaySubscriptionAPIResponse = {
+  purchase_token: string;
+  product_id: string;
+  environment: string;
+  subscription_state: string | null;
+  status: string;
+  entitlement_expires_at: string | null;
+  will_auto_renew: boolean | null;
+  acknowledged: boolean | null;
+};
+
+export type GetGooglePlaySubscriptionAPIResponse = {
+  obfuscated_account_id: string;
+  subscription: PlaySubscriptionAPIResponse | null;
+  premium: UserPremiumAPIResponse;
+};
+
+export type SyncGooglePlaySubscriptionAPIRequest = {
+  purchase_token: string;
+};
+
+export type SyncGooglePlaySubscriptionAPIResponse = {
+  subscription: PlaySubscriptionAPIResponse | null;
   premium: UserPremiumAPIResponse;
 };
 
@@ -558,6 +585,64 @@ export default class CydAPIClient {
     } catch {
       return this.returnError(
         "Failed to sync App Store subscription. Maybe the server is down?",
+      );
+    }
+  }
+
+  async getGooglePlaySubscription(): Promise<
+    GetGooglePlaySubscriptionAPIResponse | APIErrorResponse
+  > {
+    console.log("GET /user/google-play/subscription");
+    if (!(await this.validateAPIToken())) {
+      return this.returnError("Failed to get a new API token.");
+    }
+    try {
+      const response = await this.fetchAuthenticated(
+        "GET",
+        `${this.apiURL}/user/google-play/subscription`,
+        null,
+      );
+      if (response.status !== 200) {
+        return this.returnError(
+          "Failed to get Google Play subscription metadata.",
+          response.status,
+        );
+      }
+      const data =
+        (await response.json()) as GetGooglePlaySubscriptionAPIResponse;
+      return data;
+    } catch {
+      return this.returnError(
+        "Failed to get Google Play subscription metadata. Maybe the server is down?",
+      );
+    }
+  }
+
+  async syncGooglePlaySubscription(
+    request: SyncGooglePlaySubscriptionAPIRequest,
+  ): Promise<SyncGooglePlaySubscriptionAPIResponse | APIErrorResponse> {
+    console.log("POST /user/google-play/subscription");
+    if (!(await this.validateAPIToken())) {
+      return this.returnError("Failed to get a new API token.");
+    }
+    try {
+      const response = await this.fetchAuthenticated(
+        "POST",
+        `${this.apiURL}/user/google-play/subscription`,
+        request,
+      );
+      if (response.status !== 200) {
+        return this.returnError(
+          "Failed to sync Google Play subscription.",
+          response.status,
+        );
+      }
+      const data =
+        (await response.json()) as SyncGooglePlaySubscriptionAPIResponse;
+      return data;
+    } catch {
+      return this.returnError(
+        "Failed to sync Google Play subscription. Maybe the server is down?",
       );
     }
   }

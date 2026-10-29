@@ -24,11 +24,11 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
   const {
     state: cydState,
     premiumUpsellMode,
-    appStorePurchaseState,
-    getDashboardURL,
+    storePurchaseState,
+    getManageSubscriptionURL,
     checkPremiumAccess,
     purchasePremium,
-    restoreAppStorePurchases,
+    restoreStorePurchases,
   } = useCydAccount();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(false);
@@ -43,11 +43,11 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
   }, [cydState.isSignedIn, cydState.hasPremiumAccess, checkPremiumAccess]);
 
   const handleManageAccount = useCallback(() => {
-    const url = getDashboardURL();
+    const url = getManageSubscriptionURL();
     void Linking.openURL(url).catch(() => {
       Alert.alert("Error", "Could not open browser.");
     });
-  }, [getDashboardURL]);
+  }, [getManageSubscriptionURL]);
 
   const handleIveUpgraded = useCallback(() => {
     setCheckingPremium(true);
@@ -67,7 +67,7 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
     })();
   }, [checkPremiumAccess]);
 
-  const handleSubscribeWithApple = useCallback(() => {
+  const handleSubscribe = useCallback(() => {
     void (async () => {
       const result = await purchasePremium(selectedBillingPeriod);
       if (!result.success && result.error) {
@@ -78,12 +78,12 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
 
   const handleRestorePurchases = useCallback(() => {
     void (async () => {
-      const result = await restoreAppStorePurchases();
+      const result = await restoreStorePurchases();
       if (!result.success && result.error) {
         Alert.alert("Restore Failed", result.error);
       }
     })();
-  }, [restoreAppStorePurchases]);
+  }, [restoreStorePurchases]);
 
   // Loading state while checking premium (only show if actively checking, not on initial load)
   if (cydState.isLoading || checkingPremium) {
@@ -171,15 +171,17 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
 
   // User is signed in but doesn't have premium
   if (cydState.hasPremiumAccess === false) {
-    const usesAppStoreIAP = premiumUpsellMode === "app_store_iap";
+    const usesInAppPurchase =
+      premiumUpsellMode === "app_store_iap" ||
+      premiumUpsellMode === "play_billing";
     const selectedProduct =
-      appStorePurchaseState?.products?.[selectedBillingPeriod] ?? null;
-    const appStoreBusy = Boolean(
-      appStorePurchaseState?.isPurchasing || appStorePurchaseState?.isRestoring,
+      storePurchaseState?.products?.[selectedBillingPeriod] ?? null;
+    const storeBusy = Boolean(
+      storePurchaseState?.isPurchasing || storePurchaseState?.isRestoring,
     );
-    const appStorePrimaryLabel = appStorePurchaseState?.isPurchasing
+    const storePrimaryLabel = storePurchaseState?.isPurchasing
       ? "Purchasing…"
-      : appStorePurchaseState?.isLoadingProduct
+      : storePurchaseState?.isLoadingProduct
         ? "Loading Subscription…"
         : selectedBillingPeriod === "annual"
           ? "Subscribe Annually"
@@ -198,7 +200,7 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
         <View
           style={[
             styles.topRow,
-            usesAppStoreIAP && styles.centeredPremiumHeader,
+            usesInAppPurchase && styles.centeredPremiumHeader,
           ]}
         >
           <View style={styles.avatarContainer}>
@@ -206,29 +208,27 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
           </View>
           <View style={styles.contentContainer}>
             <Text style={[styles.messageText, { color: palette.text }]}>
-              {usesAppStoreIAP
+              {usesInAppPurchase
                 ? "Deleting data requires a Premium account."
                 : "Deleting data requires a Premium account. Manage your account to upgrade to Premium."}
             </Text>
           </View>
         </View>
         <View style={styles.buttonColumn}>
-          {usesAppStoreIAP ? (
+          {usesInAppPurchase ? (
             <>
               <PremiumPlanSelector
                 palette={palette}
-                products={appStorePurchaseState.products}
+                products={storePurchaseState.products}
                 selectedBillingPeriod={selectedBillingPeriod}
                 onSelect={setSelectedBillingPeriod}
-                disabled={
-                  appStoreBusy || appStorePurchaseState.isLoadingProduct
-                }
+                disabled={storeBusy || storePurchaseState.isLoadingProduct}
               />
               <Pressable
-                onPress={handleSubscribeWithApple}
+                onPress={handleSubscribe}
                 disabled={
-                  appStoreBusy ||
-                  appStorePurchaseState.isLoadingProduct ||
+                  storeBusy ||
+                  storePurchaseState.isLoadingProduct ||
                   !selectedProduct
                 }
                 style={({ pressed }) => [
@@ -237,12 +237,12 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
                     backgroundColor: palette.button?.background ?? palette.tint,
                     opacity:
                       pressed &&
-                      !appStoreBusy &&
-                      !appStorePurchaseState.isLoadingProduct &&
+                      !storeBusy &&
+                      !storePurchaseState.isLoadingProduct &&
                       selectedProduct
                         ? 0.85
-                        : appStoreBusy ||
-                            appStorePurchaseState.isLoadingProduct ||
+                        : storeBusy ||
+                            storePurchaseState.isLoadingProduct ||
                             !selectedProduct
                           ? 0.6
                           : 1,
@@ -256,19 +256,19 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
                     { color: palette.button?.text ?? "#ffffff" },
                   ]}
                 >
-                  {appStorePrimaryLabel}
+                  {storePrimaryLabel}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={handleRestorePurchases}
-                disabled={appStoreBusy}
+                disabled={storeBusy}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   {
                     borderColor: palette.icon + "33",
                     backgroundColor: palette.card,
                     opacity:
-                      pressed && !appStoreBusy ? 0.85 : appStoreBusy ? 0.6 : 1,
+                      pressed && !storeBusy ? 0.85 : storeBusy ? 0.6 : 1,
                   },
                 ]}
                 accessibilityRole="button"
@@ -276,7 +276,7 @@ export function PremiumRequiredBanner({ palette }: PremiumRequiredBannerProps) {
                 <Text
                   style={[styles.secondaryButtonText, { color: palette.text }]}
                 >
-                  {appStorePurchaseState?.isRestoring
+                  {storePurchaseState?.isRestoring
                     ? "Restoring…"
                     : "Restore Purchases"}
                 </Text>

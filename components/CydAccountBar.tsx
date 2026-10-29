@@ -38,7 +38,7 @@ export function CydAccountBar({
     Platform.OS === "android" ? Math.max(bottomInset, 8) : bottomInset;
   const colorScheme = useColorScheme();
   const palette = getThemePalette(colorScheme);
-  const { state, signOut, getDashboardURL } = useCydAccount();
+  const { state, signOut, getManageSubscriptionURL } = useCydAccount();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [signInModalVisible, setSignInModalVisible] = useState(false);
@@ -64,11 +64,11 @@ export function CydAccountBar({
 
   const handleManageAccount = useCallback(() => {
     setMenuVisible(false);
-    const dashboardURL = getDashboardURL();
-    void Linking.openURL(dashboardURL).catch((err) =>
-      console.warn("Unable to open dashboard URL:", err),
+    const manageURL = getManageSubscriptionURL();
+    void Linking.openURL(manageURL).catch((err) =>
+      console.warn("Unable to open subscription management URL:", err),
     );
-  }, [getDashboardURL]);
+  }, [getManageSubscriptionURL]);
 
   const handleSignOut = useCallback(() => {
     setMenuVisible(false);

@@ -1,15 +1,15 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
-  APP_STORE_SUBSCRIPTION_PLANS,
+  PREMIUM_SUBSCRIPTION_PLANS,
   type BillingPeriod,
 } from "@/constants/subscriptions";
-import type { AppStorePurchaseState } from "@/contexts/CydAccountProvider";
+import type { StorePurchaseState } from "@/contexts/CydAccountProvider";
 import type { AccountTabPalette } from "@/types/account-tabs";
 
 type PremiumPlanSelectorProps = {
   palette: AccountTabPalette;
-  products: AppStorePurchaseState["products"];
+  products: StorePurchaseState["products"];
   selectedBillingPeriod: BillingPeriod;
   onSelect: (billingPeriod: BillingPeriod) => void;
   disabled?: boolean;
@@ -24,7 +24,7 @@ export function PremiumPlanSelector({
 }: PremiumPlanSelectorProps) {
   return (
     <View style={styles.container} accessibilityRole="radiogroup">
-      {APP_STORE_SUBSCRIPTION_PLANS.map((plan) => {
+      {PREMIUM_SUBSCRIPTION_PLANS.map((plan) => {
         const product = products[plan.billingPeriod];
         const isSelected = selectedBillingPeriod === plan.billingPeriod;
         const isDisabled = disabled || !product;

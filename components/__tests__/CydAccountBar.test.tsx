@@ -18,6 +18,7 @@ import { useCydAccount } from "@/contexts/CydAccountProvider";
 // Mock the hooks
 const mockSignOut = jest.fn();
 const mockGetDashboardURL = jest.fn(() => "https://dash.cyd.social");
+const mockGetManageSubscriptionURL = jest.fn(() => "https://dash.cyd.social");
 
 jest.mock("@/contexts/CydAccountProvider", () => ({
   useCydAccount: jest.fn(() => ({
@@ -28,6 +29,7 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
     },
     signOut: mockSignOut,
     getDashboardURL: mockGetDashboardURL,
+    getManageSubscriptionURL: mockGetManageSubscriptionURL,
   })),
 }));
 
@@ -76,6 +78,7 @@ describe("CydAccountBar", () => {
       },
       signOut: mockSignOut,
       getDashboardURL: mockGetDashboardURL,
+      getManageSubscriptionURL: mockGetManageSubscriptionURL,
     });
   });
 
@@ -89,6 +92,7 @@ describe("CydAccountBar", () => {
         },
         signOut: mockSignOut,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
       });
 
       const { toJSON } = render(<CydAccountBar />);
@@ -170,6 +174,7 @@ describe("CydAccountBar", () => {
         },
         signOut: mockSignOut,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
       });
     });
 
@@ -220,6 +225,37 @@ describe("CydAccountBar", () => {
       mockOpenURL.mockRestore();
     });
 
+    it("should open the Google Play subscription center in Play builds", () => {
+      const mockOpenURL = jest
+        .spyOn(Linking, "openURL")
+        .mockResolvedValue(undefined);
+
+      mockUseCydAccount.mockReturnValue({
+        state: {
+          isSignedIn: true,
+          userEmail: "test@example.com",
+          isLoading: false,
+          hasPremiumAccess: false,
+        },
+        signOut: mockSignOut,
+        getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: jest.fn(
+          () =>
+            "https://play.google.com/store/account/subscriptions?package=systems.lockdown.cydmobile",
+        ),
+      });
+
+      render(<CydAccountBar />);
+
+      fireEvent.press(screen.getByText("☰"));
+      fireEvent.press(screen.getByText("Manage my Cyd account"));
+
+      expect(mockOpenURL).toHaveBeenCalledWith(
+        "https://play.google.com/store/account/subscriptions?package=systems.lockdown.cydmobile",
+      );
+      mockOpenURL.mockRestore();
+    });
+
     it("should call signOut when Sign out is pressed", () => {
       render(<CydAccountBar />);
 
@@ -266,6 +302,7 @@ describe("CydAccountBar", () => {
         },
         signOut: mockSignOut,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
       });
 
       render(<CydAccountBar />);
@@ -346,6 +383,7 @@ describe("CydAccountBar", () => {
         },
         signOut: mockSignOut,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
       });
 
       render(<CydAccountBar />);

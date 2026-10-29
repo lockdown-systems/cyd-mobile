@@ -25,9 +25,10 @@ const mockApiClient = {
 };
 
 const mockGetDashboardURL = jest.fn(() => "https://dash.cyd.social/manage");
+const mockGetManageSubscriptionURL = jest.fn(() => "https://dash.cyd.social/manage");
 const mockCheckPremiumAccess = jest.fn();
 const mockPurchasePremium = jest.fn(() => Promise.resolve({ success: true }));
-const mockRestoreAppStorePurchases = jest.fn(() =>
+const mockRestoreStorePurchases = jest.fn(() =>
   Promise.resolve({ success: true }),
 );
 
@@ -41,7 +42,7 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
     },
     apiClient: mockApiClient,
     premiumUpsellMode: "external_checkout",
-    appStorePurchaseState: {
+    storePurchaseState: {
       products: { annual: null, monthly: null },
       isConnected: false,
       isLoadingProduct: false,
@@ -50,9 +51,10 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
       error: null,
     },
     getDashboardURL: mockGetDashboardURL,
+    getManageSubscriptionURL: mockGetManageSubscriptionURL,
     checkPremiumAccess: mockCheckPremiumAccess,
     purchasePremium: mockPurchasePremium,
-    restoreAppStorePurchases: mockRestoreAppStorePurchases,
+    restoreStorePurchases: mockRestoreStorePurchases,
   })),
 }));
 
@@ -119,7 +121,7 @@ describe("PremiumRequiredModal", () => {
       },
       apiClient: mockApiClient,
       premiumUpsellMode: "external_checkout",
-      appStorePurchaseState: {
+      storePurchaseState: {
         products: { annual: null, monthly: null },
         isConnected: false,
         isLoadingProduct: false,
@@ -128,9 +130,10 @@ describe("PremiumRequiredModal", () => {
         error: null,
       },
       getDashboardURL: mockGetDashboardURL,
+      getManageSubscriptionURL: mockGetManageSubscriptionURL,
       checkPremiumAccess: mockCheckPremiumAccess,
       purchasePremium: mockPurchasePremium,
-      restoreAppStorePurchases: mockRestoreAppStorePurchases,
+      restoreStorePurchases: mockRestoreStorePurchases,
     });
   });
 
@@ -164,6 +167,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
 
@@ -216,6 +220,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
 
@@ -240,6 +245,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
       mockApiClient.getUserPremium.mockResolvedValue({
@@ -295,7 +301,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         premiumUpsellMode: "app_store_iap",
-        appStorePurchaseState: {
+        storePurchaseState: {
           products: {
             annual: {
               productId: "premium_annual",
@@ -315,9 +321,10 @@ describe("PremiumRequiredModal", () => {
           error: null,
         },
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
         purchasePremium: mockPurchasePremium,
-        restoreAppStorePurchases: mockRestoreAppStorePurchases,
+        restoreStorePurchases: mockRestoreStorePurchases,
       });
 
       render(<PremiumRequiredModal {...defaultProps} />);
@@ -343,8 +350,65 @@ describe("PremiumRequiredModal", () => {
         fireEvent.press(screen.getByText("Restore Purchases"));
       });
 
-      expect(mockRestoreAppStorePurchases).toHaveBeenCalled();
+      expect(mockRestoreStorePurchases).toHaveBeenCalled();
       expect((Linking.openURL as jest.Mock).mock.calls).toHaveLength(0);
+    });
+
+    it("should show subscribe and restore actions in Play builds", async () => {
+      mockUseCydAccount.mockReturnValue({
+        state: {
+          isSignedIn: true,
+          userEmail: "test@example.com",
+          isLoading: false,
+          hasPremiumAccess: false,
+        },
+        apiClient: mockApiClient,
+        premiumUpsellMode: "play_billing",
+        storePurchaseState: {
+          products: {
+            annual: {
+              productId: "premium_annual",
+              title: "Cyd Premium Annual",
+              displayPrice: "$35.99",
+              offerToken: "annual-offer-token",
+            },
+            monthly: {
+              productId: "premium_monthly",
+              title: "Cyd Premium Monthly",
+              displayPrice: "$4.99",
+              offerToken: "monthly-offer-token",
+            },
+          },
+          isConnected: true,
+          isLoadingProduct: false,
+          isPurchasing: false,
+          isRestoring: false,
+          error: null,
+        },
+        getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
+        checkPremiumAccess: mockCheckPremiumAccess,
+        purchasePremium: mockPurchasePremium,
+        restoreStorePurchases: mockRestoreStorePurchases,
+      });
+
+      render(<PremiumRequiredModal {...defaultProps} />);
+
+      expect(screen.getByText("Subscribe Annually")).toBeTruthy();
+      expect(screen.getByText("Restore Purchases")).toBeTruthy();
+      expect(screen.queryByText("Manage My Account")).toBeNull();
+
+      await act(async () => {
+        fireEvent.press(screen.getByText("Monthly"));
+      });
+      await waitFor(() => {
+        expect(screen.getByText("Subscribe Monthly")).toBeTruthy();
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByText("Subscribe Monthly"));
+      });
+
+      expect(mockPurchasePremium).toHaveBeenCalledWith("monthly");
     });
   });
 
@@ -359,6 +423,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
     });
@@ -389,6 +454,7 @@ describe("PremiumRequiredModal", () => {
           },
           apiClient: mockApiClient,
           getDashboardURL: mockGetDashboardURL,
+          getManageSubscriptionURL: mockGetManageSubscriptionURL,
           checkPremiumAccess: mockCheckPremiumAccess,
         });
         return Promise.resolve();
@@ -441,6 +507,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
 
@@ -469,6 +536,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
 
@@ -489,6 +557,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
 
@@ -535,6 +604,7 @@ describe("PremiumRequiredModal", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
     });

@@ -31,6 +31,7 @@ const mockApiClient = {
 };
 
 const mockGetDashboardURL = jest.fn(() => "https://dash.cyd.social/manage");
+const mockGetManageSubscriptionURL = jest.fn(() => "https://dash.cyd.social/manage");
 const mockCheckPremiumAccess = jest.fn();
 
 jest.mock("@/contexts/CydAccountProvider", () => ({
@@ -43,6 +44,7 @@ jest.mock("@/contexts/CydAccountProvider", () => ({
     },
     apiClient: mockApiClient,
     getDashboardURL: mockGetDashboardURL,
+    getManageSubscriptionURL: mockGetManageSubscriptionURL,
     checkPremiumAccess: mockCheckPremiumAccess,
   })),
 }));
@@ -262,6 +264,7 @@ describe("DeleteTab Premium Integration", () => {
       },
       apiClient: mockApiClient,
       getDashboardURL: mockGetDashboardURL,
+      getManageSubscriptionURL: mockGetManageSubscriptionURL,
       checkPremiumAccess: mockCheckPremiumAccess,
     });
   });
@@ -286,6 +289,7 @@ describe("DeleteTab Premium Integration", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
       mockApiClient.getUserPremium.mockResolvedValue({
@@ -310,6 +314,7 @@ describe("DeleteTab Premium Integration", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
       mockApiClient.getUserPremium.mockResolvedValue({
@@ -338,6 +343,7 @@ describe("DeleteTab Premium Integration", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
     });
@@ -382,6 +388,7 @@ describe("DeleteTab Premium Integration", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
       mockApiClient.getUserPremium.mockResolvedValue({
@@ -504,6 +511,7 @@ describe("DeleteTab Premium Integration", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
     });
@@ -624,6 +632,7 @@ describe("DeleteTab Premium Integration", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
 
@@ -669,6 +678,7 @@ describe("DeleteTab Premium Integration", () => {
         },
         apiClient: mockApiClient,
         getDashboardURL: mockGetDashboardURL,
+        getManageSubscriptionURL: mockGetManageSubscriptionURL,
         checkPremiumAccess: mockCheckPremiumAccess,
       });
 

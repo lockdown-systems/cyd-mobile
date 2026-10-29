@@ -23,6 +23,8 @@ import {
 
 const mockSyncAppStoreSubscription = jest.fn();
 const mockGetAppStoreSubscription = jest.fn();
+const mockGetGooglePlaySubscription = jest.fn();
+const mockSyncGooglePlaySubscription = jest.fn();
 const mockGetUserPremium = jest.fn();
 const mockRefreshAuthentication = jest.fn();
 const mockPing = jest.fn(() => Promise.resolve(false));
@@ -67,6 +69,8 @@ jest.mock("@/services/cyd-api-client", () => {
     refreshAuthentication: mockRefreshAuthentication,
     getAppStoreSubscription: mockGetAppStoreSubscription,
     syncAppStoreSubscription: mockSyncAppStoreSubscription,
+    getGooglePlaySubscription: mockGetGooglePlaySubscription,
+    syncGooglePlaySubscription: mockSyncGooglePlaySubscription,
   }));
 });
 
@@ -196,7 +200,7 @@ describe("CydAccountProvider", () => {
 
       await waitFor(() => {
         expect(context?.state.isSignedIn).toBe(true);
-        expect(context?.appStorePurchaseState.isConnected).toBe(true);
+        expect(context?.storePurchaseState.isConnected).toBe(true);
       });
       expect(fetchProducts).toHaveBeenCalledWith({
         skus: ["premium_annual", "premium_monthly"],
@@ -218,7 +222,7 @@ describe("CydAccountProvider", () => {
 
       let result;
       await act(async () => {
-        result = await context?.restoreAppStorePurchases();
+        result = await context?.restoreStorePurchases();
       });
 
       expect(result).toEqual({ success: true });

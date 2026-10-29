@@ -413,6 +413,9 @@ jobs:
     env:
       APP_VARIANT: production
       CYD_API_ENV: prod
+      ANDROID_DISTRIBUTION: play
+      GOOGLE_PLAY_ANNUAL_PRODUCT_ID: premium_annual
+      GOOGLE_PLAY_MONTHLY_PRODUCT_ID: premium_monthly
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -487,24 +490,17 @@ jobs:
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
           cd android
           chmod +x ./gradlew
-          ./gradlew bundleRelease assembleRelease --build-cache --parallel --max-workers=8
+          ./gradlew bundleRelease --build-cache --parallel --max-workers=8
           cd ..
 
           ANDROID_BUNDLE_FILE=android/app/build/outputs/bundle/release/app-release.aab
-          ANDROID_APK_FILE=android/app/build/outputs/apk/release/app-release.apk
 
           if [ ! -f "$ANDROID_BUNDLE_FILE" ]; then
             echo "No .aab file found after local Android build"
             exit 1
           fi
 
-          if [ ! -f "$ANDROID_APK_FILE" ]; then
-            echo "No .apk file found after local Android build"
-            exit 1
-          fi
-
           cp "$ANDROID_BUNDLE_FILE" cyd-mobile.aab
-          cp "$ANDROID_APK_FILE" cyd-mobile.apk
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v5
@@ -513,17 +509,129 @@ jobs:
           path: cyd-mobile.aab
           if-no-files-found: error
 
-      - name: Upload Android APK artifact
+  build_android_alt:
+    name: Build Android (alt, non-Play)
+    runs-on: ubuntu-latest-android-builder
+    needs: quality
+    env:
+      APP_VARIANT: production
+      CYD_API_ENV: prod
+      ANDROID_DISTRIBUTION: other
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_ALT_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_ALT_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_ALT_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_ALT_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check alt build prerequisites
+        run: |
+          if [ ! -f google-services-alt.json ]; then
+            echo "::error::google-services-alt.json is missing."
+            echo "Register systems.lockdown.cydmobile.alt in the Firebase console,"
+            echo "download its google-services.json, and commit it as"
+            echo "google-services-alt.json (#124)."
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_ALT_KEYSTORE_BASE64 secret is not set."
+            echo "The alt build needs its own keystore; the Play upload keystore"
+            echo "cannot be reused (#124)."
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native iOS/Android projects
+        run: npm run prebuild
+
+      - name: Decode alt keystore
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload.jks
+
+      - name: Configure release signing
+        run: |
+          python3 ./scripts/ci/configure-android-signing.py
+          echo "--- Signing config in build.gradle ---"
+          grep -A5 'signingConfigs' android/app/build.gradle | head -25
+
+      - name: Tune Gradle for CI runner
+        run: |
+          cat >> android/gradle.properties <<EOF
+
+          # Upload keystore credentials
+          UPLOAD_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
+          UPLOAD_KEY_ALIAS=$ANDROID_KEY_ALIAS
+          UPLOAD_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
+          EOF
+
+          cat >> android/gradle.properties <<'EOF'
+
+          # CI overrides for 8-core / 32GB runner
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+          org.gradle.workers.max=8
+          org.gradle.caching=true
+          org.gradle.daemon=false
+          EOF
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle', 'android/app/build.gradle') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Build Android alt APK locally with Gradle
+        run: |
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --build-cache --parallel --max-workers=8
+          cd ..
+
+          ANDROID_APK_FILE=android/app/build/outputs/apk/release/app-release.apk
+
+          if [ ! -f "$ANDROID_APK_FILE" ]; then
+            echo "No .apk file found after local Android build"
+            exit 1
+          fi
+
+          cp "$ANDROID_APK_FILE" cyd-mobile.apk
+
+      - name: Upload Android alt APK artifact
         uses: actions/upload-artifact@v5
         with:
-          name: android-apk-${{ github.ref_name }}
+          name: android-alt-apk-${{ github.ref_name }}
           path: cyd-mobile.apk
           if-no-files-found: error
 
   upload_release_assets:
+    # The direct-download APK is the alt (non-Play) build: the Play build
+    # itself is only distributed through Google Play (#124).
     name: Upload APK to GitHub Release
     runs-on: ubuntu-latest
-    needs: [build_android]
+    needs: [build_android_alt]
 
     steps:
       - name: Checkout repository
@@ -532,7 +640,7 @@ jobs:
       - name: Download Android APK artifact
         uses: actions/download-artifact@v5
         with:
-          name: android-apk-${{ github.ref_name }}
+          name: android-alt-apk-${{ github.ref_name }}
           path: dist/android
 
       - name: Upload release assets
