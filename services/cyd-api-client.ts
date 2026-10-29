@@ -235,6 +235,23 @@ export default class CydAPIClient {
     };
   }
 
+  // Surface the message the server put in an error response body (for
+  // example, why a purchase token was rejected) instead of a generic one.
+  private async responseErrorMessage(
+    response: Response,
+    fallback: string,
+  ): Promise<string> {
+    try {
+      const data = (await response.json()) as { message?: string };
+      if (data && typeof data.message === "string" && data.message !== "") {
+        return data.message;
+      }
+    } catch {
+      // The body was not JSON; fall through to the fallback.
+    }
+    return fallback;
+  }
+
   private async doFetch(
     method: string,
     resource: string,
@@ -604,7 +621,10 @@ export default class CydAPIClient {
       );
       if (response.status !== 200) {
         return this.returnError(
-          "Failed to get Google Play subscription metadata.",
+          await this.responseErrorMessage(
+            response,
+            "Failed to get Google Play subscription metadata.",
+          ),
           response.status,
         );
       }
@@ -633,7 +653,10 @@ export default class CydAPIClient {
       );
       if (response.status !== 200) {
         return this.returnError(
-          "Failed to sync Google Play subscription.",
+          await this.responseErrorMessage(
+            response,
+            "Failed to sync Google Play subscription.",
+          ),
           response.status,
         );
       }

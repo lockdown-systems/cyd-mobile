@@ -572,7 +572,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
           isLoadingProduct: false,
           error: hasAvailableProduct
             ? null
-            : `Premium is not available ${storefrontAvailabilityPreposition()} ${STOREFRONT_NAME} yet.`,
+            : storefrontNotAvailableMessage(),
         }));
       } catch (error) {
         if (!isActive) {
@@ -630,7 +630,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       if (!plan || !selectedProduct) {
         return {
           success: false,
-          error: `That Premium plan is not available ${storefrontAvailabilityPreposition()} ${STOREFRONT_NAME} yet.`,
+          error: planNotAvailableMessage(),
         };
       }
 
@@ -665,7 +665,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
           // obfuscated ID) and the base plan's offer token, so cyd-server can
           // link the purchase to this Cyd account (#124).
           if (!selectedProduct.offerToken) {
-            const message = `That Premium plan is not available ${storefrontAvailabilityPreposition()} ${STOREFRONT_NAME} yet.`;
+            const message = planNotAvailableMessage();
             setStorePurchaseState((prev) => ({
               ...prev,
               isPurchasing: false,
@@ -850,23 +850,32 @@ function summarizeStoreProduct(
   };
 }
 
-// The offer token of the base plan a Play purchase should buy. Play products
-// each have one base plan in this app's catalog, so the first offer is the
-// one.
+// The offer token of the base plan a Play purchase should buy. The paywall
+// shows the base plan's price, so that is what should be purchased: prefer
+// the plain base-plan offer (no offerId) over promotional offers such as
+// trials and intro pricing, and fall back to the first offer.
 function getGooglePlayOfferToken(product: ProductSubscription): string | null {
   if (!("subscriptionOfferDetailsAndroid" in product)) {
     return null;
   }
   const offers = product.subscriptionOfferDetailsAndroid;
-  if (offers && offers.length > 0) {
-    return offers[0].offerToken;
+  if (!offers || offers.length === 0) {
+    return null;
   }
-  return null;
+  const basePlanOffer = offers.find((offer) => !offer.offerId);
+  return (basePlanOffer ?? offers[0]).offerToken;
 }
 
-// "in the App Store" versus "on Google Play".
-function storefrontAvailabilityPreposition(): string {
-  return PREMIUM_UPSELL_MODE === "play_billing" ? "on" : "in the";
+function storefrontNotAvailableMessage(): string {
+  return PREMIUM_UPSELL_MODE === "play_billing"
+    ? "Premium is not available on Google Play yet."
+    : "Premium is not available in the App Store yet.";
+}
+
+function planNotAvailableMessage(): string {
+  return PREMIUM_UPSELL_MODE === "play_billing"
+    ? "That Premium plan is not available on Google Play yet."
+    : "That Premium plan is not available in the App Store yet.";
 }
 
 function getAppStoreSyncRequest(

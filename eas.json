@@ -41,8 +41,6 @@
         "CYD_API_ENV": "prod",
         "IOS_DISTRIBUTION": "app_store",
         "ANDROID_DISTRIBUTION": "other",
-        "GOOGLE_PLAY_ANNUAL_PRODUCT_ID": "premium_annual",
-        "GOOGLE_PLAY_MONTHLY_PRODUCT_ID": "premium_monthly",
         "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     }

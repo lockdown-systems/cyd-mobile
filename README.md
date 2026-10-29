@@ -29,7 +29,7 @@ There are two Android builds of Cyd Mobile:
 
 Which build you get is decided at build time by `ANDROID_DISTRIBUTION` (`play`, the default, or `other`), mirroring how `IOS_DISTRIBUTION` selects the iOS App Store and alt-store builds.
 
-Setting up the non-Play build for the first time requires two manual steps: a new signing keystore (stored as the `ANDROID_ALT_*` secrets), and registering `systems.lockdown.cydmobile.alt` in the Firebase console so push notifications work (commit the downloaded config as `google-services-alt.json`).
+Setting up the non-Play build for the first time requires two manual steps: a new signing keystore, and registering `systems.lockdown.cydmobile.alt` in the Firebase console so push notifications work (commit the downloaded config as `google-services-alt.json`). The keystore cannot be the Play upload keystore: EAS tracks Android credentials per application ID, so building the `production-android-alt` profile will offer to create a new keystore, and the release workflow expects it as the `ANDROID_ALT_*` secrets.
 
 ## Documentation
 

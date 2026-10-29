@@ -768,6 +768,40 @@ describe("CydAPIClient", () => {
           status: 409,
         });
       });
+
+      it("should surface the server's reason when the sync is rejected", async () => {
+        mockFetch.mockImplementation(async (url: string) => {
+          if (url.includes("/token")) {
+            return {
+              status: 200,
+              json: async () => ({
+                api_token: "api-token-xyz",
+                device_uuid: "device-uuid-123",
+                email: "test@example.com",
+              }),
+            };
+          }
+          if (url.includes("/user/google-play/subscription")) {
+            return {
+              status: 409,
+              json: async () => ({
+                message: "This subscription belongs to another Cyd account.",
+              }),
+            };
+          }
+          return { status: 200, json: async () => ({}) };
+        });
+
+        const result = await client.syncGooglePlaySubscription({
+          purchase_token: "purchase-token",
+        });
+
+        expect(result).toEqual({
+          error: true,
+          message: "This subscription belongs to another Cyd account.",
+          status: 409,
+        });
+      });
     });
 
     describe("deleteDevice", () => {

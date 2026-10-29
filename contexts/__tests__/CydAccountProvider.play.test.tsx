@@ -119,8 +119,11 @@ describe("CydAccountProvider Google Play purchases", () => {
         id: "premium_monthly",
         title: "Cyd Premium Monthly",
         displayPrice: "$4.99",
+        // A promotional offer comes back first; the base plan is what should
+        // be purchased.
         subscriptionOfferDetailsAndroid: [
-          { offerToken: "monthly-offer-token" },
+          { offerId: "trial-offer", offerToken: "trial-offer-token" },
+          { offerId: null, offerToken: "monthly-offer-token" },
         ],
       },
     ]);
