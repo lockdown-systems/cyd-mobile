@@ -13,6 +13,8 @@
     "build:ios": "eas build --platform ios --profile production --local --non-interactive",
     "submit:ios": "./scripts/ci/submit-ios.sh",
     "build:android": "JAVA_HOME=$(/usr/libexec/java_home -v 17) ANDROID_HOME=$HOME/Library/Android/sdk eas build --platform android --profile production --local --non-interactive",
+    "android:alt": "ANDROID_DISTRIBUTION=other expo run:android --device",
+    "build:android:alt": "JAVA_HOME=$(/usr/libexec/java_home -v 17) ANDROID_HOME=$HOME/Library/Android/sdk eas build --platform android --profile production-android-alt --local --non-interactive",
     "submit:android": "node ./scripts/ci/submit-android.js",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint && tsc --noEmit",

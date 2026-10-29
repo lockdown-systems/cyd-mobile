@@ -11,8 +11,11 @@
         "APP_VARIANT": "development",
         "CYD_API_ENV": "dev",
         "IOS_DISTRIBUTION": "app_store",
+        "ANDROID_DISTRIBUTION": "play",
         "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual",
         "APP_STORE_MONTHLY_PRODUCT_ID": "premium_monthly",
+        "GOOGLE_PLAY_ANNUAL_PRODUCT_ID": "premium_annual",
+        "GOOGLE_PLAY_MONTHLY_PRODUCT_ID": "premium_monthly",
         "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     },
@@ -21,8 +24,23 @@
         "APP_VARIANT": "production",
         "CYD_API_ENV": "prod",
         "IOS_DISTRIBUTION": "app_store",
+        "ANDROID_DISTRIBUTION": "play",
         "APP_STORE_ANNUAL_PRODUCT_ID": "premium_annual",
         "APP_STORE_MONTHLY_PRODUCT_ID": "premium_monthly",
+        "GOOGLE_PLAY_ANNUAL_PRODUCT_ID": "premium_annual",
+        "GOOGLE_PLAY_MONTHLY_PRODUCT_ID": "premium_monthly",
+        "EXPO_PUBLIC_USE_RN_FETCH": "1"
+      }
+    },
+    "production-android-alt": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_VARIANT": "production",
+        "CYD_API_ENV": "prod",
+        "IOS_DISTRIBUTION": "app_store",
+        "ANDROID_DISTRIBUTION": "other",
         "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     }

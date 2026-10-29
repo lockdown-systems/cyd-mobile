@@ -9,10 +9,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const cydApiEnv = process.env.CYD_API_ENV ?? (isProduction ? "prod" : "dev");
   const iosDistribution = process.env.IOS_DISTRIBUTION ?? "app_store";
   const isAltBuild = iosDistribution === "alt";
+  // The Play Store build keeps the Play application ID and sells Premium
+  // through Google Play Billing; the non-Play build gets its own application
+  // ID and keeps the external checkout (#124).
+  const androidDistribution = process.env.ANDROID_DISTRIBUTION ?? "play";
+  const isAndroidAltBuild = androidDistribution === "other";
   const appStoreAnnualProductId =
     process.env.APP_STORE_ANNUAL_PRODUCT_ID ?? "premium_annual";
   const appStoreMonthlyProductId =
     process.env.APP_STORE_MONTHLY_PRODUCT_ID ?? "premium_monthly";
+  const googlePlayAnnualProductId =
+    process.env.GOOGLE_PLAY_ANNUAL_PRODUCT_ID ?? "premium_annual";
+  const googlePlayMonthlyProductId =
+    process.env.GOOGLE_PLAY_MONTHLY_PRODUCT_ID ?? "premium_monthly";
 
   return {
     ...config,
@@ -53,8 +62,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
-      package: "systems.lockdown.cydmobile",
-      googleServicesFile: "./google-services.json",
+      package: isAndroidAltBuild
+        ? "systems.lockdown.cydmobile.alt"
+        : "systems.lockdown.cydmobile",
+      // The alt build has its own application ID, so it needs its own Firebase
+      // app (and therefore its own google-services file) for push
+      // notifications. Create it in the Firebase console and commit the file
+      // as google-services-alt.json (#124).
+      googleServicesFile: isAndroidAltBuild
+        ? "./google-services-alt.json"
+        : "./google-services.json",
       intentFilters: [
         {
           action: "VIEW",
@@ -130,8 +147,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     extra: {
       cydApiEnv,
       iosDistribution,
+      androidDistribution,
       appStoreAnnualProductId,
       appStoreMonthlyProductId,
+      googlePlayAnnualProductId,
+      googlePlayMonthlyProductId,
       router: {},
       eas: {
         projectId: "192811c5-4578-4acb-b55d-4da9d2a5f44a",

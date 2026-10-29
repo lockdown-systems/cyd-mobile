@@ -22,10 +22,13 @@ import React, {
 import { Platform } from "react-native";
 
 import {
-  APP_STORE_SUBSCRIPTION_PLANS,
-  APP_STORE_SUBSCRIPTION_PRODUCT_IDS,
   CYD_API_ENV,
+  GOOGLE_PLAY_SUBSCRIPTIONS_URL,
+  GOOGLE_PLAY_SUBSCRIPTION_PRODUCT_IDS,
+  PREMIUM_SUBSCRIPTION_PLANS,
+  PREMIUM_SUBSCRIPTION_PRODUCT_IDS,
   PREMIUM_UPSELL_MODE,
+  STOREFRONT_NAME,
   type BillingPeriod,
   type PremiumUpsellMode,
 } from "@/constants/subscriptions";
@@ -48,6 +51,11 @@ const DEV_DASH_URL = "https://dev-dash.cyd.social";
 const API_URL = CYD_API_ENV === "dev" ? DEV_API_URL : PROD_API_URL;
 const DASH_URL = CYD_API_ENV === "dev" ? DEV_DASH_URL : PROD_DASH_URL;
 
+// Whether this build sells Premium through a store's own billing system (the
+// App Store or Google Play) rather than through the website.
+const IS_IN_APP_PURCHASE_MODE =
+  PREMIUM_UPSELL_MODE === "app_store_iap" || PREMIUM_UPSELL_MODE === "play_billing";
+
 export type CydAccountState = {
   isSignedIn: boolean;
   userEmail: string | null;
@@ -55,14 +63,17 @@ export type CydAccountState = {
   hasPremiumAccess: boolean | null;
 };
 
-export type AppStoreProductSummary = {
+export type StoreProductSummary = {
   productId: string;
   title: string;
   displayPrice: string;
+  // Google Play base-plan offer token, needed to start a Play purchase.
+  // Always null for App Store products.
+  offerToken: string | null;
 };
 
-export type AppStorePurchaseState = {
-  products: Record<BillingPeriod, AppStoreProductSummary | null>;
+export type StorePurchaseState = {
+  products: Record<BillingPeriod, StoreProductSummary | null>;
   isConnected: boolean;
   isLoadingProduct: boolean;
   isPurchasing: boolean;
@@ -85,7 +96,7 @@ export type CydAccountContextType = {
   state: CydAccountState;
   apiClient: CydAPIClient;
   premiumUpsellMode: PremiumUpsellMode;
-  appStorePurchaseState: AppStorePurchaseState;
+  storePurchaseState: StorePurchaseState;
   signIn: (
     email: string,
     verificationCode: string,
@@ -97,11 +108,12 @@ export type CydAccountContextType = {
   ) => Promise<{ success: boolean; error?: string }>;
   refreshState: () => Promise<void>;
   getDashboardURL: () => string;
+  getManageSubscriptionURL: () => string;
   checkPremiumAccess: () => Promise<PremiumAccessCheckResult>;
   purchasePremium: (
     billingPeriod: BillingPeriod,
   ) => Promise<PremiumActionResult>;
-  restoreAppStorePurchases: () => Promise<PremiumActionResult>;
+  restoreStorePurchases: () => Promise<PremiumActionResult>;
 };
 
 const CydAccountContext = createContext<CydAccountContextType | null>(null);
@@ -125,14 +137,14 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
     isLoading: true,
     hasPremiumAccess: null,
   });
-  const [appStorePurchaseState, setAppStorePurchaseState] =
-    useState<AppStorePurchaseState>({
+  const [storePurchaseState, setStorePurchaseState] =
+    useState<StorePurchaseState>({
       products: {
         annual: null,
         monthly: null,
       },
       isConnected: false,
-      isLoadingProduct: PREMIUM_UPSELL_MODE === "app_store_iap",
+      isLoadingProduct: IS_IN_APP_PURCHASE_MODE,
       isPurchasing: false,
       isRestoring: false,
       error: null,
@@ -409,13 +421,13 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
 
   const syncAppStorePurchase = useCallback(
     async (purchase: Purchase): Promise<boolean> => {
-      if (!APP_STORE_SUBSCRIPTION_PRODUCT_IDS.includes(purchase.productId)) {
+      if (!PREMIUM_SUBSCRIPTION_PRODUCT_IDS.includes(purchase.productId)) {
         return false;
       }
 
       const syncRequest = getAppStoreSyncRequest(purchase);
       if (!syncRequest) {
-        setAppStorePurchaseState((prev) => ({
+        setStorePurchaseState((prev) => ({
           ...prev,
           error: "Apple did not return a transaction identifier.",
         }));
@@ -425,7 +437,7 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       const syncResponse =
         await apiClient.syncAppStoreSubscription(syncRequest);
       if ("error" in syncResponse) {
-        setAppStorePurchaseState((prev) => ({
+        setStorePurchaseState((prev) => ({
           ...prev,
           error: syncResponse.message,
         }));
@@ -437,14 +449,64 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         ...prev,
         hasPremiumAccess: syncResponse.premium.premium_access,
       }));
-      setAppStorePurchaseState((prev) => ({ ...prev, error: null }));
+      setStorePurchaseState((prev) => ({ ...prev, error: null }));
       return true;
     },
     [apiClient],
   );
 
+  // A Play purchase is only acknowledged (finishTransaction) after cyd-server
+  // verifies the purchase token and grants Premium. Play auto-refunds
+  // purchases that are left unacknowledged for three days (#124).
+  const syncGooglePlayPurchase = useCallback(
+    async (purchase: Purchase): Promise<boolean> => {
+      if (!GOOGLE_PLAY_SUBSCRIPTION_PRODUCT_IDS.includes(purchase.productId)) {
+        return false;
+      }
+
+      const purchaseToken = purchase.purchaseToken;
+      if (!purchaseToken) {
+        setStorePurchaseState((prev) => ({
+          ...prev,
+          error: "Google Play did not return a purchase token.",
+        }));
+        return false;
+      }
+
+      const syncResponse = await apiClient.syncGooglePlaySubscription({
+        purchase_token: purchaseToken,
+      });
+      if ("error" in syncResponse) {
+        setStorePurchaseState((prev) => ({
+          ...prev,
+          error: syncResponse.message,
+        }));
+        return false;
+      }
+
+      await finishTransaction({ purchase, isConsumable: false });
+      setState((prev) => ({
+        ...prev,
+        hasPremiumAccess: syncResponse.premium.premium_access,
+      }));
+      setStorePurchaseState((prev) => ({ ...prev, error: null }));
+      return true;
+    },
+    [apiClient],
+  );
+
+  const syncStorePurchase = useCallback(
+    async (purchase: Purchase): Promise<boolean> => {
+      if (PREMIUM_UPSELL_MODE === "play_billing") {
+        return syncGooglePlayPurchase(purchase);
+      }
+      return syncAppStorePurchase(purchase);
+    },
+    [syncAppStorePurchase, syncGooglePlayPurchase],
+  );
+
   useEffect(() => {
-    if (PREMIUM_UPSELL_MODE !== "app_store_iap") {
+    if (!IS_IN_APP_PURCHASE_MODE) {
       return;
     }
 
@@ -452,14 +514,14 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
     const purchaseUpdateSubscription = purchaseUpdatedListener((purchase) => {
       void (async () => {
         try {
-          await syncAppStorePurchase(purchase);
+          await syncStorePurchase(purchase);
         } catch (error) {
-          setAppStorePurchaseState((prev) => ({
+          setStorePurchaseState((prev) => ({
             ...prev,
-            error: getAppStoreErrorMessage(error),
+            error: getStoreErrorMessage(error),
           }));
         } finally {
-          setAppStorePurchaseState((prev) => ({
+          setStorePurchaseState((prev) => ({
             ...prev,
             isPurchasing: false,
           }));
@@ -467,12 +529,12 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       })();
     });
     const purchaseErrorSubscription = purchaseErrorListener((error) => {
-      setAppStorePurchaseState((prev) => ({
+      setStorePurchaseState((prev) => ({
         ...prev,
         isPurchasing: false,
-        error: isUserCancelledAppStoreError(error)
+        error: isUserCancelledStoreError(error)
           ? null
-          : getAppStoreErrorMessage(error),
+          : getStoreErrorMessage(error),
       }));
     });
 
@@ -480,18 +542,18 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       try {
         await initConnection();
         const products = (await fetchProducts({
-          skus: APP_STORE_SUBSCRIPTION_PRODUCT_IDS,
+          skus: PREMIUM_SUBSCRIPTION_PRODUCT_IDS,
           type: "subs",
         })) as ProductSubscription[];
-        const productsByBillingPeriod = APP_STORE_SUBSCRIPTION_PLANS.reduce<
-          Record<BillingPeriod, AppStoreProductSummary | null>
+        const productsByBillingPeriod = PREMIUM_SUBSCRIPTION_PLANS.reduce<
+          Record<BillingPeriod, StoreProductSummary | null>
         >(
           (result, plan) => {
             const product = products.find(
               (candidate) => candidate.id === plan.productId,
             );
             result[plan.billingPeriod] = product
-              ? summarizeAppStoreProduct(product)
+              ? summarizeStoreProduct(product)
               : null;
             return result;
           },
@@ -503,24 +565,24 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         if (!isActive) {
           return;
         }
-        setAppStorePurchaseState((prev) => ({
+        setStorePurchaseState((prev) => ({
           ...prev,
           products: productsByBillingPeriod,
           isConnected: true,
           isLoadingProduct: false,
           error: hasAvailableProduct
             ? null
-            : "Premium is not available in the App Store yet.",
+            : storefrontNotAvailableMessage(),
         }));
       } catch (error) {
         if (!isActive) {
           return;
         }
-        setAppStorePurchaseState((prev) => ({
+        setStorePurchaseState((prev) => ({
           ...prev,
           isConnected: false,
           isLoadingProduct: false,
-          error: getAppStoreErrorMessage(error),
+          error: getStoreErrorMessage(error),
         }));
       }
     })();
@@ -531,15 +593,25 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       purchaseErrorSubscription.remove();
       void endConnection();
     };
-  }, [syncAppStorePurchase]);
+  }, [syncStorePurchase]);
 
   const getDashboardURL = useCallback(() => {
     return apiClient.getDashboardURL();
   }, [apiClient]);
 
+  // Where a signed-in person manages their Premium subscription. Play builds
+  // send them to Google Play's subscription center; every other build sends
+  // them to the website (#124).
+  const getManageSubscriptionURL = useCallback(() => {
+    if (PREMIUM_UPSELL_MODE === "play_billing") {
+      return GOOGLE_PLAY_SUBSCRIPTIONS_URL;
+    }
+    return apiClient.getDashboardURL();
+  }, [apiClient]);
+
   const purchasePremium = useCallback(
     async (billingPeriod: BillingPeriod): Promise<PremiumActionResult> => {
-      if (PREMIUM_UPSELL_MODE !== "app_store_iap") {
+      if (!IS_IN_APP_PURCHASE_MODE) {
         return {
           success: false,
           error: "Premium uses account management for this build.",
@@ -549,31 +621,77 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         return { success: false, error: "Please sign in before subscribing." };
       }
 
-      const plan = APP_STORE_SUBSCRIPTION_PLANS.find(
+      const plan = PREMIUM_SUBSCRIPTION_PLANS.find(
         (candidate) => candidate.billingPeriod === billingPeriod,
       );
-      if (!plan || !appStorePurchaseState.products[billingPeriod]) {
+      const selectedProduct = plan
+        ? storePurchaseState.products[billingPeriod]
+        : null;
+      if (!plan || !selectedProduct) {
         return {
           success: false,
-          error: "That Premium plan is not available in the App Store yet.",
+          error: planNotAvailableMessage(),
         };
       }
 
-      setAppStorePurchaseState((prev) => ({
+      setStorePurchaseState((prev) => ({
         ...prev,
         isPurchasing: true,
         error: null,
       }));
 
       try {
-        if (!appStorePurchaseState.isConnected) {
+        if (!storePurchaseState.isConnected) {
           await initConnection();
-          setAppStorePurchaseState((prev) => ({ ...prev, isConnected: true }));
+          setStorePurchaseState((prev) => ({ ...prev, isConnected: true }));
+        }
+
+        if (PREMIUM_UPSELL_MODE === "play_billing") {
+          const subscriptionMetadata =
+            await apiClient.getGooglePlaySubscription();
+          if ("error" in subscriptionMetadata) {
+            setStorePurchaseState((prev) => ({
+              ...prev,
+              isPurchasing: false,
+              error: subscriptionMetadata.message,
+            }));
+            return {
+              success: false,
+              error: subscriptionMetadata.message,
+            };
+          }
+
+          // Play purchases must name the account (via the server-issued
+          // obfuscated ID) and the base plan's offer token, so cyd-server can
+          // link the purchase to this Cyd account (#124).
+          if (!selectedProduct.offerToken) {
+            const message = planNotAvailableMessage();
+            setStorePurchaseState((prev) => ({
+              ...prev,
+              isPurchasing: false,
+              error: message,
+            }));
+            return { success: false, error: message };
+          }
+
+          await requestPurchase({
+            request: {
+              google: {
+                skus: [plan.productId],
+                obfuscatedAccountId: subscriptionMetadata.obfuscated_account_id,
+                subscriptionOffers: [
+                  { sku: plan.productId, offerToken: selectedProduct.offerToken },
+                ],
+              },
+            },
+            type: "subs",
+          });
+          return { success: true };
         }
 
         const subscriptionMetadata = await apiClient.getAppStoreSubscription();
         if ("error" in subscriptionMetadata) {
-          setAppStorePurchaseState((prev) => ({
+          setStorePurchaseState((prev) => ({
             ...prev,
             isPurchasing: false,
             error: subscriptionMetadata.message,
@@ -592,8 +710,8 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         });
         return { success: true };
       } catch (error) {
-        const message = getAppStoreErrorMessage(error);
-        setAppStorePurchaseState((prev) => ({
+        const message = getStoreErrorMessage(error);
+        setStorePurchaseState((prev) => ({
           ...prev,
           isPurchasing: false,
           error: message,
@@ -601,15 +719,15 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         return { success: false, error: message };
       }
     },
-    [apiClient, appStorePurchaseState, state.isSignedIn],
+    [apiClient, storePurchaseState, state.isSignedIn],
   );
 
-  const restoreAppStorePurchases =
+  const restoreStorePurchases =
     useCallback(async (): Promise<PremiumActionResult> => {
-      if (PREMIUM_UPSELL_MODE !== "app_store_iap") {
+      if (!IS_IN_APP_PURCHASE_MODE) {
         return {
           success: false,
-          error: "Restore purchases is only available in the App Store build.",
+          error: "Restore purchases is only available in App Store and Google Play builds.",
         };
       }
       if (!state.isSignedIn) {
@@ -619,56 +737,67 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
         };
       }
 
-      setAppStorePurchaseState((prev) => ({
+      setStorePurchaseState((prev) => ({
         ...prev,
         isRestoring: true,
         error: null,
       }));
 
       try {
-        if (!appStorePurchaseState.isConnected) {
+        if (!storePurchaseState.isConnected) {
           await initConnection();
-          setAppStorePurchaseState((prev) => ({ ...prev, isConnected: true }));
+          setStorePurchaseState((prev) => ({ ...prev, isConnected: true }));
         }
 
-        await restorePurchases();
-        const purchases = await getAvailablePurchases({
-          onlyIncludeActiveItemsIOS: true,
-        });
+        let purchases;
+        if (PREMIUM_UPSELL_MODE === "play_billing") {
+          // Android returns the store's purchases directly; there is no
+          // separate restore call like iOS's.
+          purchases = await getAvailablePurchases({});
+        } else {
+          await restorePurchases();
+          purchases = await getAvailablePurchases({
+            onlyIncludeActiveItemsIOS: true,
+          });
+        }
         const premiumPurchases = purchases.filter(
           (purchase) =>
-            APP_STORE_SUBSCRIPTION_PRODUCT_IDS.includes(purchase.productId),
+            PREMIUM_SUBSCRIPTION_PRODUCT_IDS.includes(purchase.productId),
         );
 
         if (premiumPurchases.length === 0) {
           const message =
-            "No active Premium purchase was found for this Apple ID.";
-          setAppStorePurchaseState((prev) => ({ ...prev, error: message }));
+            PREMIUM_UPSELL_MODE === "play_billing"
+              ? "No active Premium purchase was found for this Google Account."
+              : "No active Premium purchase was found for this Apple ID.";
+          setStorePurchaseState((prev) => ({ ...prev, error: message }));
           return { success: false, error: message };
         }
 
         for (const purchase of premiumPurchases) {
-          const didSync = await syncAppStorePurchase(purchase);
+          const didSync = await syncStorePurchase(purchase);
           if (didSync) {
             return { success: true };
           }
         }
 
         const message =
-          "Could not restore Premium from the purchases Apple returned.";
-        setAppStorePurchaseState((prev) => ({ ...prev, error: message }));
+          PREMIUM_UPSELL_MODE === "play_billing"
+            ? "Could not restore Premium from the purchases Google returned."
+            : "Could not restore Premium from the purchases Apple returned.";
+        setStorePurchaseState((prev) => ({ ...prev, error: message }));
         return { success: false, error: message };
       } catch (error) {
-        const message = getAppStoreErrorMessage(error);
-        setAppStorePurchaseState((prev) => ({ ...prev, error: message }));
+        const message = getStoreErrorMessage(error);
+        setStorePurchaseState((prev) => ({ ...prev, error: message }));
         return { success: false, error: message };
       } finally {
-        setAppStorePurchaseState((prev) => ({ ...prev, isRestoring: false }));
+        setStorePurchaseState((prev) => ({ ...prev, isRestoring: false }));
       }
     }, [
-      appStorePurchaseState.isConnected,
+      storePurchaseState.isConnected,
       state.isSignedIn,
-      syncAppStorePurchase,
+      syncStorePurchase,
     ]);
 
   const contextValue = useMemo(
@@ -676,28 +805,30 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
       state,
       apiClient,
       premiumUpsellMode: PREMIUM_UPSELL_MODE,
-      appStorePurchaseState,
+      storePurchaseState,
       signIn,
       signOut,
       sendVerificationCode,
       refreshState,
       getDashboardURL,
+      getManageSubscriptionURL,
       checkPremiumAccess,
       purchasePremium,
-      restoreAppStorePurchases,
+      restoreStorePurchases,
     }),
     [
       state,
       apiClient,
-      appStorePurchaseState,
+      storePurchaseState,
       signIn,
       signOut,
       sendVerificationCode,
       refreshState,
       getDashboardURL,
+      getManageSubscriptionURL,
       checkPremiumAccess,
       purchasePremium,
-      restoreAppStorePurchases,
+      restoreStorePurchases,
     ],
   );
 
@@ -708,14 +839,43 @@ export function CydAccountProvider({ children }: CydAccountProviderProps) {
   );
 }
 
-function summarizeAppStoreProduct(
+function summarizeStoreProduct(
   product: ProductSubscription,
-): AppStoreProductSummary {
+): StoreProductSummary {
   return {
     productId: product.id,
     title: product.title,
     displayPrice: product.displayPrice,
+    offerToken: getGooglePlayOfferToken(product),
   };
+}
+
+// The offer token of the base plan a Play purchase should buy. The paywall
+// shows the base plan's price, so that is what should be purchased: prefer
+// the plain base-plan offer (no offerId) over promotional offers such as
+// trials and intro pricing, and fall back to the first offer.
+function getGooglePlayOfferToken(product: ProductSubscription): string | null {
+  if (!("subscriptionOfferDetailsAndroid" in product)) {
+    return null;
+  }
+  const offers = product.subscriptionOfferDetailsAndroid;
+  if (!offers || offers.length === 0) {
+    return null;
+  }
+  const basePlanOffer = offers.find((offer) => !offer.offerId);
+  return (basePlanOffer ?? offers[0]).offerToken;
+}
+
+function storefrontNotAvailableMessage(): string {
+  return PREMIUM_UPSELL_MODE === "play_billing"
+    ? "Premium is not available on Google Play yet."
+    : "Premium is not available in the App Store yet.";
+}
+
+function planNotAvailableMessage(): string {
+  return PREMIUM_UPSELL_MODE === "play_billing"
+    ? "That Premium plan is not available on Google Play yet."
+    : "That Premium plan is not available in the App Store yet.";
 }
 
 function getAppStoreSyncRequest(
@@ -738,7 +898,7 @@ function getAppStoreSyncRequest(
   return null;
 }
 
-function isUserCancelledAppStoreError(error: unknown): boolean {
+function isUserCancelledStoreError(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
   }
@@ -747,12 +907,12 @@ function isUserCancelledAppStoreError(error: unknown): boolean {
   return code.includes("cancel") || message.includes("cancel");
 }
 
-function getAppStoreErrorMessage(error: unknown): string {
+function getStoreErrorMessage(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {
     return String(error.message);
   }
   if (typeof error === "string") {
     return error;
   }
-  return "Could not complete the App Store purchase. Please try again.";
+  return `Could not complete the ${STOREFRONT_NAME} purchase. Please try again.`;
 }

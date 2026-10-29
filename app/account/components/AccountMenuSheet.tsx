@@ -61,7 +61,7 @@ export function AccountMenuSheet({
   const {
     state: cydState,
     signOut: cydSignOut,
-    getDashboardURL,
+    getManageSubscriptionURL,
   } = useCydAccount();
   const items = useMemo<SettingsItem[]>(
     () => [
@@ -235,9 +235,9 @@ export function AccountMenuSheet({
       }
 
       if (item.key === "manage-cyd") {
-        const dashboardURL = getDashboardURL();
-        void Linking.openURL(dashboardURL).catch((err) =>
-          console.warn("Unable to open dashboard URL:", err),
+        const manageURL = getManageSubscriptionURL();
+        void Linking.openURL(manageURL).catch((err) =>
+          console.warn("Unable to open subscription management URL:", err),
         );
         onClose();
         setPendingAction(null);
@@ -269,7 +269,7 @@ export function AccountMenuSheet({
       onSignOut,
       pendingAction,
       cydSignOut,
-      getDashboardURL,
+      getManageSubscriptionURL,
     ],
   );
 

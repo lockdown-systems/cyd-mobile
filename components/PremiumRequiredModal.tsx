@@ -33,11 +33,11 @@ export function PremiumRequiredModal({
   const {
     state: cydState,
     premiumUpsellMode,
-    appStorePurchaseState,
-    getDashboardURL,
+    storePurchaseState,
+    getManageSubscriptionURL,
     checkPremiumAccess,
     purchasePremium,
-    restoreAppStorePurchases,
+    restoreStorePurchases,
   } = useCydAccount();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(false);
@@ -64,11 +64,11 @@ export function PremiumRequiredModal({
   }, [visible, cydState.hasPremiumAccess, onPremiumConfirmed]);
 
   const handleManageAccount = useCallback(() => {
-    const url = getDashboardURL();
+    const url = getManageSubscriptionURL();
     void Linking.openURL(url).catch(() => {
       Alert.alert("Error", "Could not open browser.");
     });
-  }, [getDashboardURL]);
+  }, [getManageSubscriptionURL]);
 
   const handleIveUpgraded = useCallback(() => {
     setCheckingPremium(true);
@@ -94,7 +94,7 @@ export function PremiumRequiredModal({
     })();
   }, [checkPremiumAccess]);
 
-  const handleSubscribeWithApple = useCallback(() => {
+  const handleSubscribe = useCallback(() => {
     void (async () => {
       const result = await purchasePremium(selectedBillingPeriod);
       if (!result.success && result.error) {
@@ -105,12 +105,12 @@ export function PremiumRequiredModal({
 
   const handleRestorePurchases = useCallback(() => {
     void (async () => {
-      const result = await restoreAppStorePurchases();
+      const result = await restoreStorePurchases();
       if (!result.success && result.error) {
         Alert.alert("Restore Failed", result.error);
       }
     })();
-  }, [restoreAppStorePurchases]);
+  }, [restoreStorePurchases]);
 
   // Show alert when premium status changes after clicking "I've Upgraded"
   useEffect(() => {
@@ -187,15 +187,17 @@ export function PremiumRequiredModal({
     }
 
     // User is signed in but doesn't have premium
-    const usesAppStoreIAP = premiumUpsellMode === "app_store_iap";
+    const usesInAppPurchase =
+      premiumUpsellMode === "app_store_iap" ||
+      premiumUpsellMode === "play_billing";
     const selectedProduct =
-      appStorePurchaseState?.products?.[selectedBillingPeriod] ?? null;
-    const appStoreBusy = Boolean(
-      appStorePurchaseState?.isPurchasing || appStorePurchaseState?.isRestoring,
+      storePurchaseState?.products?.[selectedBillingPeriod] ?? null;
+    const storeBusy = Boolean(
+      storePurchaseState?.isPurchasing || storePurchaseState?.isRestoring,
     );
-    const appStorePrimaryLabel = appStorePurchaseState?.isPurchasing
+    const storePrimaryLabel = storePurchaseState?.isPurchasing
       ? "Purchasing…"
-      : appStorePurchaseState?.isLoadingProduct
+      : storePurchaseState?.isLoadingProduct
         ? "Loading Subscription…"
         : selectedBillingPeriod === "annual"
           ? "Subscribe Annually"
@@ -204,25 +206,25 @@ export function PremiumRequiredModal({
     return (
       <View style={styles.contentContainer}>
         <Text style={[styles.messageText, { color: palette.text }]}>
-          {usesAppStoreIAP
+          {usesInAppPurchase
             ? "Selected features require a Premium account."
             : "Selected features require a Premium account. Manage your account to upgrade to Premium."}
         </Text>
         <View style={styles.buttonColumn}>
-          {usesAppStoreIAP ? (
+          {usesInAppPurchase ? (
             <>
               <PremiumPlanSelector
                 palette={palette}
-                products={appStorePurchaseState.products}
+                products={storePurchaseState.products}
                 selectedBillingPeriod={selectedBillingPeriod}
                 onSelect={setSelectedBillingPeriod}
-                disabled={appStoreBusy || appStorePurchaseState.isLoadingProduct}
+                disabled={storeBusy || storePurchaseState.isLoadingProduct}
               />
               <Pressable
-                onPress={handleSubscribeWithApple}
+                onPress={handleSubscribe}
                 disabled={
-                  appStoreBusy ||
-                  appStorePurchaseState.isLoadingProduct ||
+                  storeBusy ||
+                  storePurchaseState.isLoadingProduct ||
                   !selectedProduct
                 }
                 style={({ pressed }) => [
@@ -231,12 +233,12 @@ export function PremiumRequiredModal({
                     backgroundColor: palette.button?.background ?? palette.tint,
                     opacity:
                       pressed &&
-                      !appStoreBusy &&
-                      !appStorePurchaseState.isLoadingProduct &&
+                      !storeBusy &&
+                      !storePurchaseState.isLoadingProduct &&
                       selectedProduct
                         ? 0.85
-                        : appStoreBusy ||
-                            appStorePurchaseState.isLoadingProduct ||
+                        : storeBusy ||
+                            storePurchaseState.isLoadingProduct ||
                             !selectedProduct
                           ? 0.6
                           : 1,
@@ -250,19 +252,19 @@ export function PremiumRequiredModal({
                     { color: palette.button?.text ?? "#ffffff" },
                   ]}
                 >
-                  {appStorePrimaryLabel}
+                  {storePrimaryLabel}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={handleRestorePurchases}
-                disabled={appStoreBusy}
+                disabled={storeBusy}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   {
                     borderColor: palette.icon + "33",
                     backgroundColor: palette.card,
                     opacity:
-                      pressed && !appStoreBusy ? 0.85 : appStoreBusy ? 0.6 : 1,
+                      pressed && !storeBusy ? 0.85 : storeBusy ? 0.6 : 1,
                   },
                 ]}
                 accessibilityRole="button"
@@ -270,7 +272,7 @@ export function PremiumRequiredModal({
                 <Text
                   style={[styles.secondaryButtonText, { color: palette.text }]}
                 >
-                  {appStorePurchaseState?.isRestoring
+                  {storePurchaseState?.isRestoring
                     ? "Restoring…"
                     : "Restore Purchases"}
                 </Text>

@@ -589,6 +589,221 @@ describe("CydAPIClient", () => {
       });
     });
 
+    describe("getGooglePlaySubscription", () => {
+      it("should return Google Play subscription metadata on success", async () => {
+        const googlePlayResponse = {
+          obfuscated_account_id: "obfuscated-account-id",
+          subscription: {
+            purchase_token: "purchase-token",
+            product_id: "premium_monthly",
+            environment: "production",
+            subscription_state: "SUBSCRIPTION_STATE_ACTIVE",
+            status: "active",
+            entitlement_expires_at: "2026-06-01T00:00:00",
+            will_auto_renew: true,
+            acknowledged: true,
+          },
+          premium: {
+            premium_price_annual_cents: 3599,
+            premium_price_monthly_cents: 499,
+            premium_business_price_cents: 4900,
+            premium_access: true,
+            has_individual_subscription: true,
+            individual_subscription_provider: "play_store",
+            individual_subscription_status: "active",
+            individual_subscription_manage_mode: "google_play_settings",
+            current_billing_period: "monthly",
+            subscription_cancel_at_period_end: false,
+            subscription_current_period_end: "2026-06-01",
+            has_business_subscription: false,
+            business_organizations: [],
+            partner: false,
+            stored_credit_cents: 0,
+          },
+        };
+
+        mockFetch.mockImplementation(async (url: string) => {
+          if (url.includes("/token")) {
+            return {
+              status: 200,
+              json: async () => ({
+                api_token: "api-token-xyz",
+                device_uuid: "device-uuid-123",
+                email: "test@example.com",
+              }),
+            };
+          }
+          if (url.includes("/user/google-play/subscription")) {
+            return {
+              status: 200,
+              json: async () => googlePlayResponse,
+            };
+          }
+          return { status: 200, json: async () => ({}) };
+        });
+
+        const result = await client.getGooglePlaySubscription();
+
+        expect(result).toEqual(googlePlayResponse);
+      });
+
+      it("should return error on failure", async () => {
+        mockFetch.mockImplementation(async (url: string) => {
+          if (url.includes("/token")) {
+            return {
+              status: 200,
+              json: async () => ({
+                api_token: "api-token-xyz",
+                device_uuid: "device-uuid-123",
+                email: "test@example.com",
+              }),
+            };
+          }
+          if (url.includes("/user/google-play/subscription")) {
+            return { status: 500 };
+          }
+          return { status: 200, json: async () => ({}) };
+        });
+
+        const result = await client.getGooglePlaySubscription();
+
+        expect(result).toEqual({
+          error: true,
+          message: "Failed to get Google Play subscription metadata.",
+          status: 500,
+        });
+      });
+    });
+
+    describe("syncGooglePlaySubscription", () => {
+      it("should post the purchase token to the Google Play sync endpoint", async () => {
+        const syncResponse = {
+          subscription: {
+            purchase_token: "purchase-token",
+            product_id: "premium_monthly",
+            environment: "production",
+            subscription_state: "SUBSCRIPTION_STATE_ACTIVE",
+            status: "active",
+            entitlement_expires_at: "2026-06-01T00:00:00",
+            will_auto_renew: true,
+            acknowledged: true,
+          },
+          premium: {
+            premium_price_annual_cents: 3599,
+            premium_price_monthly_cents: 499,
+            premium_business_price_cents: 4900,
+            premium_access: true,
+            has_individual_subscription: true,
+            individual_subscription_provider: "play_store",
+            individual_subscription_status: "active",
+            individual_subscription_manage_mode: "google_play_settings",
+            current_billing_period: "monthly",
+            subscription_cancel_at_period_end: false,
+            subscription_current_period_end: "2026-06-01",
+            has_business_subscription: false,
+            business_organizations: [],
+            partner: false,
+            stored_credit_cents: 0,
+          },
+        };
+
+        mockFetch.mockImplementation(
+          async (url: string, options?: RequestInit) => {
+            if (url.includes("/token")) {
+              return {
+                status: 200,
+                json: async () => ({
+                  api_token: "api-token-xyz",
+                  device_uuid: "device-uuid-123",
+                  email: "test@example.com",
+                }),
+              };
+            }
+            if (url.includes("/user/google-play/subscription")) {
+              expect(options?.method).toBe("POST");
+              expect(options?.body).toBe(
+                JSON.stringify({ purchase_token: "purchase-token" }),
+              );
+              return {
+                status: 200,
+                json: async () => syncResponse,
+              };
+            }
+            return { status: 200, json: async () => ({}) };
+          },
+        );
+
+        const result = await client.syncGooglePlaySubscription({
+          purchase_token: "purchase-token",
+        });
+
+        expect(result).toEqual(syncResponse);
+      });
+
+      it("should return error when the sync fails", async () => {
+        mockFetch.mockImplementation(async (url: string) => {
+          if (url.includes("/token")) {
+            return {
+              status: 200,
+              json: async () => ({
+                api_token: "api-token-xyz",
+                device_uuid: "device-uuid-123",
+                email: "test@example.com",
+              }),
+            };
+          }
+          if (url.includes("/user/google-play/subscription")) {
+            return { status: 409 };
+          }
+          return { status: 200, json: async () => ({}) };
+        });
+
+        const result = await client.syncGooglePlaySubscription({
+          purchase_token: "purchase-token",
+        });
+
+        expect(result).toEqual({
+          error: true,
+          message: "Failed to sync Google Play subscription.",
+          status: 409,
+        });
+      });
+
+      it("should surface the server's reason when the sync is rejected", async () => {
+        mockFetch.mockImplementation(async (url: string) => {
+          if (url.includes("/token")) {
+            return {
+              status: 200,
+              json: async () => ({
+                api_token: "api-token-xyz",
+                device_uuid: "device-uuid-123",
+                email: "test@example.com",
+              }),
+            };
+          }
+          if (url.includes("/user/google-play/subscription")) {
+            return {
+              status: 409,
+              json: async () => ({
+                message: "This subscription belongs to another Cyd account.",
+              }),
+            };
+          }
+          return { status: 200, json: async () => ({}) };
+        });
+
+        const result = await client.syncGooglePlaySubscription({
+          purchase_token: "purchase-token",
+        });
+
+        expect(result).toEqual({
+          error: true,
+          message: "This subscription belongs to another Cyd account.",
+          status: 409,
+        });
+      });
+    });
+
     describe("deleteDevice", () => {
       it("should delete device successfully", async () => {
         mockFetch.mockImplementation(async (url: string) => {
